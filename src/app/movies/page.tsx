@@ -540,6 +540,9 @@ function MoviesContent() {
                           const num = fieldId.replace('custom_field_', '');
                           const customName = (settings as any)?.[`custom_field_${num}_name`];
                           if (!customName || !customName.trim()) return null;
+                          const displayInList = (settings as any)?.[`custom_field_${num}_display_in_list`];
+                          if (displayInList === false) return null;
+
                           const customVal = (movie as any)[fieldId];
 
                           return (

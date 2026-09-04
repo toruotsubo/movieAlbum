@@ -4,6 +4,9 @@ export interface AppSettings {
   custom_field_1_name: string | null;
   custom_field_2_name: string | null;
   custom_field_3_name: string | null;
+  custom_field_1_display_in_list?: boolean;
+  custom_field_2_display_in_list?: boolean;
+  custom_field_3_display_in_list?: boolean;
   key_fields: string[]; // JSON array stored in DB
   field_order?: string[]; // Order of metadata fields
   language?: 'auto' | 'ja' | 'en' | null; // Language setting

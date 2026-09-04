@@ -60,6 +60,7 @@ export const TRANSLATIONS = {
     settings_custom_item2_placeholder: '例: シリーズ',
     settings_custom_item3: '項目 3',
     settings_custom_item3_placeholder: '例: 受賞',
+    settings_custom_display_in_list: '動画一覧画面に表示する',
 
     // Key Item List Page (Main Index)
     key_list_title: '{key}一覧',
@@ -201,6 +202,7 @@ export const TRANSLATIONS = {
     settings_custom_item2_placeholder: 'e.g., Series',
     settings_custom_item3: 'Item 3',
     settings_custom_item3_placeholder: 'e.g., Award',
+    settings_custom_display_in_list: 'Show in video list',
 
     // Key Item List Page (Main Index)
     key_list_title: '{key} List',

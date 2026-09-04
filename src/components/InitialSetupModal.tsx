@@ -16,6 +16,9 @@ interface InitialSetupModalProps {
     custom_field_1_name: string | null;
     custom_field_2_name: string | null;
     custom_field_3_name: string | null;
+    custom_field_1_display_in_list?: boolean;
+    custom_field_2_display_in_list?: boolean;
+    custom_field_3_display_in_list?: boolean;
     key_fields: string[];
     field_order?: string[];
     language?: LanguageSetting;
@@ -35,6 +38,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
   const [custom3, setCustom3] = useState('');
+  const [custom1DisplayInList, setCustom1DisplayInList] = useState(true);
+  const [custom2DisplayInList, setCustom2DisplayInList] = useState(true);
+  const [custom3DisplayInList, setCustom3DisplayInList] = useState(true);
   const [selectedKeyField, setSelectedKeyField] = useState<string>('genre');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageSetting>('auto');
 
@@ -68,6 +74,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
       setCustom3(currentSettings.custom_field_3_name || '');
+      setCustom1DisplayInList(currentSettings.custom_field_1_display_in_list !== false);
+      setCustom2DisplayInList(currentSettings.custom_field_2_display_in_list !== false);
+      setCustom3DisplayInList(currentSettings.custom_field_3_display_in_list !== false);
       setSelectedLanguage(currentSettings.language || 'auto');
 
       if (currentSettings.key_fields && currentSettings.key_fields.length > 0) {
@@ -151,6 +160,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       custom_field_1_name: custom1.trim() || null,
       custom_field_2_name: custom2.trim() || null,
       custom_field_3_name: custom3.trim() || null,
+      custom_field_1_display_in_list: custom1DisplayInList,
+      custom_field_2_display_in_list: custom2DisplayInList,
+      custom_field_3_display_in_list: custom3DisplayInList,
       key_fields: [selectedKeyField], // Always single selection
       field_order: fullFieldOrder,
       language: selectedLanguage,
@@ -169,6 +181,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setCustom1('');
     setCustom2('');
     setCustom3('');
+    setCustom1DisplayInList(true);
+    setCustom2DisplayInList(true);
+    setCustom3DisplayInList(true);
     setSelectedKeyField('genre');
     setSelectedLanguage('auto');
     setReorderableFieldIds(DEFAULT_FIELD_ORDER.filter((id) => id !== 'title' && id !== 'rating'));
@@ -193,7 +208,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             {t('settings_section1')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
+            <div className="space-y-2">
               <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item1')}</label>
               <input
                 type="text"
@@ -202,8 +217,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 placeholder={t('settings_custom_item1_placeholder')}
                 className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-0.5 select-none">
+                <input
+                  type="checkbox"
+                  checked={custom1DisplayInList}
+                  onChange={(e) => setCustom1DisplayInList(e.target.checked)}
+                  className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-4 h-4 cursor-pointer"
+                />
+                <span>{t('settings_custom_display_in_list')}</span>
+              </label>
             </div>
-            <div>
+            <div className="space-y-2">
               <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item2')}</label>
               <input
                 type="text"
@@ -212,8 +236,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 placeholder={t('settings_custom_item2_placeholder')}
                 className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-0.5 select-none">
+                <input
+                  type="checkbox"
+                  checked={custom2DisplayInList}
+                  onChange={(e) => setCustom2DisplayInList(e.target.checked)}
+                  className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-4 h-4 cursor-pointer"
+                />
+                <span>{t('settings_custom_display_in_list')}</span>
+              </label>
             </div>
-            <div>
+            <div className="space-y-2">
               <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item3')}</label>
               <input
                 type="text"
@@ -222,6 +255,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 placeholder={t('settings_custom_item3_placeholder')}
                 className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-0.5 select-none">
+                <input
+                  type="checkbox"
+                  checked={custom3DisplayInList}
+                  onChange={(e) => setCustom3DisplayInList(e.target.checked)}
+                  className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-4 h-4 cursor-pointer"
+                />
+                <span>{t('settings_custom_display_in_list')}</span>
+              </label>
             </div>
           </div>
         </div>

@@ -111,6 +111,9 @@ function initDatabase() {
         custom_field_1_name: null,
         custom_field_2_name: null,
         custom_field_3_name: null,
+        custom_field_1_display_in_list: true,
+        custom_field_2_display_in_list: true,
+        custom_field_3_display_in_list: true,
         key_fields: ["genre", "cast"],
         field_order: DEFAULT_FIELD_ORDER,
         language: "auto"
@@ -138,6 +141,9 @@ function saveAppSettings(input) {
     ...jsonDb.settings,
     ...input,
     is_initialized: input.is_initialized !== void 0 ? input.is_initialized : jsonDb.settings.is_initialized,
+    custom_field_1_display_in_list: input.custom_field_1_display_in_list !== void 0 ? input.custom_field_1_display_in_list : jsonDb.settings.custom_field_1_display_in_list !== false,
+    custom_field_2_display_in_list: input.custom_field_2_display_in_list !== void 0 ? input.custom_field_2_display_in_list : jsonDb.settings.custom_field_2_display_in_list !== false,
+    custom_field_3_display_in_list: input.custom_field_3_display_in_list !== void 0 ? input.custom_field_3_display_in_list : jsonDb.settings.custom_field_3_display_in_list !== false,
     key_fields: input.key_fields || jsonDb.settings.key_fields,
     field_order: input.field_order || jsonDb.settings.field_order || DEFAULT_FIELD_ORDER,
     language: input.language !== void 0 ? input.language : jsonDb.settings.language || "auto"
@@ -371,6 +377,9 @@ function resetAllData() {
       custom_field_1_name: null,
       custom_field_2_name: null,
       custom_field_3_name: null,
+      custom_field_1_display_in_list: true,
+      custom_field_2_display_in_list: true,
+      custom_field_3_display_in_list: true,
       key_fields: ["genre"],
       field_order: DEFAULT_FIELD_ORDER,
       language: "auto"
