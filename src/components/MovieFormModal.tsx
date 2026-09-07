@@ -75,6 +75,11 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
   const [isAutoGeneratingSummary, setIsAutoGeneratingSummary] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [errorModalState, setErrorModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+  } | null>(null);
 
   const generateDefaultSummaryImage = (filePath: string, presetDuration?: number | null) => {
     return new Promise<{ imagePath: string | null; targetTime: number }>(async (resolve) => {
@@ -148,7 +153,16 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
               const dataUrl = canvas.toDataURL('image/png');
               let savedPath = dataUrl;
               if (window.api?.saveSummaryImage) {
-                savedPath = await window.api.saveSummaryImage(dataUrl);
+                try {
+                  savedPath = await window.api.saveSummaryImage(dataUrl);
+                } catch (err) {
+                  console.error('Failed to save summary image:', err);
+                  setErrorModalState({
+                    isOpen: true,
+                    title: t('error_title'),
+                    description: t('error_save_summary_failed'),
+                  });
+                }
               }
               cleanup();
               resolve({ imagePath: savedPath, targetTime });
@@ -294,7 +308,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
         setIsPlaying(true);
       } catch (err: any) {
         console.error('Failed to play video:', err);
-        setVideoError('動画の再生に失敗しました。ファイル形式または参照パスをご確認ください。');
+        setVideoError(t('error_video_play_failed'));
         setIsPlaying(false);
       }
     }
@@ -343,9 +357,19 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
       const dataUrl = canvas.toDataURL('image/png');
 
       if (window.api?.saveSummaryImage) {
-        const savedPath = await window.api.saveSummaryImage(dataUrl);
-        setSummaryImagePath(savedPath);
-        return savedPath;
+        try {
+          const savedPath = await window.api.saveSummaryImage(dataUrl);
+          setSummaryImagePath(savedPath);
+          return savedPath;
+        } catch (err) {
+          console.error('Failed to save summary image:', err);
+          setErrorModalState({
+            isOpen: true,
+            title: t('error_title'),
+            description: t('error_save_summary_failed'),
+          });
+          return null;
+        }
       }
       setSummaryImagePath(dataUrl);
       return dataUrl;
@@ -373,7 +397,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
 
     onSave({
       ...movie,
-      title: title.trim() || movie.file_name || '無題',
+      title: title.trim() || movie.file_name || t('untitled'),
       genre: genre.trim() || null,
       cast: cast.trim() || null,
       cast_kana: castKana.trim() || null,
@@ -456,10 +480,22 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
                 <button
                   type="button"
                   disabled={isUnsupportedPlaybackFormat}
-                  onClick={() => {
-                    if (!isUnsupportedPlaybackFormat) {
-                      setIsPlayingVideo(true);
+                  onClick={async () => {
+                    if (isUnsupportedPlaybackFormat) return;
+
+                    if (movie.file_path && window.api?.checkFileExists) {
+                      const exists = await window.api.checkFileExists(movie.file_path);
+                      if (!exists) {
+                        setErrorModalState({
+                          isOpen: true,
+                          title: t('error_title'),
+                          description: t('error_file_not_found'),
+                        });
+                        return;
+                      }
                     }
+
+                    setIsPlayingVideo(true);
                   }}
                   className={clsx(
                     "w-full h-full relative flex items-center justify-center group focus:outline-none",
@@ -521,12 +557,30 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
                           <button
                             type="button"
                             onClick={async () => {
+                              if (movie.file_path && window.api?.checkFileExists) {
+                                const exists = await window.api.checkFileExists(movie.file_path);
+                                if (!exists) {
+                                  setErrorModalState({
+                                    isOpen: true,
+                                    title: t('error_title'),
+                                    description: t('error_file_not_found'),
+                                  });
+                                  return;
+                                }
+                              }
+
                               setIsAutoGeneratingSummary(true);
                               const res = await window.api.generateThumbnail(movie.file_path!);
                               if (res) {
                                 setSummaryImagePath(res.imagePath);
                                 setCapturedTime(res.targetTime);
                                 if (res.duration && !duration) setDuration(res.duration);
+                              } else {
+                                setErrorModalState({
+                                  isOpen: true,
+                                  title: t('error_title'),
+                                  description: t('error_file_not_found'),
+                                });
                               }
                               setIsAutoGeneratingSummary(false);
                             }}
@@ -595,7 +649,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
                             }).catch(() => {});
                           }
                         } else {
-                          setVideoError(`動画ソースのロードに失敗しました (${errorDetails})。参照パス: ${movie.file_path}`);
+                          setVideoError(t('error_video_load_failed', { error: errorDetails, path: movie.file_path || '' }));
                         }
                       }}
                       onEnded={() => setIsPlaying(false)}
@@ -632,7 +686,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
                         type="button"
                         onClick={togglePlay}
                         className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors"
-                        title={isPlaying ? '一時停止' : '再生'}
+                        title={isPlaying ? t('pause') : t('play')}
                       >
                         {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
                       </button>
@@ -915,6 +969,19 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
         onConfirm={executeDelete}
         onClose={() => setShowDeleteConfirm(false)}
       />
+
+      {errorModalState && (
+        <ConfirmModal
+          isOpen={errorModalState.isOpen}
+          title={errorModalState.title}
+          description={errorModalState.description}
+          confirmText="OK"
+          showCancel={false}
+          variant="danger"
+          onConfirm={() => setErrorModalState(null)}
+          onClose={() => setErrorModalState(null)}
+        />
+      )}
     </div>
   );
 };

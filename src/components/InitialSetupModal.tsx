@@ -217,15 +217,6 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 placeholder={t('settings_custom_item1_placeholder')}
                 className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-0.5 select-none">
-                <input
-                  type="checkbox"
-                  checked={custom1DisplayInList}
-                  onChange={(e) => setCustom1DisplayInList(e.target.checked)}
-                  className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-4 h-4 cursor-pointer"
-                />
-                <span>{t('settings_custom_display_in_list')}</span>
-              </label>
             </div>
             <div className="space-y-2">
               <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item2')}</label>
@@ -236,15 +227,6 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 placeholder={t('settings_custom_item2_placeholder')}
                 className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-0.5 select-none">
-                <input
-                  type="checkbox"
-                  checked={custom2DisplayInList}
-                  onChange={(e) => setCustom2DisplayInList(e.target.checked)}
-                  className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-4 h-4 cursor-pointer"
-                />
-                <span>{t('settings_custom_display_in_list')}</span>
-              </label>
             </div>
             <div className="space-y-2">
               <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item3')}</label>
@@ -255,15 +237,6 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 placeholder={t('settings_custom_item3_placeholder')}
                 className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
-              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-0.5 select-none">
-                <input
-                  type="checkbox"
-                  checked={custom3DisplayInList}
-                  onChange={(e) => setCustom3DisplayInList(e.target.checked)}
-                  className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-4 h-4 cursor-pointer"
-                />
-                <span>{t('settings_custom_display_in_list')}</span>
-              </label>
             </div>
           </div>
         </div>
@@ -354,7 +327,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                     <div className="flex items-center gap-3 min-w-0">
                       <div
                         className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 rounded transition-colors"
-                        title="ドラッグして並び替え"
+                        title={t('settings_drag_to_reorder')}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <GripVertical className="w-4 h-4" />
@@ -369,7 +342,33 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                       <span className="truncate">{getFieldLabel(fieldId)}</span>
                     </div>
 
-                    <span className="text-xs text-slate-600 font-mono">#{index + 1}</span>
+                    <div className="flex items-center gap-3 shrink-0">
+                      {fieldId.startsWith('custom_field_') && (
+                        <label
+                          className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white cursor-pointer select-none"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={
+                              fieldId === 'custom_field_1'
+                                ? custom1DisplayInList
+                                : fieldId === 'custom_field_2'
+                                ? custom2DisplayInList
+                                : custom3DisplayInList
+                            }
+                            onChange={(e) => {
+                              if (fieldId === 'custom_field_1') setCustom1DisplayInList(e.target.checked);
+                              else if (fieldId === 'custom_field_2') setCustom2DisplayInList(e.target.checked);
+                              else if (fieldId === 'custom_field_3') setCustom3DisplayInList(e.target.checked);
+                            }}
+                            className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-3.5 h-3.5 cursor-pointer"
+                          />
+                          <span>{t('settings_custom_display_in_list')}</span>
+                        </label>
+                      )}
+                      <span className="text-xs text-slate-600 font-mono">#{index + 1}</span>
+                    </div>
                   </div>
                 );
               })}
@@ -420,7 +419,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             type="button"
             onClick={handleResetData}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
-            title="設定と登録済みデータをすべて初期化"
+            title={t('settings_reset_data_tooltip')}
           >
             <RotateCcw className="w-4 h-4" />
             <span>{t('resetData')}</span>

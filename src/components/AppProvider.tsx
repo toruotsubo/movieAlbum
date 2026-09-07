@@ -7,6 +7,7 @@ import { TitleBar } from './TitleBar';
 import { InitialSetupModal } from './InitialSetupModal';
 import { MovieFormModal } from './MovieFormModal';
 import { KeyItemFormModal } from './KeyItemFormModal';
+import { ConfirmModal } from './ConfirmModal';
 import { DragDropWrapper } from './DragDropWrapper';
 import { getSplitValues, getKanaForCast, isVideoFile } from '../lib/utils';
 
@@ -79,6 +80,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isKeyItemFormOpen, setIsKeyItemFormOpen] = useState(false);
   const [activeKeyGroup, setActiveKeyGroup] = useState<KeyItemGroup | null>(null);
 
+  const [errorModalState, setErrorModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+  } | null>(null);
+
   const refreshData = async () => {
     if (typeof window === 'undefined' || !window.api) {
       setLoading(false);
@@ -140,7 +147,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (window.api) {
       const result = await window.api.openMoviePlayer(filePath);
       if (!result.success) {
-        alert(result.error || '動画プレイヤーの起動に失敗しました。');
+        const msg =
+          result.code === 'FILE_NOT_FOUND'
+            ? tFunc('error_file_not_found')
+            : tFunc('error_player_launch_failed');
+        setErrorModalState({
+          isOpen: true,
+          title: tFunc('error_title'),
+          description: msg,
+        });
       }
     }
   };
@@ -352,6 +367,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setActiveKeyGroup(null);
           }}
         />
+
+        {errorModalState && (
+          <ConfirmModal
+            isOpen={errorModalState.isOpen}
+            title={errorModalState.title}
+            description={errorModalState.description}
+            confirmText="OK"
+            showCancel={false}
+            variant="danger"
+            onConfirm={() => setErrorModalState(null)}
+            onClose={() => setErrorModalState(null)}
+          />
+        )}
       </DragDropWrapper>
     </AppContext.Provider>
   );

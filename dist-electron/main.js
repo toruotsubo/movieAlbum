@@ -1013,15 +1013,22 @@ import_electron3.ipcMain.handle("app:resetData", async () => resetAllData());
 import_electron3.ipcMain.handle("app:openMoviePlayer", async (_, filePath) => {
   try {
     if (!import_fs4.default.existsSync(filePath)) {
-      return { success: false, error: "\u6307\u5B9A\u3055\u308C\u305F\u52D5\u753B\u30D5\u30A1\u30A4\u30EB\u304C\u5B58\u5728\u3057\u307E\u305B\u3093\u3002" };
+      return { success: false, code: "FILE_NOT_FOUND" };
     }
     const errorMsg = await import_electron3.shell.openPath(filePath);
     if (errorMsg) {
-      return { success: false, error: errorMsg };
+      return { success: false, code: "LAUNCH_FAILED", error: errorMsg };
     }
     return { success: true };
   } catch (err) {
-    return { success: false, error: err?.message || "\u52D5\u753B\u30D7\u30EC\u30A4\u30E4\u30FC\u306E\u8D77\u52D5\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002" };
+    return { success: false, code: "LAUNCH_FAILED", error: err?.message };
+  }
+});
+import_electron3.ipcMain.handle("app:checkFileExists", async (_, filePath) => {
+  try {
+    return !!(filePath && import_fs4.default.existsSync(filePath));
+  } catch {
+    return false;
   }
 });
 import_electron3.ipcMain.handle("app:saveSummaryImage", async (_, base64Data) => {
@@ -1039,7 +1046,7 @@ import_electron3.ipcMain.handle("app:saveSummaryImage", async (_, base64Data) =>
     return fullPath;
   } catch (err) {
     console.error("Failed to save summary image:", err);
-    throw new Error("\u30B5\u30DE\u30EA\u30FC\u753B\u50CF\u306E\u4FDD\u5B58\u306B\u5931\u6557\u3057\u307E\u3057\u305F\u3002");
+    throw new Error("SAVE_SUMMARY_FAILED");
   }
 });
 async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {

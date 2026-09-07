@@ -83,7 +83,7 @@ export const DragDropWrapper: React.FC<DragDropWrapperProps> = ({ children, onFi
       if (filePath) {
         onFileDrop(filePath, file.name);
       } else {
-        alert('ファイルのパスが取得できませんでした。');
+        alert(t('error_cannot_get_file_path'));
       }
     }
   };

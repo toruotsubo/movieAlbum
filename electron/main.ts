@@ -204,15 +204,23 @@ ipcMain.handle('app:resetData', async () => resetAllData());
 ipcMain.handle('app:openMoviePlayer', async (_, filePath: string) => {
   try {
     if (!fs.existsSync(filePath)) {
-      return { success: false, error: '指定された動画ファイルが存在しません。' };
+      return { success: false, code: 'FILE_NOT_FOUND' };
     }
     const errorMsg = await shell.openPath(filePath);
     if (errorMsg) {
-      return { success: false, error: errorMsg };
+      return { success: false, code: 'LAUNCH_FAILED', error: errorMsg };
     }
     return { success: true };
   } catch (err: any) {
-    return { success: false, error: err?.message || '動画プレイヤーの起動に失敗しました。' };
+    return { success: false, code: 'LAUNCH_FAILED', error: err?.message };
+  }
+});
+
+ipcMain.handle('app:checkFileExists', async (_, filePath: string) => {
+  try {
+    return !!(filePath && fs.existsSync(filePath));
+  } catch {
+    return false;
   }
 });
 
@@ -235,7 +243,7 @@ ipcMain.handle('app:saveSummaryImage', async (_, base64Data: string) => {
     return fullPath;
   } catch (err: any) {
     console.error('Failed to save summary image:', err);
-    throw new Error('サマリー画像の保存に失敗しました。');
+    throw new Error('SAVE_SUMMARY_FAILED');
   }
 });
 

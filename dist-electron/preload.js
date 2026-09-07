@@ -46,6 +46,7 @@ var api = {
   updateKeyItemRating: (key_signature, rating) => import_electron.ipcRenderer.invoke("keyItems:updateRating", { key_signature, rating }),
   updateKeyItemDetails: (input) => import_electron.ipcRenderer.invoke("keyItems:updateDetails", input),
   openMoviePlayer: (filePath) => import_electron.ipcRenderer.invoke("app:openMoviePlayer", filePath),
+  checkFileExists: (filePath) => import_electron.ipcRenderer.invoke("app:checkFileExists", filePath),
   extractMetadata: (filePath) => import_electron.ipcRenderer.invoke("movies:extractMetadata", filePath),
   saveSummaryImage: (base64Data) => import_electron.ipcRenderer.invoke("app:saveSummaryImage", base64Data),
   generateThumbnail: (filePath, targetTime) => import_electron.ipcRenderer.invoke("app:generateThumbnail", { filePath, targetTime }),

@@ -28,8 +28,10 @@ export const api = {
   updateKeyItemDetails: (input: UpdateKeyItemInput): Promise<void> =>
     ipcRenderer.invoke('keyItems:updateDetails', input),
 
-  openMoviePlayer: (filePath: string): Promise<{ success: boolean; error?: string }> =>
+  openMoviePlayer: (filePath: string): Promise<{ success: boolean; code?: string; error?: string }> =>
     ipcRenderer.invoke('app:openMoviePlayer', filePath),
+  checkFileExists: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('app:checkFileExists', filePath),
 
   extractMetadata: (
     filePath: string

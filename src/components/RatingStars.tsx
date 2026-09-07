@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Star } from 'lucide-react';
 import { clsx } from 'clsx';
+import { useApp } from './AppProvider';
 
 interface RatingStarsProps {
   rating: number; // 1 - 5
@@ -17,6 +18,7 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
   readOnly = false,
   size = 'md',
 }) => {
+  const { t } = useApp();
   const [hoverRating, setHoverRating] = useState<number | null>(null);
 
   const starSizes = {
@@ -47,7 +49,7 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
               'transition-all duration-150 transform hover:scale-110 focus:outline-none',
               readOnly ? 'cursor-default' : 'cursor-pointer'
             )}
-            title={`評価 ${starIndex}`}
+            title={t('rating_tooltip', { rating: starIndex })}
           >
             <Star
               className={clsx(

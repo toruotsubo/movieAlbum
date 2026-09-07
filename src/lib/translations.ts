@@ -60,7 +60,7 @@ export const TRANSLATIONS = {
     settings_custom_item2_placeholder: '例: シリーズ',
     settings_custom_item3: '項目 3',
     settings_custom_item3_placeholder: '例: 受賞',
-    settings_custom_display_in_list: '動画一覧画面に表示する',
+    settings_custom_display_in_list: '動画一覧に表示',
 
     // Key Item List Page (Main Index)
     key_list_title: '{key}一覧',
@@ -143,6 +143,28 @@ export const TRANSLATIONS = {
     drag_drop_overlay_desc: '項目入力フォームが自動で開きます',
     drag_drop_invalid_title: '非対応のファイル',
     drag_drop_invalid_file: '動画以外のファイルは登録できません。',
+
+    untitled: '無題',
+    play: '再生',
+    pause: '一時停止',
+    field_key_item: 'キー項目',
+
+    // Errors & Player Messages
+    error_title: 'エラー',
+    error_file_not_found: '指定された動画ファイルが存在しません。',
+    error_player_launch_failed: '動画プレイヤーの起動に失敗しました。',
+    error_save_summary_failed: 'サマリー画像の保存に失敗しました。',
+    error_video_play_failed: '動画の再生に失敗しました。ファイル形式または参照パスをご確認ください。',
+    error_video_load_failed: '動画ソースのロードに失敗しました ({error})。参照パス: {path}',
+    error_cannot_get_file_path: 'ファイルのパスが取得できませんでした。',
+
+    // Tooltips & Filters
+    settings_drag_to_reorder: 'ドラッグして並び替え',
+    settings_reset_data_tooltip: '設定と登録済みデータをすべて初期化',
+    rating_tooltip: '評価 {rating}',
+    filter_by_field: '{field}「{value}」で絞り込み',
+    filter_by_genre: 'カテゴリ「{value}」で絞り込み',
+    filter_by_cast: '登場「{value}」で絞り込み',
   },
   en: {
     // English Translation (Defaulting to Japanese text as requested until translated by user)
@@ -285,6 +307,28 @@ export const TRANSLATIONS = {
     drag_drop_overlay_desc: 'The item input form will open automatically',
     drag_drop_invalid_title: 'Unsupported File',
     drag_drop_invalid_file: 'Only video files can be registered.',
+
+    untitled: 'Untitled',
+    play: 'Play',
+    pause: 'Pause',
+    field_key_item: 'Key Item',
+
+    // Errors & Player Messages
+    error_title: 'Error',
+    error_file_not_found: 'The specified video file does not exist.',
+    error_player_launch_failed: 'Failed to launch the video player.',
+    error_save_summary_failed: 'Failed to save summary image.',
+    error_video_play_failed: 'Failed to play video. Please check the file format or reference path.',
+    error_video_load_failed: 'Failed to load video source ({error}). Reference path: {path}',
+    error_cannot_get_file_path: 'Failed to get file path.',
+
+    // Tooltips & Filters
+    settings_drag_to_reorder: 'Drag to reorder',
+    settings_reset_data_tooltip: 'Reset settings and all registered data',
+    rating_tooltip: 'Rating {rating}',
+    filter_by_field: 'Filter by {field}: "{value}"',
+    filter_by_genre: 'Filter by category: "{value}"',
+    filter_by_cast: 'Filter by cast: "{value}"',
   },
 } as const;
 

@@ -108,12 +108,12 @@ function MovieDetailContent() {
   if (!movie) {
     return (
       <div className="text-center py-16 space-y-4">
-        <h2 className="text-xl font-bold text-slate-300">動画が見つかりませんでした</h2>
+        <h2 className="text-xl font-bold text-slate-300">{t('detail_movie_not_found')}</h2>
         <button
           onClick={handleBack}
           className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-medium"
         >
-          動画一覧へ戻る
+          {t('detail_back_to_list')}
         </button>
       </div>
     );
@@ -402,8 +402,9 @@ function MovieDetailContent() {
 }
 
 export default function MovieDetailPage() {
+  const { t } = useApp();
   return (
-    <Suspense fallback={<div className="flex justify-center p-12 text-slate-400">Loading...</div>}>
+    <Suspense fallback={<div className="flex justify-center p-12 text-slate-400">{t('loading')}</div>}>
       <MovieDetailContent />
     </Suspense>
   );

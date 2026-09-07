@@ -22,7 +22,7 @@ const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k
   if (keyId === 'custom_field_3') return settings?.custom_field_3_name || tFunc('field_custom_3_default');
 
   const base = ALL_BASE_FIELDS.find((f) => f.id === keyId);
-  return base?.label || 'キー項目';
+  return base ? tFunc(`field_${base.id}` as any) : tFunc('field_key_item');
 };
 
 export default function KeyItemsPage() {

@@ -36,7 +36,7 @@ const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k
   if (keyId === 'custom_field_3') return settings?.custom_field_3_name || tFunc('field_custom_3_default');
 
   const base = ALL_BASE_FIELDS.find((f) => f.id === keyId);
-  return base?.label || 'キー項目';
+  return base ? tFunc(`field_${base.id}` as any) : tFunc('field_key_item');
 };
 
 function MoviesContent() {
@@ -463,7 +463,7 @@ function MoviesContent() {
                                           handleKeyItemClick('genre', gVal);
                                         }}
                                         className="text-blue-400 hover:underline font-semibold cursor-pointer"
-                                        title={`カテゴリ「${gVal}」で絞り込み`}
+                                        title={t('filter_by_genre', { value: gVal })}
                                       >
                                         {gVal}
                                       </button>
@@ -493,7 +493,7 @@ function MoviesContent() {
                                           handleKeyItemClick('cast', cVal);
                                         }}
                                         className="text-blue-400 hover:underline font-semibold cursor-pointer"
-                                        title={`登場「${cVal}」で絞り込み`}
+                                        title={t('filter_by_cast', { value: cVal })}
                                       >
                                         {cVal}
                                       </button>
@@ -559,7 +559,7 @@ function MoviesContent() {
                                           handleKeyItemClick(fieldId, cVal);
                                         }}
                                         className="text-blue-400 hover:underline font-semibold cursor-pointer"
-                                        title={`${customName}「${cVal}」で絞り込み`}
+                                        title={t('filter_by_field', { field: customName, value: cVal })}
                                       >
                                         {cVal}
                                       </button>
@@ -646,8 +646,9 @@ function MoviesContent() {
 }
 
 export default function MoviesPage() {
+  const { t } = useApp();
   return (
-    <Suspense fallback={<div className="flex justify-center p-12 text-slate-400">読み込み中...</div>}>
+    <Suspense fallback={<div className="flex justify-center p-12 text-slate-400">{t('loading')}</div>}>
       <MoviesContent />
     </Suspense>
   );

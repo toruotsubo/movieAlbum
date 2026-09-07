@@ -22,7 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
   const keyFieldId = settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre';
   const baseField = ALL_BASE_FIELDS.find((f) => f.id === keyFieldId);
 
-  let keyLabel = 'キー項目';
+  let keyLabel = t('field_key_item');
   if (keyFieldId === 'title') keyLabel = t('field_title');
   else if (keyFieldId === 'genre') keyLabel = t('field_genre');
   else if (keyFieldId === 'cast') keyLabel = t('field_cast');
@@ -32,7 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
   else if (keyFieldId === 'custom_field_1') keyLabel = settings?.custom_field_1_name || t('field_custom_1_default');
   else if (keyFieldId === 'custom_field_2') keyLabel = settings?.custom_field_2_name || t('field_custom_2_default');
   else if (keyFieldId === 'custom_field_3') keyLabel = settings?.custom_field_3_name || t('field_custom_3_default');
-  else if (baseField) keyLabel = baseField.label;
+  else if (baseField) keyLabel = t(`field_${baseField.id}` as any);
 
   return (
     <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">

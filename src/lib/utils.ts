@@ -112,7 +112,7 @@ export const INLINE_PLAYBACK_EXTENSIONS = new Set(['mp4', 'm4v', 'webm', 'ogv', 
 export const VIDEO_EXTENSIONS = new Set([
   'mp4', 'm4v', 'mkv', 'avi', 'wmv', 'mov', 'flv', 'webm',
   'mpg', 'mpeg', 'm2v', '3gp', '3g2', 'ts', 'mts', 'm2ts',
-  'vob', 'ogv', 'rm', 'rmvb', 'asf', 'divx', 'f4v'
+  'vob', 'ogv', 'ogg', 'rm', 'rmvb', 'asf', 'divx', 'f4v'
 ]);
 
 export function isVideoFile(fileNameOrPath: string | null | undefined, mimeType?: string): boolean {

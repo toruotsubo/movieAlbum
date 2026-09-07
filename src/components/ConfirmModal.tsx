@@ -3,6 +3,7 @@
 import React from 'react';
 import { AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import clsx from 'clsx';
+import { useApp } from './AppProvider';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -21,12 +22,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   title,
   description,
   confirmText = 'OK',
-  cancelText = 'キャンセル',
+  cancelText,
   showCancel = true,
   variant = 'danger',
   onConfirm,
   onClose,
 }) => {
+  const { t } = useApp();
+  const effectiveCancelText = cancelText || t('cancel');
   if (!isOpen) return null;
 
   const handleConfirm = async () => {
@@ -87,7 +90,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               onClick={onClose}
               className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
             >
-              {cancelText}
+              {effectiveCancelText}
             </button>
           )}
           <button

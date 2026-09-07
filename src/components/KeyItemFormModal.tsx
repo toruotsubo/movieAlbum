@@ -14,20 +14,20 @@ interface KeyItemFormModalProps {
   onClose: () => void;
 }
 
-const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc?: (k: any) => string): string => {
-  if (keyId === 'title') return tFunc ? tFunc('field_title') : 'タイトル';
-  if (keyId === 'genre') return tFunc ? tFunc('field_genre') : 'カテゴリ';
-  if (keyId === 'cast') return tFunc ? tFunc('field_cast') : '登場';
-  if (keyId === 'release_year') return tFunc ? tFunc('field_release_year') : '公開年';
-  if (keyId === 'release_date') return tFunc ? tFunc('field_release_date') : '公開月日';
-  if (keyId === 'rating') return tFunc ? tFunc('field_rating') : '評価';
+const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k: any) => string): string => {
+  if (keyId === 'title') return tFunc('field_title');
+  if (keyId === 'genre') return tFunc('field_genre');
+  if (keyId === 'cast') return tFunc('field_cast');
+  if (keyId === 'release_year') return tFunc('field_release_year');
+  if (keyId === 'release_date') return tFunc('field_release_date');
+  if (keyId === 'rating') return tFunc('field_rating');
 
-  if (keyId === 'custom_field_1') return settings?.custom_field_1_name || (tFunc ? tFunc('field_custom_1_default') : 'ユーザー定義項目1');
-  if (keyId === 'custom_field_2') return settings?.custom_field_2_name || (tFunc ? tFunc('field_custom_2_default') : 'ユーザー定義項目2');
-  if (keyId === 'custom_field_3') return settings?.custom_field_3_name || (tFunc ? tFunc('field_custom_3_default') : 'ユーザー定義項目3');
+  if (keyId === 'custom_field_1') return settings?.custom_field_1_name || tFunc('field_custom_1_default');
+  if (keyId === 'custom_field_2') return settings?.custom_field_2_name || tFunc('field_custom_2_default');
+  if (keyId === 'custom_field_3') return settings?.custom_field_3_name || tFunc('field_custom_3_default');
 
   const base = ALL_BASE_FIELDS.find((f) => f.id === keyId);
-  return base ? base.label : 'キー項目';
+  return base ? tFunc(`field_${base.id}` as any) : tFunc('field_key_item');
 };
 
 export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
