@@ -49,7 +49,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
   const [genre, setGenre] = useState('');
   const [cast, setCast] = useState('');
   const [castKana, setCastKana] = useState('');
-  const [releaseYear, setReleaseYear] = useState<number | ''>('');
+  const [releaseYear, setReleaseYear] = useState<number | string>('');
   const [releaseDate, setReleaseDate] = useState('');
   const [rating, setRating] = useState(3);
   const [comment, setComment] = useState('');
@@ -80,6 +80,48 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
     title: string;
     description: string;
   } | null>(null);
+
+  const split8DigitYear = (
+    yearVal: number | string | null | undefined
+  ): { year: number; date: string } | null => {
+    if (!yearVal && yearVal !== 0) return null;
+    const str = String(yearVal).trim().replace(/[０-９]/g, (s) =>
+      String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+    );
+    if (/^\d{8}$/.test(str)) {
+      const y = Number(str.slice(0, 4));
+      const m = str.slice(4, 6);
+      const d = str.slice(6, 8);
+      return {
+        year: y,
+        date: `${m}-${d}`,
+      };
+    }
+    return null;
+  };
+
+  const handleReleaseYearChange = (rawVal: string) => {
+    const normalized = rawVal.trim().replace(/[０-９]/g, (s) =>
+      String.fromCharCode(s.charCodeAt(0) - 0xfee0)
+    );
+    const splitResult = split8DigitYear(normalized);
+    if (splitResult) {
+      setReleaseYear(splitResult.year);
+      setReleaseDate(splitResult.date);
+      return;
+    }
+    if (/^\d*$/.test(normalized)) {
+      setReleaseYear(normalized);
+    }
+  };
+
+  const handleReleaseYearBlur = () => {
+    const splitResult = split8DigitYear(releaseYear);
+    if (splitResult) {
+      setReleaseYear(splitResult.year);
+      setReleaseDate(splitResult.date);
+    }
+  };
 
   const generateDefaultSummaryImage = (filePath: string, presetDuration?: number | null) => {
     return new Promise<{ imagePath: string | null; targetTime: number }>(async (resolve) => {
@@ -214,8 +256,17 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
       setGenre(movie.genre || '');
       setCast(movie.cast || '');
       setCastKana(movie.cast_kana || '');
-      setReleaseYear(movie.release_year || '');
-      setReleaseDate(movie.release_date || '');
+      let initYear: number | string = movie.release_year ?? '';
+      let initDate: string = movie.release_date || '';
+
+      const splitResult = split8DigitYear(initYear);
+      if (splitResult) {
+        initYear = splitResult.year;
+        initDate = splitResult.date;
+      }
+
+      setReleaseYear(initYear);
+      setReleaseDate(initDate);
       setRating(movie.rating || 3);
       setComment(movie.comment || '');
       setTags(movie.tags || '');
@@ -390,7 +441,18 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
       if (captured) finalImagePath = captured;
     }
 
-    let formattedReleaseDate = releaseDate.trim().replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
+    let finalYear: number | null = null;
+    let targetDateStr = releaseDate;
+
+    const splitResult = split8DigitYear(releaseYear);
+    if (splitResult) {
+      finalYear = splitResult.year;
+      targetDateStr = splitResult.date;
+    } else if (releaseYear !== '' && !isNaN(Number(releaseYear))) {
+      finalYear = Number(releaseYear);
+    }
+
+    let formattedReleaseDate = targetDateStr.trim().replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0));
     if (/^\d{4}$/.test(formattedReleaseDate)) {
       formattedReleaseDate = `${formattedReleaseDate.slice(0, 2)}-${formattedReleaseDate.slice(2, 4)}`;
     }
@@ -401,7 +463,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
       genre: genre.trim() || null,
       cast: cast.trim() || null,
       cast_kana: castKana.trim() || null,
-      release_year: releaseYear !== '' ? Number(releaseYear) : null,
+      release_year: finalYear,
       release_date: formattedReleaseDate || null,
       rating,
       comment: comment.trim() || null,
@@ -825,9 +887,11 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
                     <div key="release_year">
                       <label className="text-xs text-slate-400 mb-1 block">{t('form_release_year_label')}</label>
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={releaseYear}
-                        onChange={(e) => setReleaseYear(e.target.value ? Number(e.target.value) : '')}
+                        onChange={(e) => handleReleaseYearChange(e.target.value)}
+                        onBlur={handleReleaseYearBlur}
                         placeholder={t('form_release_year_placeholder')}
                         className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
                       />
