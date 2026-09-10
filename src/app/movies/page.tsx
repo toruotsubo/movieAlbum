@@ -130,6 +130,68 @@ function MoviesContent() {
     ).sort((a, b) => a.localeCompare(b, 'ja'));
   }, [movies]);
 
+  // Map of movie ID to group count and deduplicated tags of all movies in the group
+  const groupDataMap = useMemo(() => {
+    const keyFields = settings?.key_fields || ['genre'];
+    const map = new Map<number, { count: number; tags: string[] }>();
+
+    for (const movie of movies) {
+      if (movie.parent_movie_id) continue;
+
+      const parentId = movie.parent_movie_id || (movie.is_grouped ? movie.id : null);
+      let groupMovies: Movie[] = [movie];
+
+      if (parentId || movie.is_grouped) {
+        const matches = movies.filter((m) => {
+          if (parentId && (m.id === parentId || m.parent_movie_id === parentId)) {
+            return true;
+          }
+          if (m.parent_movie_id === movie.id || movie.parent_movie_id === m.id) {
+            return true;
+          }
+          if (movie.is_grouped && m.is_grouped) {
+            if ((m.title || null) !== (movie.title || null)) return false;
+            if ((m.genre || null) !== (movie.genre || null)) return false;
+            if ((m.release_year || null) !== (movie.release_year || null)) return false;
+            if ((m.release_date || null) !== (movie.release_date || null)) return false;
+
+            for (const kf of keyFields) {
+              if (((m as any)[kf] || null) !== ((movie as any)[kf] || null)) return false;
+            }
+            return true;
+          }
+          return false;
+        });
+
+        const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
+        if (uniqueMatches.length > 0) {
+          groupMovies = uniqueMatches;
+        }
+      }
+
+      // Collect all tags from the group movies without duplicates, preserving order
+      const tagSet = new Set<string>();
+      for (const m of groupMovies) {
+        if (m.tags) {
+          const splitTags = getSplitValues(m.tags);
+          for (const t of splitTags) {
+            const trimmed = t.trim();
+            if (trimmed) {
+              tagSet.add(trimmed);
+            }
+          }
+        }
+      }
+
+      map.set(movie.id, {
+        count: groupMovies.length,
+        tags: Array.from(tagSet),
+      });
+    }
+
+    return map;
+  }, [movies, settings]);
+
   const filteredMovies = useMemo(() => {
     // Exclude sibling movies (movies with a parent_movie_id)
     let result = movies.filter((movie) => !movie.parent_movie_id);
@@ -151,13 +213,13 @@ function MoviesContent() {
     }
     if (tagFilter !== 'all') {
       result = result.filter((movie) => {
-        if (!movie.tags) return false;
-        const tags = getSplitValues(movie.tags);
+        const groupInfo = groupDataMap.get(movie.id);
+        const tags = groupInfo ? groupInfo.tags : (movie.tags ? getSplitValues(movie.tags) : []);
         return tags.includes(tagFilter);
       });
     }
     return result;
-  }, [movies, filterValues, ratingFilter, tagFilter]);
+  }, [movies, filterValues, ratingFilter, tagFilter, groupDataMap]);
 
   const sortedMovies = useMemo(() => {
     return [...filteredMovies].sort((a, b) => {
@@ -196,41 +258,6 @@ function MoviesContent() {
       return sortOrder === 'desc' ? -result : result;
     });
   }, [filteredMovies, sortKey, sortOrder, keyFieldId]);
-
-  const groupCountMap = useMemo(() => {
-    const keyFields = settings?.key_fields || ['genre'];
-    const map = new Map<number, number>();
-
-    for (const movie of filteredMovies) {
-      const parentId = movie.parent_movie_id || (movie.is_grouped ? movie.id : null);
-      let count = 1;
-      if (parentId || movie.is_grouped) {
-        const matches = movies.filter((m) => {
-          if (parentId && (m.id === parentId || m.parent_movie_id === parentId)) {
-            return true;
-          }
-          if (m.parent_movie_id === movie.id || movie.parent_movie_id === m.id) {
-            return true;
-          }
-          if (movie.is_grouped && m.is_grouped) {
-            if ((m.title || null) !== (movie.title || null)) return false;
-            if ((m.genre || null) !== (movie.genre || null)) return false;
-            if ((m.release_year || null) !== (movie.release_year || null)) return false;
-            if ((m.release_date || null) !== (movie.release_date || null)) return false;
-
-            for (const kf of keyFields) {
-              if (((m as any)[kf] || null) !== ((movie as any)[kf] || null)) return false;
-            }
-            return true;
-          }
-          return false;
-        });
-        count = new Set(matches.map((m) => m.id)).size;
-      }
-      map.set(movie.id, count);
-    }
-    return map;
-  }, [filteredMovies, movies, settings]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -390,7 +417,9 @@ function MoviesContent() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {sortedMovies.map((movie) => {
           const imageSrc = formatMediaUrl(movie.summary_image_path);
-          const groupCount = groupCountMap.get(movie.id) || 1;
+          const groupInfo = groupDataMap.get(movie.id);
+          const groupCount = groupInfo?.count || 1;
+          const displayTags = groupInfo?.tags || (movie.tags ? getSplitValues(movie.tags) : []);
 
           return (
             <div
@@ -578,10 +607,10 @@ function MoviesContent() {
                     })()}
 
                     {/* Tags Display */}
-                    {movie.tags && (
+                    {displayTags.length > 0 && (
                       <div className="flex flex-wrap items-center gap-1.5 pt-1">
                         <Tag className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        {getSplitValues(movie.tags).map((tag, idx) => {
+                        {displayTags.map((tag, idx) => {
                           const isSelected = tagFilter === tag;
                           return (
                             <button

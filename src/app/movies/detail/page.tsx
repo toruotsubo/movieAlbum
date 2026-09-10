@@ -17,6 +17,7 @@ import {
   Shapes,
   MessageSquare,
   FileText,
+  Tag,
   Tags,
   Layers,
   Clock,
@@ -239,38 +240,55 @@ function MovieDetailContent() {
               {groupMovies.map((gMovie) => {
                 const gImgSrc = formatMediaUrl(gMovie.summary_image_path);
                 const isCurrent = gMovie.id === movie.id;
+                const gTags = gMovie.tags ? Array.from(new Set(getSplitValues(gMovie.tags).map((t) => t.trim()).filter(Boolean))) : [];
 
                 return (
-                  <div
-                    key={gMovie.id}
-                    onClick={() => openMoviePlayer(gMovie.file_path)}
-                    className={`relative aspect-video rounded-xl overflow-hidden bg-slate-950 border cursor-pointer group transition-all ${isCurrent
-                        ? 'border-blue-500 ring-2 ring-blue-500/50'
-                        : 'border-slate-800 hover:border-slate-600'
-                      }`}
-                    title={t('movies_list_play_tooltip')}
-                  >
-                    {gImgSrc ? (
-                      <img
-                        src={gImgSrc}
-                        alt={gMovie.title || 'Group item'}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900">
-                        <Film className="w-6 h-6 opacity-40" />
-                      </div>
-                    )}
+                  <div key={gMovie.id} className="flex flex-col gap-1.5">
+                    <div
+                      onClick={() => openMoviePlayer(gMovie.file_path)}
+                      className={`relative aspect-video rounded-xl overflow-hidden bg-slate-950 border cursor-pointer group transition-all ${isCurrent
+                          ? 'border-blue-500 ring-2 ring-blue-500/50'
+                          : 'border-slate-800 hover:border-slate-600'
+                        }`}
+                      title={t('movies_list_play_tooltip')}
+                    >
+                      {gImgSrc ? (
+                        <img
+                          src={gImgSrc}
+                          alt={gMovie.title || 'Group item'}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900">
+                          <Film className="w-6 h-6 opacity-40" />
+                        </div>
+                      )}
 
-                    {isCurrent && (
-                      <div className="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                        {t('detail_displaying')}
-                      </div>
-                    )}
+                      {isCurrent && (
+                        <div className="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                          {t('detail_displaying')}
+                        </div>
+                      )}
 
-                    <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Play className="w-4 h-4 text-white fill-current" />
+                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Play className="w-4 h-4 text-white fill-current" />
+                      </div>
                     </div>
+
+                    {/* Tags for this group movie */}
+                    {gTags.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Tag className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                        {gTags.map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="px-1.5 py-0.5 rounded-md bg-blue-600/20 text-blue-300 border border-blue-500/30 text-[10px] font-medium"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
