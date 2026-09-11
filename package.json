@@ -12,6 +12,7 @@
     "build:electron": "tsup electron/main.ts electron/preload.ts --out-dir dist-electron --external electron --external ffmpeg-static",
     "build:next": "next build",
     "build": "npm run build:next && npm run build:electron && electron-builder",
+    "build:exe": "npm run build:next && npm run build:electron && electron-builder --win nsis",
     "build:appx": "npm run build:next && npm run build:electron && electron-builder --win appx",
     "start": "electron ."
   },
@@ -32,6 +33,7 @@
     "win": {
       "icon": "build/icon.ico",
       "target": [
+        "nsis",
         "appx"
       ]
     },
@@ -39,7 +41,11 @@
       "applicationId": "com.moviealbum.app",
       "identityName": "WebStudioTokotan.movieAlbum",
       "publisher": "CN=031D2318-DD62-44C5-B9A7-E0D87C1EE2D8",
-      "publisherDisplayName": "Web Studio Tokotan"
+      "publisherDisplayName": "Web Studio Tokotan",
+      "languages": [
+        "ja-JP",
+        "en-US"
+      ]
     }
   },
   "dependencies": {

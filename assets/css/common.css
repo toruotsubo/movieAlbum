@@ -1,26 +1,4 @@
 @charset "UTF-8";
-@media screen and (hover: hover) and (pointer: fine) {
-  .hov:hover {
-    opacity: 0.8;
-  }
-  @supports (filter: brightness(100%)) {
-    .hov:hover {
-      filter: brightness(110%);
-      opacity: 1;
-    }
-  }
-}
-@media screen and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
-  .hov {
-    transition: opacity 0.4s;
-  }
-  @supports (filter: brightness(100%)) {
-    .hov {
-      transition-property: filter;
-    }
-  }
-}
-
 * {
   -webkit-tap-highlight-color: transparent;
 }
@@ -141,20 +119,6 @@ video {
   height: auto;
 }
 
-:root {
-  font-size: 100px;
-}
-@media screen and (max-width: 1280px) and (min-width: 751px) {
-  :root {
-    font-size: 7.8125vw;
-  }
-}
-@media screen and (max-width: 750px) {
-  :root {
-    font-size: 26.6666666667vw;
-  }
-}
-
 html {
   scroll-behavior: smooth;
   scrollbar-gutter: stable;
@@ -165,69 +129,16 @@ body {
   min-height: 100dvh;
   color: #000;
   font-family: "Noto Sans JP", "游ゴシック", "Yu Gothic", "游ゴシック体", "YuGothic", sans-serif;
-  font-size: 0.16rem;
+  font-size: 16px;
   letter-spacing: 0;
   line-height: 1.5;
 }
-@media screen and (max-width: 750px) {
-  body {
-    font-size: 0.16rem;
-    line-height: 1.5;
-  }
-}
 
 .wrap {
-  max-width: 12.8rem;
+  max-width: 1280px;
   margin-inline: auto;
 }
-@media screen and (max-width: 750px) {
-  .wrap {
-    padding-inline: 0.4rem;
-  }
-}
 
-.sp {
-  display: none;
-}
-
-@media screen and (max-width: 750px) {
-  .pc {
-    display: none;
-  }
-  .sp {
-    display: revert;
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .fadeUp {
-    opacity: 0;
-    translate: 0 1rem 0;
-    transition: 0.8s;
-    transition-property: opacity, translate;
-  }
-  .fadeUp.scrollIn {
-    opacity: 1;
-    translate: 0 0 0;
-  }
-}
-
-@-webkit-keyframes ticker {
-  from {
-    translate: 0 0 0;
-  }
-  to {
-    translate: -50% 0 0;
-  }
-}
-
-@keyframes ticker {
-  from {
-    translate: 0 0 0;
-  }
-  to {
-    translate: -50% 0 0;
-  }
-}
 .header {
   margin: 2em 0;
   text-align: center;
@@ -237,7 +148,7 @@ body {
 }
 
 .main section {
-  margin: 2em 0;
+  margin: 2em 1em;
 }
 .main section .title {
   margin: 0 0 1em;
@@ -251,13 +162,13 @@ body {
   list-style-type: disc;
 }
 .main section ul.horizontal {
-  margin: 1em 0 0;
+  margin: 1em 0;
 }
 .main section ul.horizontal li {
   display: inline;
 }
-.main section ul.horizontal li:nth-child(n+2)::before {
-  content: ", ";
+.main section ul.horizontal li:nth-last-child(n+2)::after {
+  content: ",";
 }
 .main section section {
   margin: 1.5em 0;

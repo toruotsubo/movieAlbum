@@ -5,17 +5,6 @@
 
 // 共通設定
 // #############################################################################################
-:root {
-	font-size: 100px;
-
-	@include pcNarrow {
-		font-size: 100vw * 100 / $pcWidth;
-	}
-
-	@include sp {
-		font-size: 100vw * 100 / $spDesignWidth;
-	}
-}
 
 html {
 	scroll-behavior: smooth;
@@ -27,70 +16,17 @@ body {
 	min-height: 100dvh;
 	color: $colorP;
 	font-family: $sans;
-	font-size: $baseFontSize;
-	letter-spacing: $baseLetterSpacing;
-	line-height: $baseLineHeight;
-
-	@include sp {
-		font-size: $baseFontSizeSp;
-		line-height: $baseLineHeightSp;
-	}
+	font-size: 16px;
+	letter-spacing: 0;
+	line-height: 1.5;
 }
 
 // レスポンシブ対応
 // ==========================================================================
 .wrap {
-	max-width: #{$pcWrapWidth / 100}rem;
+	max-width: 1280px;
 
 	margin-inline: auto;
-
-	@include sp {
-		padding-inline: $spPadding;
-	}
-}
-
-.sp {
-	display: none;
-}
-
-@include sp {
-	.pc {
-		display: none;
-	}
-
-	.sp {
-		display: revert;
-	}
-}
-
-// アニメーション
-// ==========================================================================
-.hov {
-	@extend %hov;
-}
-
-.fadeUp {
-	@include animation {
-		opacity: 0;
-		translate: 0 1rem 0;
-		transition: .8s;
-		transition-property: opacity, translate;
-
-		&.scrollIn {
-			opacity: 1;
-			translate: 0 0 0;
-		}
-	}
-}
-
-@keyframes ticker {
-	from {
-		translate: 0 0 0;
-	}
-
-	to {
-		translate: -50% 0 0;
-	}
 }
 
 // #header
@@ -107,12 +43,11 @@ body {
 // #main
 // #############################################################################################
 .main {
-	@include sp {}
 
 	// #units
 	// ==========================================================================
 	section {
-		margin: 2em 0;
+		margin: 2em 1em;
 
 		@include sp {}
 
@@ -131,14 +66,14 @@ body {
 		}
 
 		ul.horizontal {
-			margin: 1em 0 0;
+			margin: 1em 0;
 
 			li {
 				display: inline;
 
-				&:nth-child(n+2) {
-					&::before {
-						content: ', ';
+				&:nth-last-child(n+2) {
+					&::after {
+						content: ',';
 					}
 				}
 			}
