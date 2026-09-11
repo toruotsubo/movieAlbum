@@ -1,0 +1,165 @@
+// 変数定義
+// #############################################################################################
+@use 'settings' as *;
+@use 'reset';
+
+// 共通設定
+// #############################################################################################
+:root {
+	font-size: 100px;
+
+	@include pcNarrow {
+		font-size: 100vw * 100 / $pcWidth;
+	}
+
+	@include sp {
+		font-size: 100vw * 100 / $spDesignWidth;
+	}
+}
+
+html {
+	scroll-behavior: smooth;
+	scrollbar-gutter: stable;
+}
+
+body {
+	min-height: 100vh;
+	min-height: 100dvh;
+	color: $colorP;
+	font-family: $sans;
+	font-size: $baseFontSize;
+	letter-spacing: $baseLetterSpacing;
+	line-height: $baseLineHeight;
+
+	@include sp {
+		font-size: $baseFontSizeSp;
+		line-height: $baseLineHeightSp;
+	}
+}
+
+// レスポンシブ対応
+// ==========================================================================
+.wrap {
+	max-width: #{$pcWrapWidth / 100}rem;
+
+	margin-inline: auto;
+
+	@include sp {
+		padding-inline: $spPadding;
+	}
+}
+
+.sp {
+	display: none;
+}
+
+@include sp {
+	.pc {
+		display: none;
+	}
+
+	.sp {
+		display: revert;
+	}
+}
+
+// アニメーション
+// ==========================================================================
+.hov {
+	@extend %hov;
+}
+
+.fadeUp {
+	@include animation {
+		opacity: 0;
+		translate: 0 1rem 0;
+		transition: .8s;
+		transition-property: opacity, translate;
+
+		&.scrollIn {
+			opacity: 1;
+			translate: 0 0 0;
+		}
+	}
+}
+
+@keyframes ticker {
+	from {
+		translate: 0 0 0;
+	}
+
+	to {
+		translate: -50% 0 0;
+	}
+}
+
+// #header
+// #############################################################################################
+.header {
+	margin: 2em 0;
+	text-align: center;
+
+	.title {
+		font-size: 2em;
+	}
+}
+
+// #main
+// #############################################################################################
+.main {
+	@include sp {}
+
+	// #units
+	// ==========================================================================
+	section {
+		margin: 2em 0;
+
+		@include sp {}
+
+		.title {
+			margin: 0 0 1em;
+			font-size: 1.5em;
+		}
+
+		ul:not(.horizontal) {
+			margin: 1em 0 0;
+			padding: 0 0 0 1.5em;
+
+			li {
+				list-style-type: disc;
+			}
+		}
+
+		ul.horizontal {
+			margin: 1em 0 0;
+
+			li {
+				display: inline;
+
+				&:nth-child(n+2) {
+					&::before {
+						content: ', ';
+					}
+				}
+			}
+		}
+
+		section {
+			margin: 1.5em 0;
+
+			.title {
+				margin: 0 0 1em;
+				font-size: 1em;
+			}
+		}
+	}
+}
+
+// #footer
+// #############################################################################################
+.footer {
+	@include sp {}
+
+	margin: 2em 0;
+	text-align: center;
+}
