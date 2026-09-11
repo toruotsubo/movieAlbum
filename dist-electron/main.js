@@ -897,7 +897,7 @@ function createWindow() {
     height: 800,
     minWidth: 1024,
     minHeight: 700,
-    title: "Movie Manager",
+    title: "movieAlbum",
     icon: winIcon,
     backgroundColor: "#0b0f19",
     titleBarStyle: "hidden",

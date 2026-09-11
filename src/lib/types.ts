@@ -92,7 +92,7 @@ export interface UpdateMovieInput extends Partial<CreateMovieInput> {
 export const ALL_BASE_FIELDS = [
   { id: 'title', label: 'タイトル' },
   { id: 'genre', label: 'カテゴリ' },
-  { id: 'cast', label: '登場' },
+  { id: 'cast', label: '名前' },
   { id: 'release_year', label: '公開年' },
   { id: 'release_date', label: '公開月日' },
   { id: 'rating', label: '評価' },

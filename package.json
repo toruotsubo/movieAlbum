@@ -1,7 +1,8 @@
 {
-  "name": "movie-manager",
+  "name": "movie-album",
   "version": "1.0.0",
-  "description": "Electron + Next.js Movie Management Desktop App",
+  "description": "movieAlbum Desktop App",
+  "author": "Web Studio Tokotan",
   "main": "dist-electron/main.js",
   "private": true,
   "scripts": {
@@ -11,11 +12,12 @@
     "build:electron": "tsup electron/main.ts electron/preload.ts --out-dir dist-electron --external electron --external ffmpeg-static",
     "build:next": "next build",
     "build": "npm run build:next && npm run build:electron && electron-builder",
+    "build:appx": "npm run build:next && npm run build:electron && electron-builder --win appx",
     "start": "electron ."
   },
   "build": {
-    "appId": "com.moviemanager.app",
-    "productName": "Movie Manager",
+    "appId": "com.moviealbum.app",
+    "productName": "movieAlbum",
     "directories": {
       "output": "release"
     },
@@ -28,7 +30,16 @@
     ],
     "icon": "build/icon.png",
     "win": {
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "target": [
+        "appx"
+      ]
+    },
+    "appx": {
+      "applicationId": "com.moviealbum.app",
+      "identityName": "WebStudioTokotan.movieAlbum",
+      "publisher": "CN=031D2318-DD62-44C5-B9A7-E0D87C1EE2D8",
+      "publisherDisplayName": "Web Studio Tokotan"
     }
   },
   "dependencies": {

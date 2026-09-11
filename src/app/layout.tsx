@@ -3,7 +3,7 @@ import './globals.css';
 import { AppProvider } from '@/components/AppProvider';
 
 export const metadata: Metadata = {
-  title: 'Movie Manager',
+  title: 'movieAlbum',
   description: 'Electron + Next.js による動画管理デスクトップアプリケーション',
   icons: {
     icon: '/icon.png',

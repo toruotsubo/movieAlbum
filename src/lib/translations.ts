@@ -4,7 +4,7 @@ export type LanguageSetting = 'auto' | 'ja' | 'en';
 export const TRANSLATIONS = {
   ja: {
     // General / Common
-    appName: 'Movie Manager',
+    appName: 'movieAlbum',
     save: '保存',
     saving: '保存中...',
     saveSettings: '設定を保存する',
@@ -24,8 +24,8 @@ export const TRANSLATIONS = {
     // Fields
     field_title: 'タイトル',
     field_genre: 'カテゴリ',
-    field_cast: '登場',
-    field_cast_kana: '登場（ふりがな）',
+    field_cast: '名前',
+    field_cast_kana: '名前（ふりがな）',
     field_release_year: '公開年',
     field_release_date: '公開月日',
     field_release_full: '公開年月日',
@@ -75,7 +75,7 @@ export const TRANSLATIONS = {
     // Key Item Detail Form Modal
     key_modal_title: 'キー項目詳細編集',
     key_modal_key_value: 'キー項目値:',
-    key_modal_cast_kana_label: '登場（ふりがな）',
+    key_modal_cast_kana_label: '名前（ふりがな）',
     key_modal_cast_kana_placeholder: '例: たろう, はなこ, ぽち, ほっかいどう (カンマ区切り)',
     key_modal_rating_label: '評価',
     key_modal_tags_label: 'タグ',
@@ -164,11 +164,11 @@ export const TRANSLATIONS = {
     rating_tooltip: '評価 {rating}',
     filter_by_field: '{field}「{value}」で絞り込み',
     filter_by_genre: 'カテゴリ「{value}」で絞り込み',
-    filter_by_cast: '登場「{value}」で絞り込み',
+    filter_by_cast: '名前「{value}」で絞り込み',
   },
   en: {
     // English Translation (Defaulting to Japanese text as requested until translated by user)
-    appName: 'Movie Manager',
+    appName: 'movieAlbum',
     save: 'Save',
     saving: 'Saving...',
     saveSettings: 'Save Settings',

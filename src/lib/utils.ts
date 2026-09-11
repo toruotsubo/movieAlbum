@@ -99,7 +99,7 @@ export function getKanaForCast(
     if (idx < kanaSplits.length) {
       return kanaSplits[idx];
     } else {
-      // 登場の数に登場ふりがなが足りないときは、直前のふりがな（末尾のふりがな）を使う
+      // 名前の数に名前ふりがなが足りないときは、直前のふりがな（末尾のふりがな）を使う
       return kanaSplits[kanaSplits.length - 1];
     }
   }
