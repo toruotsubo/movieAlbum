@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, List, Settings, UploadCloud } from 'lucide-react';
+import { LayoutGrid, List, Settings, DatabasePlus } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { ALL_BASE_FIELDS } from '@/lib/types';
@@ -69,7 +69,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
         {/* Actions & Drop Hint */}
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40">
-            <UploadCloud className="w-4 h-4 text-blue-400 animate-pulse" />
+            <DatabasePlus className="w-4 h-4 text-blue-400 animate-pulse" />
             <span>{t('drag_drop_overlay_title')}</span>
           </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UploadCloud } from 'lucide-react';
+import { DatabasePlus } from 'lucide-react';
 import { useApp } from './AppProvider';
 import { isVideoFile } from '@/lib/utils';
 import { ConfirmModal } from './ConfirmModal';
@@ -101,7 +101,7 @@ export const DragDropWrapper: React.FC<DragDropWrapperProps> = ({ children, onFi
       {isDragging && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md border-4 border-dashed border-blue-500/80 animate-fadeIn pointer-events-none">
           <div className="p-6 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-400 mb-4 animate-bounce">
-            <UploadCloud className="w-16 h-16" />
+            <DatabasePlus className="w-16 h-16" />
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">{t('drag_drop_overlay_title')}</h2>
           <p className="text-slate-300 text-sm">{t('drag_drop_overlay_desc')}</p>
