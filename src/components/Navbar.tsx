@@ -2,8 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutGrid, List, Settings, DatabasePlus } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
+import { LayoutGrid, List, Settings, DatabasePlus, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { ALL_BASE_FIELDS } from '@/lib/types';
@@ -13,8 +13,9 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
+  const router = useRouter();
   const pathname = usePathname();
-  const { settings, t } = useApp();
+  const { settings, t, headerMovieCount, headerFilterText } = useApp();
 
   const isKeyItemsActive = pathname === '/';
   const isMoviesActive = pathname === '/movies' || pathname.startsWith('/movies/');
@@ -64,6 +65,23 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
             <List className="w-4 h-4" />
             <span>{t('movies_list_title')}</span>
           </Link>
+          {headerFilterText && (
+            <div className="flex items-center gap-1.5 text-xs font-medium text-blue-300 bg-blue-950/60 border border-blue-800/60 px-2.5 py-1.5 rounded-lg animate-fadeIn">
+              <span>{headerFilterText}</span>
+              <button
+                onClick={() => router.push('/movies')}
+                className="p-0.5 hover:bg-blue-800/60 rounded text-blue-400 hover:text-white transition-colors"
+                title={t('key_list_filter_clear')}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          {headerMovieCount !== null && (
+            <span className="text-xs font-medium text-slate-300 bg-slate-800/80 border border-slate-700/50 px-2.5 py-1.5 rounded-lg">
+              {t('movies_list_movies_count', { count: headerMovieCount })}
+            </span>
+          )}
         </nav>
 
         {/* Actions & Drop Hint */}

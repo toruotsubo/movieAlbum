@@ -14,7 +14,6 @@ import {
   Calendar,
   User,
   Shapes,
-  X,
   FileText,
   Edit,
   Tag,
@@ -40,7 +39,7 @@ const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k
 };
 
 function MoviesContent() {
-  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language } = useApp();
+  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language, setHeaderMovieCount, setHeaderFilterText } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterSignature = searchParams.get('filter');
@@ -103,7 +102,7 @@ function MoviesContent() {
     }
   }, [filterSignature]);
 
-  const pageTitle = useMemo(() => {
+  const filterText = useMemo(() => {
     if (filterValues && Object.keys(filterValues).length > 0) {
       const formattedVals = Object.entries(filterValues).map(([key, val]) => {
         if (key === 'release_year') {
@@ -114,10 +113,17 @@ function MoviesContent() {
         }
         return String(val);
       });
-      return t('movies_list_filtered_title', { value: formattedVals.join(' / ') });
+      return formattedVals.join(' / ');
     }
-    return t('movies_list_title');
-  }, [filterValues, t, language]);
+    return null;
+  }, [filterValues, language]);
+
+  useEffect(() => {
+    setHeaderFilterText(filterText);
+    return () => {
+      setHeaderFilterText(null);
+    };
+  }, [filterText, setHeaderFilterText]);
 
   // Extract all unique tags across movies
   const availableTags = useMemo(() => {
@@ -258,6 +264,12 @@ function MoviesContent() {
       return sortOrder === 'desc' ? -result : result;
     });
   }, [filteredMovies, sortKey, sortOrder, keyFieldId]);
+  useEffect(() => {
+    setHeaderMovieCount(sortedMovies.length);
+    return () => {
+      setHeaderMovieCount(null);
+    };
+  }, [sortedMovies.length, setHeaderMovieCount]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -296,33 +308,8 @@ function MoviesContent() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="space-y-4 pb-4 border-b border-slate-800">
-        {/* Title Row */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              <span>{pageTitle}</span>
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              {t('movies_list_movies_count', { count: sortedMovies.length })}
-            </p>
-          </div>
-
-          {/* Key Item Filter Indicator / Clear Button (Right-aligned in Title Row) */}
-          {filterSignature && (
-            <button
-              onClick={() => router.push('/movies')}
-              className="flex items-center gap-1.5 bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 border border-blue-500/40 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-              title={t('key_list_filter_clear')}
-            >
-              <span>{t('key_list_filter_clear')}</span>
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Filter & Sort Controls Row (Left-aligned) */}
+      {/* Filter & Sort Controls Row */}
+      <div className="pb-4 border-b border-slate-800">
         <div className="flex flex-wrap items-center justify-start gap-4">
           {/* Tag Filter Controls */}
           {availableTags.length > 0 && (

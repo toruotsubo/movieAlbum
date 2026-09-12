@@ -30,6 +30,10 @@ interface AppContextType {
   openSettingsModal: () => void;
   resetData: () => Promise<void>;
   deleteMovie: (id: number) => Promise<void>;
+  headerMovieCount: number | null;
+  setHeaderMovieCount: (count: number | null) => void;
+  headerFilterText: string | null;
+  setHeaderFilterText: (text: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -47,6 +51,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [movies, setMovies] = useState<Movie[]>([]);
   const [keyGroups, setKeyGroups] = useState<KeyItemGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [headerMovieCount, setHeaderMovieCount] = useState<number | null>(null);
+  const [headerFilterText, setHeaderFilterText] = useState<string | null>(null);
   const [detectedLang, setDetectedLang] = useState<Language>('ja');
 
   // Detect OS Language
@@ -303,6 +309,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         openSettingsModal: () => setIsSettingsOpen(true),
         resetData: handleResetData,
         deleteMovie: handleDeleteMovie,
+        headerMovieCount,
+        setHeaderMovieCount,
+        headerFilterText,
+        setHeaderFilterText,
       }}
     >
       <DragDropWrapper onFileDrop={handleFileDrop}>
