@@ -16,38 +16,6 @@
     "build:appx": "npm run build:next && npm run build:electron && electron-builder --win appx",
     "start": "electron ."
   },
-  "build": {
-    "appId": "com.moviealbum.app",
-    "productName": "movieAlbum",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist-electron/**/*",
-      "out/**/*"
-    ],
-    "asarUnpack": [
-      "**/node_modules/ffmpeg-static/**/*"
-    ],
-    "icon": "build/icon.png",
-    "win": {
-      "icon": "build/icon.ico",
-      "target": [
-        "nsis",
-        "appx"
-      ]
-    },
-    "appx": {
-      "applicationId": "com.moviealbum.app",
-      "identityName": "WebStudioTokotan.movieAlbum",
-      "publisher": "CN=031D2318-DD62-44C5-B9A7-E0D87C1EE2D8",
-      "publisherDisplayName": "Web Studio Tokotan",
-      "languages": [
-        "ja-JP",
-        "en-US"
-      ]
-    }
-  },
   "dependencies": {
     "clsx": "^2.1.1",
     "ffmpeg-static": "^5.3.0",
