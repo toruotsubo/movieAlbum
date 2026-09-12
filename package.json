@@ -11,9 +11,9 @@
     "dev": "concurrently -k \"npm run dev:next\" \"npm run dev:electron\" \"wait-on http://localhost:3000 && electron .\"",
     "build:electron": "tsup electron/main.ts electron/preload.ts --out-dir dist-electron --external electron --external ffmpeg-static",
     "build:next": "next build",
-    "build": "npm run build:next && npm run build:electron && electron-builder",
-    "build:exe": "npm run build:next && npm run build:electron && electron-builder --win nsis",
-    "build:appx": "npm run build:next && npm run build:electron && electron-builder --win appx",
+    "build": "npm run build:next && npm run build:electron && electron-builder --config electron-builder.config.js",
+    "build:exe": "npm run build:next && npm run build:electron && electron-builder --config electron-builder.config.js --win nsis",
+    "build:appx": "npm run build:next && npm run build:electron && electron-builder --config electron-builder.config.js --win appx",
     "start": "electron ."
   },
   "dependencies": {
