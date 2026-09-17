@@ -177,6 +177,9 @@ body {
   margin: 0 0 1em;
   font-size: 1em;
 }
+.main section .banner {
+  margin: 1em 0 0;
+}
 
 .footer {
   margin: 2em 0;
