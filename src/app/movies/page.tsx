@@ -29,11 +29,14 @@ function MoviesContent() {
   const filterSignature = searchParams.get('filter');
   const queryTag = searchParams.get('tag');
 
+  const PAGE_SIZE = 36;
   const [sortKey, setSortKey] = useState<SortKey>('title');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [ratingFilter, setRatingFilter] = useState<string | number>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [isInitialized, setIsInitialized] = useState(false);
+  const loadMoreRef = React.useRef<HTMLDivElement>(null);
 
   // Restore filter/sort state from sessionStorage on mount
   useEffect(() => {
@@ -120,21 +123,27 @@ function MoviesContent() {
     ).sort((a, b) => a.localeCompare(b, 'ja'));
   }, [movies]);
 
-  // Map of movie ID to group count and deduplicated tags of all movies in the group
+  // Map of movie ID to group count and deduplicated tags of all movies in the group: O(N)
   const groupDataMap = useMemo(() => {
-    const keyFields = settings?.key_fields || ['genre'];
+    const childrenMap = new Map<number, Movie[]>();
+    for (const m of movies) {
+      if (m.parent_movie_id) {
+        let list = childrenMap.get(m.parent_movie_id);
+        if (!list) {
+          list = [];
+          childrenMap.set(m.parent_movie_id, list);
+        }
+        list.push(m);
+      }
+    }
+
     const map = new Map<number, { count: number; tags: string[] }>();
 
     for (const movie of movies) {
       if (movie.parent_movie_id) continue;
 
-      let groupMovies: Movie[] = [movie];
-      if (movie.parent_movie_id || movie.is_grouped) {
-        const matches = getGroupMatches(movie, movies, keyFields);
-        if (matches.length > 0) {
-          groupMovies = matches;
-        }
-      }
+      const children = childrenMap.get(movie.id);
+      const groupMovies: Movie[] = children ? [movie, ...children] : [movie];
 
       // Collect all tags from the group movies without duplicates, preserving order
       const tagSet = new Set<string>();
@@ -157,7 +166,7 @@ function MoviesContent() {
     }
 
     return map;
-  }, [movies, settings]);
+  }, [movies]);
 
   const filteredMovies = useMemo(() => {
     // Exclude sibling movies (movies with a parent_movie_id)
@@ -231,6 +240,40 @@ function MoviesContent() {
       setHeaderMovieCount(null);
     };
   }, [sortedMovies.length, setHeaderMovieCount]);
+
+  // Reset pagination when filter/sort conditions change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filterSignature, ratingFilter, tagFilter, sortKey, sortOrder]);
+
+  // Infinite scroll observer: load next batch when scrolling near bottom
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => {
+            if (prev < sortedMovies.length) {
+              return Math.min(prev + PAGE_SIZE, sortedMovies.length);
+            }
+            return prev;
+          });
+        }
+      },
+      { rootMargin: '400px' }
+    );
+
+    observer.observe(target);
+    return () => {
+      observer.unobserve(target);
+    };
+  }, [sortedMovies.length]);
+
+  const displayedMovies = useMemo(() => {
+    return sortedMovies.slice(0, visibleCount);
+  }, [sortedMovies, visibleCount]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -363,7 +406,7 @@ function MoviesContent() {
 
       {/* Movies Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sortedMovies.map((movie) => {
+        {displayedMovies.map((movie) => {
           const imageSrc = formatMediaUrl(movie.summary_image_path);
           const groupInfo = groupDataMap.get(movie.id);
           const groupCount = groupInfo?.count || 1;
@@ -384,6 +427,8 @@ function MoviesContent() {
                   <img
                     src={imageSrc}
                     alt={movie.title || 'Movie'}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
                   />
                 ) : (
@@ -618,6 +663,13 @@ function MoviesContent() {
           );
         })}
       </div>
+
+      {/* Infinite Scroll Sentinel */}
+      {visibleCount < sortedMovies.length && (
+        <div ref={loadMoreRef} className="py-8 flex justify-center items-center">
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
     </div>
   );
 }
