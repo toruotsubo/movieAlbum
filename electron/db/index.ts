@@ -1,7 +1,17 @@
 import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
-import { AppSettings, Movie, KeyItemGroup, CreateMovieInput, UpdateMovieInput, UpdateKeyItemInput, DEFAULT_FIELD_ORDER } from '../../src/lib/types';
+import {
+  AppSettings,
+  Movie,
+  KeyItemGroup,
+  CreateMovieInput,
+  UpdateMovieInput,
+  UpdateKeyItemInput,
+  SaveSettingsInput,
+  DEFAULT_APP_SETTINGS,
+  DEFAULT_FIELD_ORDER,
+} from '../../src/lib/types';
 import { getSplitValues, getKanaForCast } from '../../src/lib/utils';
 
 interface JsonDatabaseSchema {
@@ -13,6 +23,64 @@ interface JsonDatabaseSchema {
 
 let jsonDb: JsonDatabaseSchema | null = null;
 let dbFilePath = '';
+
+/**
+ * Check if two movies have matching group attributes
+ */
+function isMatchingGroupAttributes(movieA: Movie, movieB: Movie, keyFields: string[]): boolean {
+  if ((movieA.title || null) !== (movieB.title || null)) return false;
+  if ((movieA.genre || null) !== (movieB.genre || null)) return false;
+  if ((movieA.release_year || null) !== (movieB.release_year || null)) return false;
+  if ((movieA.release_date || null) !== (movieB.release_date || null)) return false;
+
+  for (const kf of keyFields) {
+    if (((movieA as any)[kf] || null) !== ((movieB as any)[kf] || null)) return false;
+  }
+  return true;
+}
+
+/**
+ * Synchronize grouping relationships for a movie
+ */
+function syncGroupingForMovie(movie: Movie): void {
+  if (!jsonDb) return;
+  const keyFields = jsonDb.settings.key_fields || ['genre'];
+
+  if (movie.is_grouped) {
+    for (const m of jsonDb.movies) {
+      if (m.id === movie.id) continue;
+      if (isMatchingGroupAttributes(movie, m, keyFields)) {
+        m.parent_movie_id = movie.id;
+        m.updated_at = new Date().toISOString();
+      }
+    }
+  } else {
+    for (const m of jsonDb.movies) {
+      if (m.parent_movie_id === movie.id) {
+        m.parent_movie_id = null;
+        m.updated_at = new Date().toISOString();
+      }
+    }
+  }
+}
+
+/**
+ * Build combinations of key field values for a movie
+ */
+function buildKeyCombinations(movie: Movie, keyFields: string[]): Record<string, string>[] {
+  let combinations: Record<string, string>[] = [{}];
+  for (const kf of keyFields) {
+    const values = getSplitValues((movie as any)[kf]);
+    const nextCombinations: Record<string, string>[] = [];
+    for (const comb of combinations) {
+      for (const val of values) {
+        nextCombinations.push({ ...comb, [kf]: val });
+      }
+    }
+    combinations = nextCombinations;
+  }
+  return combinations;
+}
 
 export function initDatabase() {
   const userDataPath = app.getPath('userData');
@@ -27,26 +95,26 @@ export function initDatabase() {
     try {
       jsonDb = JSON.parse(fs.readFileSync(dbFilePath, 'utf-8'));
     } catch (err) {
-      console.error('Failed to parse database file, resetting:', err);
-      jsonDb = null;
+      console.error('Failed to parse database file, attempting recovery from backup:', err);
+      const bakFilePath = `${dbFilePath}.bak`;
+      if (fs.existsSync(bakFilePath)) {
+        try {
+          jsonDb = JSON.parse(fs.readFileSync(bakFilePath, 'utf-8'));
+          console.warn('Successfully recovered database from backup:', bakFilePath);
+          saveDatabase();
+        } catch (bakErr) {
+          console.error('Failed to parse backup database file:', bakErr);
+          jsonDb = null;
+        }
+      } else {
+        jsonDb = null;
+      }
     }
   }
 
   if (!jsonDb) {
     jsonDb = {
-      settings: {
-        id: 1,
-        is_initialized: false,
-        custom_field_1_name: null,
-        custom_field_2_name: null,
-        custom_field_3_name: null,
-        custom_field_1_display_in_list: true,
-        custom_field_2_display_in_list: true,
-        custom_field_3_display_in_list: true,
-        key_fields: ['genre', 'cast'],
-        field_order: DEFAULT_FIELD_ORDER,
-        language: 'auto',
-      },
+      settings: { ...DEFAULT_APP_SETTINGS },
       movies: [],
       keyRatings: {},
       keyTags: {},
@@ -59,7 +127,27 @@ export function initDatabase() {
 
 function saveDatabase() {
   if (jsonDb && dbFilePath) {
-    fs.writeFileSync(dbFilePath, JSON.stringify(jsonDb, null, 2), 'utf-8');
+    const tmpFilePath = `${dbFilePath}.tmp`;
+    const jsonStr = JSON.stringify(jsonDb, null, 2);
+    try {
+      // Atomic write using temp file and rename
+      fs.writeFileSync(tmpFilePath, jsonStr, 'utf-8');
+      fs.renameSync(tmpFilePath, dbFilePath);
+
+      // Create backup copy for recovery
+      try {
+        fs.copyFileSync(dbFilePath, `${dbFilePath}.bak`);
+      } catch {
+        // Backup failure is non-fatal
+      }
+    } catch (err) {
+      console.error('Failed to atomically save database, falling back to direct write:', err);
+      try {
+        fs.writeFileSync(dbFilePath, jsonStr, 'utf-8');
+      } catch (writeErr) {
+        console.error('Direct database write failed:', writeErr);
+      }
+    }
   }
 }
 
@@ -69,29 +157,27 @@ export function getAppSettings(): AppSettings {
   return jsonDb!.settings;
 }
 
-export function saveAppSettings(input: {
-  is_initialized?: boolean;
-  custom_field_1_name?: string | null;
-  custom_field_2_name?: string | null;
-  custom_field_3_name?: string | null;
-  custom_field_1_display_in_list?: boolean;
-  custom_field_2_display_in_list?: boolean;
-  custom_field_3_display_in_list?: boolean;
-  key_fields?: string[];
-  field_order?: string[];
-  language?: 'auto' | 'ja' | 'en' | null;
-}): AppSettings {
+export function saveAppSettings(input: SaveSettingsInput): AppSettings {
   if (!jsonDb) initDatabase();
   jsonDb!.settings = {
     ...jsonDb!.settings,
     ...input,
     is_initialized: input.is_initialized !== undefined ? input.is_initialized : jsonDb!.settings.is_initialized,
-    custom_field_1_display_in_list: input.custom_field_1_display_in_list !== undefined ? input.custom_field_1_display_in_list : (jsonDb!.settings.custom_field_1_display_in_list !== false),
-    custom_field_2_display_in_list: input.custom_field_2_display_in_list !== undefined ? input.custom_field_2_display_in_list : (jsonDb!.settings.custom_field_2_display_in_list !== false),
-    custom_field_3_display_in_list: input.custom_field_3_display_in_list !== undefined ? input.custom_field_3_display_in_list : (jsonDb!.settings.custom_field_3_display_in_list !== false),
+    custom_field_1_display_in_list:
+      input.custom_field_1_display_in_list !== undefined
+        ? input.custom_field_1_display_in_list
+        : jsonDb!.settings.custom_field_1_display_in_list !== false,
+    custom_field_2_display_in_list:
+      input.custom_field_2_display_in_list !== undefined
+        ? input.custom_field_2_display_in_list
+        : jsonDb!.settings.custom_field_2_display_in_list !== false,
+    custom_field_3_display_in_list:
+      input.custom_field_3_display_in_list !== undefined
+        ? input.custom_field_3_display_in_list
+        : jsonDb!.settings.custom_field_3_display_in_list !== false,
     key_fields: input.key_fields || jsonDb!.settings.key_fields,
     field_order: input.field_order || jsonDb!.settings.field_order || DEFAULT_FIELD_ORDER,
-    language: input.language !== undefined ? input.language : (jsonDb!.settings.language || 'auto'),
+    language: input.language !== undefined ? input.language : jsonDb!.settings.language || 'auto',
   };
   saveDatabase();
   return jsonDb!.settings;
@@ -120,7 +206,10 @@ export function addMovie(movie: CreateMovieInput): Movie {
     return updateMovie({ ...movie, id: existing.id });
   }
 
-  const newId = jsonDb!.movies.length > 0 ? Math.max(...jsonDb!.movies.map((m) => m.id)) + 1 : 1;
+  // Safe ID generation without array spread limits
+  const maxId = jsonDb!.movies.reduce((max, m) => Math.max(max, m.id), 0);
+  const newId = maxId + 1;
+
   const newMovie: Movie = {
     id: newId,
     file_path: movie.file_path,
@@ -151,6 +240,7 @@ export function addMovie(movie: CreateMovieInput): Movie {
   };
 
   jsonDb!.movies.push(newMovie);
+  syncGroupingForMovie(newMovie);
   saveDatabase();
   return newMovie;
 }
@@ -160,20 +250,30 @@ export function updateMovie(movie: UpdateMovieInput): Movie {
   const index = jsonDb!.movies.findIndex((m) => m.id === movie.id);
   if (index === -1) throw new Error(`Movie with id ${movie.id} not found.`);
 
-  jsonDb!.movies[index] = {
+  const updatedMovie: Movie = {
     ...jsonDb!.movies[index],
     ...movie,
     updated_at: new Date().toISOString(),
   };
 
+  jsonDb!.movies[index] = updatedMovie;
+  syncGroupingForMovie(updatedMovie);
   saveDatabase();
-  return jsonDb!.movies[index];
+  return updatedMovie;
 }
 
 export function deleteMovie(id: number): boolean {
   if (!jsonDb) initDatabase();
   const index = jsonDb!.movies.findIndex((m) => m.id === id);
   if (index !== -1) {
+    // Clear parent_movie_id for any sibling movies referencing this deleted movie
+    for (const m of jsonDb!.movies) {
+      if (m.parent_movie_id === id) {
+        m.parent_movie_id = null;
+        m.updated_at = new Date().toISOString();
+      }
+    }
+
     jsonDb!.movies.splice(index, 1);
     saveDatabase();
     return true;
@@ -203,19 +303,7 @@ export function getKeyItemGroups(): KeyItemGroup[] {
   const groupsMap = new Map<string, { keyValues: Record<string, string>; movies: Movie[] }>();
 
   for (const movie of movies) {
-    let combinations: Record<string, string>[] = [{}];
-
-    for (const kf of keyFields) {
-      const values = getSplitValues((movie as any)[kf]);
-      const nextCombinations: Record<string, string>[] = [];
-      for (const comb of combinations) {
-        for (const val of values) {
-          nextCombinations.push({ ...comb, [kf]: val });
-        }
-      }
-      combinations = nextCombinations;
-    }
-
+    const combinations = buildKeyCombinations(movie, keyFields);
     for (const keyValues of combinations) {
       const signature = JSON.stringify(keyValues);
       if (!groupsMap.has(signature)) {
@@ -228,7 +316,6 @@ export function getKeyItemGroups(): KeyItemGroup[] {
   const result: KeyItemGroup[] = [];
 
   for (const [signature, group] of groupsMap.entries()) {
-    // "サマリー画像は、項目に紐づいた動画のうち評価が高いもの1点を自動的に選択する。選択はキー項目一覧画面表示時に行われる。"
     const sortedMovies = [...group.movies].sort((a, b) => b.rating - a.rating);
     const topMovie = sortedMovies.find((m) => m.summary_image_path) || sortedMovies[0];
 
@@ -303,18 +390,7 @@ export function updateKeyItemDetails(input: UpdateKeyItemInput): void {
     }
 
     for (const movie of movies) {
-      let combinations: Record<string, string>[] = [{}];
-      for (const kf of keyFields) {
-        const values = getSplitValues((movie as any)[kf]);
-        const nextCombinations: Record<string, string>[] = [];
-        for (const comb of combinations) {
-          for (const val of values) {
-            nextCombinations.push({ ...comb, [kf]: val });
-          }
-        }
-        combinations = nextCombinations;
-      }
-
+      const combinations = buildKeyCombinations(movie, keyFields);
       const isMatch = combinations.some((comb) => JSON.stringify(comb) === key_signature);
       if (isMatch) {
         if (targetCastVal && movie.cast) {
@@ -359,19 +435,7 @@ export function resetAllData(): AppSettings {
   }
 
   jsonDb = {
-    settings: {
-      id: 1,
-      is_initialized: false,
-      custom_field_1_name: null,
-      custom_field_2_name: null,
-      custom_field_3_name: null,
-      custom_field_1_display_in_list: true,
-      custom_field_2_display_in_list: true,
-      custom_field_3_display_in_list: true,
-      key_fields: ['genre'],
-      field_order: DEFAULT_FIELD_ORDER,
-      language: 'auto',
-    },
+    settings: { ...DEFAULT_APP_SETTINGS },
     movies: [],
     keyRatings: {},
     keyTags: {},
@@ -380,4 +444,3 @@ export function resetAllData(): AppSettings {
   saveDatabase();
   return jsonDb.settings;
 }
-

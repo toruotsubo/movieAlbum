@@ -37,6 +37,7 @@ var import_electron3 = require("electron");
 var import_path4 = __toESM(require("path"));
 var import_fs4 = __toESM(require("fs"));
 var import_url = __toESM(require("url"));
+var import_child_process2 = require("child_process");
 
 // electron/db/index.ts
 var import_path = __toESM(require("path"));
@@ -44,6 +45,29 @@ var import_fs = __toESM(require("fs"));
 var import_electron = require("electron");
 
 // src/lib/types.ts
+var DEFAULT_APP_SETTINGS = {
+  id: 1,
+  is_initialized: false,
+  custom_field_1_name: null,
+  custom_field_2_name: null,
+  custom_field_3_name: null,
+  custom_field_1_display_in_list: true,
+  custom_field_2_display_in_list: true,
+  custom_field_3_display_in_list: true,
+  key_fields: ["genre"],
+  field_order: [
+    "title",
+    "rating",
+    "genre",
+    "cast",
+    "release_year",
+    "release_date",
+    "custom_field_1",
+    "custom_field_2",
+    "custom_field_3"
+  ],
+  language: "auto"
+};
 var DEFAULT_FIELD_ORDER = [
   "title",
   "rating",
@@ -88,6 +112,50 @@ function getKanaForCast(cast, castKana, targetCastVal) {
 // electron/db/index.ts
 var jsonDb = null;
 var dbFilePath = "";
+function isMatchingGroupAttributes(movieA, movieB, keyFields) {
+  if ((movieA.title || null) !== (movieB.title || null)) return false;
+  if ((movieA.genre || null) !== (movieB.genre || null)) return false;
+  if ((movieA.release_year || null) !== (movieB.release_year || null)) return false;
+  if ((movieA.release_date || null) !== (movieB.release_date || null)) return false;
+  for (const kf of keyFields) {
+    if ((movieA[kf] || null) !== (movieB[kf] || null)) return false;
+  }
+  return true;
+}
+function syncGroupingForMovie(movie) {
+  if (!jsonDb) return;
+  const keyFields = jsonDb.settings.key_fields || ["genre"];
+  if (movie.is_grouped) {
+    for (const m of jsonDb.movies) {
+      if (m.id === movie.id) continue;
+      if (isMatchingGroupAttributes(movie, m, keyFields)) {
+        m.parent_movie_id = movie.id;
+        m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      }
+    }
+  } else {
+    for (const m of jsonDb.movies) {
+      if (m.parent_movie_id === movie.id) {
+        m.parent_movie_id = null;
+        m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      }
+    }
+  }
+}
+function buildKeyCombinations(movie, keyFields) {
+  let combinations = [{}];
+  for (const kf of keyFields) {
+    const values = getSplitValues(movie[kf]);
+    const nextCombinations = [];
+    for (const comb of combinations) {
+      for (const val of values) {
+        nextCombinations.push({ ...comb, [kf]: val });
+      }
+    }
+    combinations = nextCombinations;
+  }
+  return combinations;
+}
 function initDatabase() {
   const userDataPath = import_electron.app.getPath("userData");
   const dbDir = import_path.default.join(userDataPath, "db");
@@ -99,25 +167,25 @@ function initDatabase() {
     try {
       jsonDb = JSON.parse(import_fs.default.readFileSync(dbFilePath, "utf-8"));
     } catch (err) {
-      console.error("Failed to parse database file, resetting:", err);
-      jsonDb = null;
+      console.error("Failed to parse database file, attempting recovery from backup:", err);
+      const bakFilePath = `${dbFilePath}.bak`;
+      if (import_fs.default.existsSync(bakFilePath)) {
+        try {
+          jsonDb = JSON.parse(import_fs.default.readFileSync(bakFilePath, "utf-8"));
+          console.warn("Successfully recovered database from backup:", bakFilePath);
+          saveDatabase();
+        } catch (bakErr) {
+          console.error("Failed to parse backup database file:", bakErr);
+          jsonDb = null;
+        }
+      } else {
+        jsonDb = null;
+      }
     }
   }
   if (!jsonDb) {
     jsonDb = {
-      settings: {
-        id: 1,
-        is_initialized: false,
-        custom_field_1_name: null,
-        custom_field_2_name: null,
-        custom_field_3_name: null,
-        custom_field_1_display_in_list: true,
-        custom_field_2_display_in_list: true,
-        custom_field_3_display_in_list: true,
-        key_fields: ["genre", "cast"],
-        field_order: DEFAULT_FIELD_ORDER,
-        language: "auto"
-      },
+      settings: { ...DEFAULT_APP_SETTINGS },
       movies: [],
       keyRatings: {},
       keyTags: {}
@@ -128,7 +196,23 @@ function initDatabase() {
 }
 function saveDatabase() {
   if (jsonDb && dbFilePath) {
-    import_fs.default.writeFileSync(dbFilePath, JSON.stringify(jsonDb, null, 2), "utf-8");
+    const tmpFilePath = `${dbFilePath}.tmp`;
+    const jsonStr = JSON.stringify(jsonDb, null, 2);
+    try {
+      import_fs.default.writeFileSync(tmpFilePath, jsonStr, "utf-8");
+      import_fs.default.renameSync(tmpFilePath, dbFilePath);
+      try {
+        import_fs.default.copyFileSync(dbFilePath, `${dbFilePath}.bak`);
+      } catch {
+      }
+    } catch (err) {
+      console.error("Failed to atomically save database, falling back to direct write:", err);
+      try {
+        import_fs.default.writeFileSync(dbFilePath, jsonStr, "utf-8");
+      } catch (writeErr) {
+        console.error("Direct database write failed:", writeErr);
+      }
+    }
   }
 }
 function getAppSettings() {
@@ -169,7 +253,8 @@ function addMovie(movie) {
   if (existing) {
     return updateMovie({ ...movie, id: existing.id });
   }
-  const newId = jsonDb.movies.length > 0 ? Math.max(...jsonDb.movies.map((m) => m.id)) + 1 : 1;
+  const maxId = jsonDb.movies.reduce((max, m) => Math.max(max, m.id), 0);
+  const newId = maxId + 1;
   const newMovie = {
     id: newId,
     file_path: movie.file_path,
@@ -199,6 +284,7 @@ function addMovie(movie) {
     updated_at: (/* @__PURE__ */ new Date()).toISOString()
   };
   jsonDb.movies.push(newMovie);
+  syncGroupingForMovie(newMovie);
   saveDatabase();
   return newMovie;
 }
@@ -206,18 +292,26 @@ function updateMovie(movie) {
   if (!jsonDb) initDatabase();
   const index = jsonDb.movies.findIndex((m) => m.id === movie.id);
   if (index === -1) throw new Error(`Movie with id ${movie.id} not found.`);
-  jsonDb.movies[index] = {
+  const updatedMovie = {
     ...jsonDb.movies[index],
     ...movie,
     updated_at: (/* @__PURE__ */ new Date()).toISOString()
   };
+  jsonDb.movies[index] = updatedMovie;
+  syncGroupingForMovie(updatedMovie);
   saveDatabase();
-  return jsonDb.movies[index];
+  return updatedMovie;
 }
 function deleteMovie(id) {
   if (!jsonDb) initDatabase();
   const index = jsonDb.movies.findIndex((m) => m.id === id);
   if (index !== -1) {
+    for (const m of jsonDb.movies) {
+      if (m.parent_movie_id === id) {
+        m.parent_movie_id = null;
+        m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      }
+    }
     jsonDb.movies.splice(index, 1);
     saveDatabase();
     return true;
@@ -240,17 +334,7 @@ function getKeyItemGroups() {
   if (keyFields.length === 0) return [];
   const groupsMap = /* @__PURE__ */ new Map();
   for (const movie of movies) {
-    let combinations = [{}];
-    for (const kf of keyFields) {
-      const values = getSplitValues(movie[kf]);
-      const nextCombinations = [];
-      for (const comb of combinations) {
-        for (const val of values) {
-          nextCombinations.push({ ...comb, [kf]: val });
-        }
-      }
-      combinations = nextCombinations;
-    }
+    const combinations = buildKeyCombinations(movie, keyFields);
     for (const keyValues of combinations) {
       const signature = JSON.stringify(keyValues);
       if (!groupsMap.has(signature)) {
@@ -322,17 +406,7 @@ function updateKeyItemDetails(input) {
       console.error("Failed to parse key_signature in updateKeyItemDetails:", e);
     }
     for (const movie of movies) {
-      let combinations = [{}];
-      for (const kf of keyFields) {
-        const values = getSplitValues(movie[kf]);
-        const nextCombinations = [];
-        for (const comb of combinations) {
-          for (const val of values) {
-            nextCombinations.push({ ...comb, [kf]: val });
-          }
-        }
-        combinations = nextCombinations;
-      }
+      const combinations = buildKeyCombinations(movie, keyFields);
       const isMatch = combinations.some((comb) => JSON.stringify(comb) === key_signature);
       if (isMatch) {
         if (targetCastVal && movie.cast) {
@@ -371,19 +445,7 @@ function resetAllData() {
     console.error("Failed to clear thumbnails directory:", err);
   }
   jsonDb = {
-    settings: {
-      id: 1,
-      is_initialized: false,
-      custom_field_1_name: null,
-      custom_field_2_name: null,
-      custom_field_3_name: null,
-      custom_field_1_display_in_list: true,
-      custom_field_2_display_in_list: true,
-      custom_field_3_display_in_list: true,
-      key_fields: ["genre"],
-      field_order: DEFAULT_FIELD_ORDER,
-      language: "auto"
-    },
+    settings: { ...DEFAULT_APP_SETTINGS },
     movies: [],
     keyRatings: {},
     keyTags: {}
@@ -430,7 +492,7 @@ function getFFmpegPath() {
 }
 
 // electron/metadataParser.ts
-function extractVideoMetadata(filePath) {
+async function extractVideoMetadata(filePath) {
   try {
     if (!import_fs3.default.existsSync(filePath)) {
       return null;
@@ -456,7 +518,7 @@ function extractVideoMetadata(filePath) {
       }
     }
     if (!meta || !meta.duration || !meta.width) {
-      const ffmpegMeta = extractMetadataWithFFmpeg(filePath);
+      const ffmpegMeta = await extractMetadataWithFFmpeg(filePath);
       if (ffmpegMeta) {
         meta = {
           duration: meta?.duration ?? ffmpegMeta.duration,
@@ -478,46 +540,49 @@ function extractVideoMetadata(filePath) {
     return null;
   }
 }
-function extractMetadataWithFFmpeg(filePath) {
-  try {
-    let output = "";
-    try {
-      output = (0, import_child_process.execFileSync)(getFFmpegPath(), ["-hide_banner", "-i", filePath], {
+async function extractMetadataWithFFmpeg(filePath) {
+  return new Promise((resolve) => {
+    (0, import_child_process.execFile)(
+      getFFmpegPath(),
+      ["-hide_banner", "-i", filePath],
+      {
         encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 5e3
-      }).toString();
-    } catch (err) {
-      output = err.stderr ? err.stderr.toString() : err.output ? err.output.toString() : "";
-    }
-    if (!output) return null;
-    let duration;
-    let width;
-    let height;
-    let frameRate;
-    const durMatch = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
-    if (durMatch) {
-      const h = parseFloat(durMatch[1]);
-      const m = parseFloat(durMatch[2]);
-      const s = parseFloat(durMatch[3]);
-      duration = Math.round((h * 3600 + m * 60 + s) * 100) / 100;
-    }
-    const streamMatch = output.match(/Stream #\d+:\d+.*?: Video:.*? (\d{2,5})x(\d{2,5})/);
-    if (streamMatch) {
-      width = parseInt(streamMatch[1], 10);
-      height = parseInt(streamMatch[2], 10);
-    }
-    const fpsMatch = output.match(/(\d+(?:\.\d+)?)\s*fps/);
-    if (fpsMatch) {
-      frameRate = Math.round(parseFloat(fpsMatch[1]) * 100) / 100;
-    }
-    if (duration || width || height) {
-      return { duration, width, height, frameRate };
-    }
-  } catch (err) {
-    console.warn("FFmpeg metadata extraction fallback failed:", err);
-  }
-  return null;
+        timeout: 8e3
+      },
+      (err, _stdout, stderr) => {
+        const output = (stderr || "") + (_stdout || "") + (err?.message || "");
+        if (!output) {
+          resolve(null);
+          return;
+        }
+        let duration;
+        let width;
+        let height;
+        let frameRate;
+        const durMatch = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+        if (durMatch) {
+          const h = parseFloat(durMatch[1]);
+          const m = parseFloat(durMatch[2]);
+          const s = parseFloat(durMatch[3]);
+          duration = Math.round((h * 3600 + m * 60 + s) * 100) / 100;
+        }
+        const streamMatch = output.match(/Stream #\d+:\d+.*?: Video:.*? (\d{2,5})x(\d{2,5})/);
+        if (streamMatch) {
+          width = parseInt(streamMatch[1], 10);
+          height = parseInt(streamMatch[2], 10);
+        }
+        const fpsMatch = output.match(/(\d+(?:\.\d+)?)\s*fps/);
+        if (fpsMatch) {
+          frameRate = Math.round(parseFloat(fpsMatch[1]) * 100) / 100;
+        }
+        if (duration || width || height) {
+          resolve({ duration, width, height, frameRate });
+        } else {
+          resolve(null);
+        }
+      }
+    );
+  });
 }
 function extractMp4MetadataNative(filePath, fileSize) {
   let fd = null;
@@ -862,7 +927,6 @@ function extractAviMetadataNative(filePath) {
 }
 
 // electron/main.ts
-var import_child_process2 = require("child_process");
 import_electron3.protocol.registerSchemesAsPrivileged([
   {
     scheme: "app",
@@ -911,7 +975,7 @@ function createWindow() {
       preload: import_path4.default.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false
+      webSecurity: true
     }
   });
   mainWindow.setMenu(null);
@@ -954,7 +1018,7 @@ function registerAppProtocol() {
   });
 }
 function registerMediaProtocol() {
-  import_electron3.protocol.registerFileProtocol("media", (request, callback) => {
+  import_electron3.protocol.handle("media", (request) => {
     try {
       let rawUrl = request.url.replace(/^media:\/\/(local\/)?/, "");
       let cleanUrl = rawUrl.split("?")[0].split("#")[0];
@@ -965,11 +1029,59 @@ function registerMediaProtocol() {
         }
       }
       const normalizedPath = import_path4.default.normalize(decodedPath);
-      callback({ path: normalizedPath });
+      if (!import_fs4.default.existsSync(normalizedPath)) {
+        return new Response("Media Not Found", { status: 404 });
+      }
+      return import_electron3.net.fetch(import_url.default.pathToFileURL(normalizedPath).toString());
     } catch (error) {
       console.error("Failed to handle media file protocol:", error);
-      callback({ error: -6 });
+      return new Response("Internal Server Error", { status: 500 });
     }
+  });
+}
+async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
+  if (!import_fs4.default.existsSync(filePath)) {
+    return null;
+  }
+  const meta = await extractVideoMetadata(filePath);
+  const duration = meta?.duration || null;
+  let targetTime = targetTimeInput;
+  if (targetTime === void 0 || targetTime === null || isNaN(targetTime)) {
+    targetTime = duration && duration > 0 ? duration * 0.5 : 0;
+  }
+  return new Promise((resolve) => {
+    const userDataPath = import_electron3.app.getPath("userData");
+    const thumbDir = import_path4.default.join(userDataPath, "thumbnails");
+    if (!import_fs4.default.existsSync(thumbDir)) {
+      import_fs4.default.mkdirSync(thumbDir, { recursive: true });
+    }
+    const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
+    const fullPath = import_path4.default.join(thumbDir, filename);
+    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : "0";
+    (0, import_child_process2.execFile)(
+      getFFmpegPath(),
+      [
+        "-y",
+        "-ss",
+        seekArg,
+        "-i",
+        filePath,
+        "-vframes",
+        "1",
+        "-vf",
+        "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
+        fullPath
+      ],
+      { timeout: 15e3 },
+      (err) => {
+        if (!err && import_fs4.default.existsSync(fullPath)) {
+          resolve({ imagePath: fullPath, duration, targetTime });
+        } else {
+          console.error("FFmpeg thumbnail generation error:", err);
+          resolve(null);
+        }
+      }
+    );
   });
 }
 import_electron3.app.whenReady().then(() => {
@@ -1049,52 +1161,6 @@ import_electron3.ipcMain.handle("app:saveSummaryImage", async (_, base64Data) =>
     throw new Error("SAVE_SUMMARY_FAILED");
   }
 });
-async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
-  return new Promise((resolve) => {
-    if (!import_fs4.default.existsSync(filePath)) {
-      resolve(null);
-      return;
-    }
-    const meta = extractVideoMetadata(filePath);
-    const duration = meta?.duration || null;
-    let targetTime = targetTimeInput;
-    if (targetTime === void 0 || targetTime === null || isNaN(targetTime)) {
-      targetTime = duration && duration > 0 ? duration * 0.5 : 0;
-    }
-    const userDataPath = import_electron3.app.getPath("userData");
-    const thumbDir = import_path4.default.join(userDataPath, "thumbnails");
-    if (!import_fs4.default.existsSync(thumbDir)) {
-      import_fs4.default.mkdirSync(thumbDir, { recursive: true });
-    }
-    const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
-    const fullPath = import_path4.default.join(thumbDir, filename);
-    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : "0";
-    (0, import_child_process2.execFile)(
-      getFFmpegPath(),
-      [
-        "-y",
-        "-ss",
-        seekArg,
-        "-i",
-        filePath,
-        "-vframes",
-        "1",
-        "-vf",
-        "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
-        fullPath
-      ],
-      { timeout: 15e3 },
-      (err) => {
-        if (!err && import_fs4.default.existsSync(fullPath)) {
-          resolve({ imagePath: fullPath, duration, targetTime });
-        } else {
-          console.error("FFmpeg thumbnail generation error:", err);
-          resolve(null);
-        }
-      }
-    );
-  });
-}
 import_electron3.ipcMain.handle("app:generateThumbnail", async (_, { filePath, targetTime }) => {
   return generateThumbnailWithFFmpeg(filePath, targetTime);
 });

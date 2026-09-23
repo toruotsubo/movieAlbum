@@ -3,9 +3,9 @@
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, getSplitValues, formatReleaseDate } from '@/lib/utils';
+import { formatMediaUrl, getSplitValues, formatReleaseDate, getKeyFieldLabel, getGroupMatches } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ALL_BASE_FIELDS, AppSettings, Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
+import { Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
 import {
   Play,
   ArrowUpDown,
@@ -21,22 +21,6 @@ import {
 import { clsx } from 'clsx';
 
 type SortKey = 'title' | 'genre' | 'key_field' | 'release';
-
-const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k: any) => string): string => {
-  if (keyId === 'title') return tFunc('field_title');
-  if (keyId === 'genre') return tFunc('field_genre');
-  if (keyId === 'cast') return tFunc('field_cast');
-  if (keyId === 'release_year') return tFunc('field_release_year');
-  if (keyId === 'release_date') return tFunc('field_release_date');
-  if (keyId === 'rating') return tFunc('field_rating');
-
-  if (keyId === 'custom_field_1') return settings?.custom_field_1_name || tFunc('field_custom_1_default');
-  if (keyId === 'custom_field_2') return settings?.custom_field_2_name || tFunc('field_custom_2_default');
-  if (keyId === 'custom_field_3') return settings?.custom_field_3_name || tFunc('field_custom_3_default');
-
-  const base = ALL_BASE_FIELDS.find((f) => f.id === keyId);
-  return base ? tFunc(`field_${base.id}` as any) : tFunc('field_key_item');
-};
 
 function MoviesContent() {
   const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language, setHeaderMovieCount, setHeaderFilterText } = useApp();
@@ -144,34 +128,11 @@ function MoviesContent() {
     for (const movie of movies) {
       if (movie.parent_movie_id) continue;
 
-      const parentId = movie.parent_movie_id || (movie.is_grouped ? movie.id : null);
       let groupMovies: Movie[] = [movie];
-
-      if (parentId || movie.is_grouped) {
-        const matches = movies.filter((m) => {
-          if (parentId && (m.id === parentId || m.parent_movie_id === parentId)) {
-            return true;
-          }
-          if (m.parent_movie_id === movie.id || movie.parent_movie_id === m.id) {
-            return true;
-          }
-          if (movie.is_grouped && m.is_grouped) {
-            if ((m.title || null) !== (movie.title || null)) return false;
-            if ((m.genre || null) !== (movie.genre || null)) return false;
-            if ((m.release_year || null) !== (movie.release_year || null)) return false;
-            if ((m.release_date || null) !== (movie.release_date || null)) return false;
-
-            for (const kf of keyFields) {
-              if (((m as any)[kf] || null) !== ((movie as any)[kf] || null)) return false;
-            }
-            return true;
-          }
-          return false;
-        });
-
-        const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
-        if (uniqueMatches.length > 0) {
-          groupMovies = uniqueMatches;
+      if (movie.parent_movie_id || movie.is_grouped) {
+        const matches = getGroupMatches(movie, movies, keyFields);
+        if (matches.length > 0) {
+          groupMovies = matches;
         }
       }
 

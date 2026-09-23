@@ -12,6 +12,32 @@ export interface AppSettings {
   language?: 'auto' | 'ja' | 'en' | null; // Language setting
 }
 
+export type SaveSettingsInput = Partial<Omit<AppSettings, 'id'>>;
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  id: 1,
+  is_initialized: false,
+  custom_field_1_name: null,
+  custom_field_2_name: null,
+  custom_field_3_name: null,
+  custom_field_1_display_in_list: true,
+  custom_field_2_display_in_list: true,
+  custom_field_3_display_in_list: true,
+  key_fields: ['genre'],
+  field_order: [
+    'title',
+    'rating',
+    'genre',
+    'cast',
+    'release_year',
+    'release_date',
+    'custom_field_1',
+    'custom_field_2',
+    'custom_field_3',
+  ],
+  language: 'auto',
+};
+
 export interface Movie {
   id: number;
   file_path: string;

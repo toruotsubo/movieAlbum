@@ -3,7 +3,7 @@
 import React, { Suspense, useMemo, useEffect } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, formatReleaseDate, getSplitValues } from '@/lib/utils';
+import { formatMediaUrl, formatReleaseDate, getSplitValues, getGroupMatches } from '@/lib/utils';
 import { formatDuration, formatResolution, formatFrameRate, formatFileSize } from '@/lib/metadataExtractor';
 import { ensureLegacyMovieMetadata } from '@/lib/legacyMetadataFetcher';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -59,34 +59,7 @@ function MovieDetailContent() {
     if (!movie) return [];
 
     const keyFields = settings?.key_fields || ['genre'];
-    const parentId = movie.parent_movie_id || (movie.is_grouped ? movie.id : null);
-
-    const matches = movies.filter((m) => {
-      // 1. Check parent-child relationships
-      if (parentId && (m.id === parentId || m.parent_movie_id === parentId)) {
-        return true;
-      }
-      if (m.parent_movie_id === movie.id || movie.parent_movie_id === m.id) {
-        return true;
-      }
-
-      // 2. Check matching attributes if both are grouped
-      if (movie.is_grouped && m.is_grouped) {
-        if ((m.title || null) !== (movie.title || null)) return false;
-        if ((m.genre || null) !== (movie.genre || null)) return false;
-        if ((m.release_year || null) !== (movie.release_year || null)) return false;
-        if ((m.release_date || null) !== (movie.release_date || null)) return false;
-
-        for (const kf of keyFields) {
-          if (((m as any)[kf] || null) !== ((movie as any)[kf] || null)) return false;
-        }
-        return true;
-      }
-
-      return false;
-    });
-
-    const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
+    const uniqueMatches = getGroupMatches(movie, movies, keyFields);
 
     return uniqueMatches.sort((a, b) => {
       const fileA = a.file_name || a.title || '';

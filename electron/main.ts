@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, protocol, Menu, net } from 'electro
 import path from 'path';
 import fs from 'fs';
 import url from 'url';
+import { execFile } from 'child_process';
 import {
   initDatabase,
   getAppSettings,
@@ -18,6 +19,8 @@ import {
   updateKeyItemDetails,
   resetAllData,
 } from './db';
+import { extractVideoMetadata } from './metadataParser';
+import { getFFmpegPath } from './ffmpegPath';
 
 // Register scheme privileges before app is ready
 protocol.registerSchemesAsPrivileged([
@@ -72,7 +75,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false,
+      webSecurity: true,
     },
   });
 
@@ -124,9 +127,9 @@ function registerAppProtocol() {
   });
 }
 
-// Setup custom protocol for local media files using native File Protocol binding
+// Setup custom protocol for local media files using net.fetch
 function registerMediaProtocol() {
-  protocol.registerFileProtocol('media', (request, callback) => {
+  protocol.handle('media', (request) => {
     try {
       // 1. Remove media:// or media://local/ prefix
       let rawUrl = request.url.replace(/^media:\/\/(local\/)?/, '');
@@ -145,11 +148,68 @@ function registerMediaProtocol() {
       }
 
       const normalizedPath = path.normalize(decodedPath);
-      callback({ path: normalizedPath });
+      if (!fs.existsSync(normalizedPath)) {
+        return new Response('Media Not Found', { status: 404 });
+      }
+
+      return net.fetch(url.pathToFileURL(normalizedPath).toString());
     } catch (error) {
       console.error('Failed to handle media file protocol:', error);
-      callback({ error: -6 }); // NET_ERROR FILE_NOT_FOUND
+      return new Response('Internal Server Error', { status: 500 });
     }
+  });
+}
+
+/**
+ * Generate 720x405 summary thumbnail from video file using FFmpeg
+ */
+export async function generateThumbnailWithFFmpeg(
+  filePath: string,
+  targetTimeInput?: number | null
+): Promise<{ imagePath: string; duration: number | null; targetTime: number } | null> {
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  const meta = await extractVideoMetadata(filePath);
+  const duration = meta?.duration || null;
+
+  let targetTime = targetTimeInput;
+  if (targetTime === undefined || targetTime === null || isNaN(targetTime)) {
+    targetTime = duration && duration > 0 ? duration * 0.5 : 0;
+  }
+
+  return new Promise((resolve) => {
+    const userDataPath = app.getPath('userData');
+    const thumbDir = path.join(userDataPath, 'thumbnails');
+    if (!fs.existsSync(thumbDir)) {
+      fs.mkdirSync(thumbDir, { recursive: true });
+    }
+
+    const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
+    const fullPath = path.join(thumbDir, filename);
+    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : '0';
+
+    execFile(
+      getFFmpegPath(),
+      [
+        '-y',
+        '-ss', seekArg,
+        '-i', filePath,
+        '-vframes', '1',
+        '-vf', 'scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2',
+        fullPath,
+      ],
+      { timeout: 15000 },
+      (err) => {
+        if (!err && fs.existsSync(fullPath)) {
+          resolve({ imagePath: fullPath, duration, targetTime });
+        } else {
+          console.error('FFmpeg thumbnail generation error:', err);
+          resolve(null);
+        }
+      }
+    );
   });
 }
 
@@ -182,8 +242,6 @@ ipcMain.handle('movies:delete', async (_, id: number) => deleteMovie(id));
 ipcMain.handle('movies:updateRating', async (_, { id, rating }: { id: number; rating: number }) =>
   updateMovieRating(id, rating)
 );
-
-import { extractVideoMetadata } from './metadataParser';
 
 // Extract movie metadata IPC
 ipcMain.handle('movies:extractMetadata', async (_, filePath: string) => {
@@ -246,63 +304,6 @@ ipcMain.handle('app:saveSummaryImage', async (_, base64Data: string) => {
     throw new Error('SAVE_SUMMARY_FAILED');
   }
 });
-
-import { execFile } from 'child_process';
-import { getFFmpegPath } from './ffmpegPath';
-
-/**
- * Generate 720x405 summary thumbnail from video file using FFmpeg
- */
-export async function generateThumbnailWithFFmpeg(
-  filePath: string,
-  targetTimeInput?: number | null
-): Promise<{ imagePath: string; duration: number | null; targetTime: number } | null> {
-  return new Promise((resolve) => {
-    if (!fs.existsSync(filePath)) {
-      resolve(null);
-      return;
-    }
-
-    const meta = extractVideoMetadata(filePath);
-    const duration = meta?.duration || null;
-
-    let targetTime = targetTimeInput;
-    if (targetTime === undefined || targetTime === null || isNaN(targetTime)) {
-      targetTime = duration && duration > 0 ? duration * 0.5 : 0;
-    }
-
-    const userDataPath = app.getPath('userData');
-    const thumbDir = path.join(userDataPath, 'thumbnails');
-    if (!fs.existsSync(thumbDir)) {
-      fs.mkdirSync(thumbDir, { recursive: true });
-    }
-
-    const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
-    const fullPath = path.join(thumbDir, filename);
-    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : '0';
-
-    execFile(
-      getFFmpegPath(),
-      [
-        '-y',
-        '-ss', seekArg,
-        '-i', filePath,
-        '-vframes', '1',
-        '-vf', 'scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2',
-        fullPath,
-      ],
-      { timeout: 15000 },
-      (err) => {
-        if (!err && fs.existsSync(fullPath)) {
-          resolve({ imagePath: fullPath, duration, targetTime });
-        } else {
-          console.error('FFmpeg thumbnail generation error:', err);
-          resolve(null);
-        }
-      }
-    );
-  });
-}
 
 // Generate thumbnail via FFmpeg IPC handler
 ipcMain.handle('app:generateThumbnail', async (_, { filePath, targetTime }: { filePath: string; targetTime?: number | null }) => {

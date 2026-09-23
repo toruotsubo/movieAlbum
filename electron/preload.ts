@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import { AppSettings, Movie, KeyItemGroup, CreateMovieInput, UpdateMovieInput, UpdateKeyItemInput } from '../src/lib/types';
+import {
+  AppSettings,
+  Movie,
+  KeyItemGroup,
+  CreateMovieInput,
+  UpdateMovieInput,
+  UpdateKeyItemInput,
+  SaveSettingsInput,
+} from '../src/lib/types';
 
 export const api = {
   getPathForFile: (file: File): string => {
@@ -12,7 +20,7 @@ export const api = {
   },
 
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
-  saveSettings: (input: any): Promise<AppSettings> => ipcRenderer.invoke('settings:save', input),
+  saveSettings: (input: SaveSettingsInput): Promise<AppSettings> => ipcRenderer.invoke('settings:save', input),
 
   getMovies: (): Promise<Movie[]> => ipcRenderer.invoke('movies:getAll'),
   getMovieById: (id: number): Promise<Movie | null> => ipcRenderer.invoke('movies:getById', id),

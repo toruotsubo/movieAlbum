@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { KeyItemGroup, ALL_BASE_FIELDS, AppSettings } from '@/lib/types';
+import { KeyItemGroup } from '@/lib/types';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
+import { getKeyFieldLabel } from '@/lib/utils';
 import { X, Save } from 'lucide-react';
 
 interface KeyItemFormModalProps {
@@ -13,22 +14,6 @@ interface KeyItemFormModalProps {
   onSave: (data: { key_signature: string; cast_kana: string; tags: string; rating?: number }) => Promise<void>;
   onClose: () => void;
 }
-
-const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k: any) => string): string => {
-  if (keyId === 'title') return tFunc('field_title');
-  if (keyId === 'genre') return tFunc('field_genre');
-  if (keyId === 'cast') return tFunc('field_cast');
-  if (keyId === 'release_year') return tFunc('field_release_year');
-  if (keyId === 'release_date') return tFunc('field_release_date');
-  if (keyId === 'rating') return tFunc('field_rating');
-
-  if (keyId === 'custom_field_1') return settings?.custom_field_1_name || tFunc('field_custom_1_default');
-  if (keyId === 'custom_field_2') return settings?.custom_field_2_name || tFunc('field_custom_2_default');
-  if (keyId === 'custom_field_3') return settings?.custom_field_3_name || tFunc('field_custom_3_default');
-
-  const base = ALL_BASE_FIELDS.find((f) => f.id === keyId);
-  return base ? tFunc(`field_${base.id}` as any) : tFunc('field_key_item');
-};
 
 export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
   isOpen,

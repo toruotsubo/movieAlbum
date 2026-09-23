@@ -9,7 +9,7 @@ import { MovieFormModal } from './MovieFormModal';
 import { KeyItemFormModal } from './KeyItemFormModal';
 import { ConfirmModal } from './ConfirmModal';
 import { DragDropWrapper } from './DragDropWrapper';
-import { getSplitValues, getKanaForCast, isVideoFile } from '../lib/utils';
+import { isVideoFile, findInitialCastKana } from '../lib/utils';
 
 import { Language, TranslationKey, t as translate } from '../lib/translations';
 
@@ -173,47 +173,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleSaveMovie = async (movieData: Partial<Movie>) => {
     if (!window.api) return;
-    let savedMovie: Movie;
     if (movieData.id) {
-      savedMovie = await window.api.updateMovie(movieData as any);
+      await window.api.updateMovie(movieData as any);
     } else {
-      savedMovie = await window.api.addMovie(movieData as any);
+      await window.api.addMovie(movieData as any);
     }
-
-    // Sync grouping siblings
-    const keyFields = settings?.key_fields || ['genre'];
-    const currentMovies = await window.api.getMovies();
-
-    if (savedMovie.is_grouped) {
-      // Grouping ON: Find matches and set parent_movie_id
-      const matches = currentMovies.filter((m) => {
-        if (m.id === savedMovie.id) return false;
-
-        if ((m.title || null) !== (savedMovie.title || null)) return false;
-        if ((m.genre || null) !== (savedMovie.genre || null)) return false;
-        if ((m.release_year || null) !== (savedMovie.release_year || null)) return false;
-        if ((m.release_date || null) !== (savedMovie.release_date || null)) return false;
-
-        // Check each key field
-        for (const kf of keyFields) {
-          if (((m as any)[kf] || null) !== ((savedMovie as any)[kf] || null)) return false;
-        }
-
-        return true;
-      });
-
-      for (const sibling of matches) {
-        await window.api.updateMovie({ id: sibling.id, parent_movie_id: savedMovie.id });
-      }
-    } else {
-      // Grouping OFF: Clear parent_movie_id for any siblings linked to this parent
-      const siblings = currentMovies.filter((m) => m.parent_movie_id === savedMovie.id);
-      for (const sibling of siblings) {
-        await window.api.updateMovie({ id: sibling.id, parent_movie_id: null });
-      }
-    }
-
-    // Refresh groups and all data
     await refreshData();
   };
 
@@ -271,19 +235,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleDeleteMovie = async (id: number) => {
     if (window.api) {
-      // グループ化解除: 親動画に紐づく子動画のparent_movie_idをクリア
-      const currentMovies = await window.api.getMovies();
-      const siblings = currentMovies.filter((m) => m.parent_movie_id === id);
-      for (const sibling of siblings) {
-        await window.api.updateMovie({ id: sibling.id, parent_movie_id: null });
-      }
-
-      // 自身がグループ化されていた場合もグループ化を解除
-      const targetMovie = currentMovies.find((m) => m.id === id);
-      if (targetMovie && (targetMovie.is_grouped || targetMovie.parent_movie_id)) {
-        await window.api.updateMovie({ id, is_grouped: false, parent_movie_id: null });
-      }
-
       await window.api.deleteMovie(id);
       setMovies((prev) => prev.filter((m) => m.id !== id));
       await refreshData();
@@ -343,34 +294,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         <KeyItemFormModal
           isOpen={isKeyItemFormOpen}
           group={activeKeyGroup}
-          initialCastKana={(() => {
-            if (!activeKeyGroup) return '';
-            const keyFields = settings?.key_fields || ['genre'];
-            const targetCastVal = activeKeyGroup.key_values['cast'];
-
-            for (const m of movies) {
-              let combinations: Record<string, string>[] = [{}];
-              for (const kf of keyFields) {
-                const values = getSplitValues((m as any)[kf]);
-                const nextCombinations: Record<string, string>[] = [];
-                for (const comb of combinations) {
-                  for (const val of values) {
-                    nextCombinations.push({ ...comb, [kf]: val });
-                  }
-                }
-                combinations = nextCombinations;
-              }
-              const isMatch = combinations.some((comb) => JSON.stringify(comb) === activeKeyGroup.key_signature);
-              if (isMatch) {
-                if (targetCastVal && m.cast && m.cast_kana) {
-                  const kana = getKanaForCast(m.cast, m.cast_kana, targetCastVal);
-                  if (kana) return kana;
-                }
-                if (m.cast_kana) return m.cast_kana;
-              }
-            }
-            return '';
-          })()}
+          initialCastKana={findInitialCastKana(activeKeyGroup, movies)}
           onSave={handleSaveKeyItemDetails}
           onClose={() => {
             setIsKeyItemFormOpen(false);
