@@ -7,6 +7,8 @@ import {
   UpdateMovieInput,
   UpdateKeyItemInput,
   SaveSettingsInput,
+  DatabaseInfo,
+  DatabaseState,
 } from '../src/lib/types';
 
 export const api = {
@@ -18,6 +20,14 @@ export const api = {
       return (file as any).path || '';
     }
   },
+
+  getDatabaseState: (): Promise<DatabaseState> => ipcRenderer.invoke('databases:getState'),
+  switchDatabase: (id: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
+    ipcRenderer.invoke('databases:switch', id),
+  createDatabase: (name?: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
+    ipcRenderer.invoke('databases:create', name),
+  deleteDatabase: (id: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
+    ipcRenderer.invoke('databases:delete', id),
 
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   saveSettings: (input: SaveSettingsInput): Promise<AppSettings> => ipcRenderer.invoke('settings:save', input),

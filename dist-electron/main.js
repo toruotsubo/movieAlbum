@@ -66,7 +66,8 @@ var DEFAULT_APP_SETTINGS = {
     "custom_field_2",
     "custom_field_3"
   ],
-  language: "auto"
+  language: "auto",
+  database_name: "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00"
 };
 var DEFAULT_FIELD_ORDER = [
   "title",
@@ -111,7 +112,261 @@ function getKanaForCast(cast, castKana, targetCastVal) {
 
 // electron/db/index.ts
 var jsonDb = null;
-var dbFilePath = "";
+var currentDbId = "";
+var currentDbFilePath = "";
+function getDbDir() {
+  const userDataPath = import_electron.app.getPath("userData");
+  const dbDir = import_path.default.join(userDataPath, "db");
+  if (!import_fs.default.existsSync(dbDir)) {
+    import_fs.default.mkdirSync(dbDir, { recursive: true });
+  }
+  return dbDir;
+}
+function getManifestPath() {
+  return import_path.default.join(getDbDir(), "databases.json");
+}
+function loadManifest() {
+  const manifestPath = getManifestPath();
+  const dbDir = getDbDir();
+  if (import_fs.default.existsSync(manifestPath)) {
+    try {
+      const data = JSON.parse(import_fs.default.readFileSync(manifestPath, "utf-8"));
+      if (data && Array.isArray(data.databases) && data.databases.length > 0) {
+        return data;
+      }
+    } catch (err) {
+      console.error("Failed to parse databases.json, recreating manifest:", err);
+    }
+  }
+  const legacyFilePath = import_path.default.join(dbDir, "movie_manager.json");
+  const initialId = "db_00";
+  const initialName = "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00";
+  const initialFilename = "db_00.json";
+  const targetInitialPath = import_path.default.join(dbDir, initialFilename);
+  if (import_fs.default.existsSync(legacyFilePath) && !import_fs.default.existsSync(targetInitialPath)) {
+    try {
+      import_fs.default.copyFileSync(legacyFilePath, targetInitialPath);
+    } catch (e) {
+      console.error("Failed to copy legacy movie_manager.json to db_00.json:", e);
+    }
+  }
+  const manifest = {
+    activeId: initialId,
+    databases: [
+      {
+        id: initialId,
+        name: initialName,
+        filename: initialFilename,
+        created_at: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    ]
+  };
+  saveManifest(manifest);
+  return manifest;
+}
+function saveManifest(manifest) {
+  const manifestPath = getManifestPath();
+  const tmpPath = `${manifestPath}.tmp`;
+  try {
+    import_fs.default.writeFileSync(tmpPath, JSON.stringify(manifest, null, 2), "utf-8");
+    import_fs.default.renameSync(tmpPath, manifestPath);
+  } catch (err) {
+    console.error("Failed to save databases manifest:", err);
+    try {
+      import_fs.default.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
+    } catch (directErr) {
+      console.error("Direct manifest write failed:", directErr);
+    }
+  }
+}
+function getNextDatabaseNumber(manifest) {
+  const usedNumbers = /* @__PURE__ */ new Set();
+  for (const db of manifest.databases) {
+    const nameMatch = db.name.match(/設定ファイル_(\d+)/);
+    if (nameMatch) {
+      usedNumbers.add(parseInt(nameMatch[1], 10));
+    }
+    const idMatch = db.id.match(/db_(\d+)/);
+    if (idMatch) {
+      usedNumbers.add(parseInt(idMatch[1], 10));
+    }
+  }
+  let nextNum = 0;
+  while (usedNumbers.has(nextNum)) {
+    nextNum++;
+  }
+  return String(nextNum).padStart(2, "0");
+}
+function loadDatabaseFile(filePath, defaultName) {
+  let loadedDb = null;
+  if (import_fs.default.existsSync(filePath)) {
+    try {
+      loadedDb = JSON.parse(import_fs.default.readFileSync(filePath, "utf-8"));
+    } catch (err) {
+      console.error(`Failed to parse db file ${filePath}, attempting backup:`, err);
+      const bakPath = `${filePath}.bak`;
+      if (import_fs.default.existsSync(bakPath)) {
+        try {
+          loadedDb = JSON.parse(import_fs.default.readFileSync(bakPath, "utf-8"));
+          console.warn("Successfully recovered from backup:", bakPath);
+        } catch (bakErr) {
+          console.error("Failed to recover from backup:", bakErr);
+        }
+      }
+    }
+  }
+  if (!loadedDb) {
+    loadedDb = {
+      settings: {
+        ...DEFAULT_APP_SETTINGS,
+        database_name: defaultName
+      },
+      movies: [],
+      keyRatings: {},
+      keyTags: {}
+    };
+  }
+  if (!loadedDb.settings.database_name) {
+    loadedDb.settings.database_name = defaultName;
+  }
+  if (!loadedDb.settings.field_order) {
+    loadedDb.settings.field_order = [...DEFAULT_FIELD_ORDER];
+  }
+  if (!loadedDb.settings.key_fields || loadedDb.settings.key_fields.length === 0) {
+    loadedDb.settings.key_fields = ["genre"];
+  }
+  if (!loadedDb.keyRatings) loadedDb.keyRatings = {};
+  if (!loadedDb.keyTags) loadedDb.keyTags = {};
+  return loadedDb;
+}
+function initDatabase() {
+  const manifest = loadManifest();
+  let activeMeta = manifest.databases.find((d) => d.id === manifest.activeId);
+  if (!activeMeta) {
+    activeMeta = manifest.databases[0];
+    manifest.activeId = activeMeta.id;
+    saveManifest(manifest);
+  }
+  currentDbId = activeMeta.id;
+  currentDbFilePath = import_path.default.join(getDbDir(), activeMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, activeMeta.name);
+  saveDatabase();
+  console.log(`Database initialized: [${activeMeta.id}] ${activeMeta.name} at ${currentDbFilePath}`);
+}
+function saveDatabase() {
+  if (jsonDb && currentDbFilePath) {
+    const tmpFilePath = `${currentDbFilePath}.tmp`;
+    const jsonStr = JSON.stringify(jsonDb, null, 2);
+    try {
+      import_fs.default.writeFileSync(tmpFilePath, jsonStr, "utf-8");
+      import_fs.default.renameSync(tmpFilePath, currentDbFilePath);
+      try {
+        import_fs.default.copyFileSync(currentDbFilePath, `${currentDbFilePath}.bak`);
+      } catch {
+      }
+    } catch (err) {
+      console.error("Failed to save database atomically, falling back:", err);
+      try {
+        import_fs.default.writeFileSync(currentDbFilePath, jsonStr, "utf-8");
+      } catch (writeErr) {
+        console.error("Direct database write failed:", writeErr);
+      }
+    }
+  }
+}
+function getDatabaseState() {
+  const manifest = loadManifest();
+  return {
+    databases: manifest.databases.map((d) => ({
+      id: d.id,
+      name: d.name
+    })),
+    activeId: manifest.activeId
+  };
+}
+function switchDatabase(id) {
+  const manifest = loadManifest();
+  const targetMeta = manifest.databases.find((d) => d.id === id);
+  if (!targetMeta) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+  saveDatabase();
+  manifest.activeId = id;
+  saveManifest(manifest);
+  currentDbId = targetMeta.id;
+  currentDbFilePath = import_path.default.join(getDbDir(), targetMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, targetMeta.name);
+  saveDatabase();
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings
+  };
+}
+function createDatabase(nameInput) {
+  saveDatabase();
+  const manifest = loadManifest();
+  const numStr = getNextDatabaseNumber(manifest);
+  const id = `db_${numStr}`;
+  const name = nameInput?.trim() || `\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_${numStr}`;
+  const filename = `${id}.json`;
+  const filePath = import_path.default.join(getDbDir(), filename);
+  const newDb = {
+    settings: {
+      ...DEFAULT_APP_SETTINGS,
+      database_name: name
+    },
+    movies: [],
+    keyRatings: {},
+    keyTags: {}
+  };
+  import_fs.default.writeFileSync(filePath, JSON.stringify(newDb, null, 2), "utf-8");
+  manifest.databases.push({
+    id,
+    name,
+    filename,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  manifest.activeId = id;
+  saveManifest(manifest);
+  currentDbId = id;
+  currentDbFilePath = filePath;
+  jsonDb = newDb;
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings
+  };
+}
+function deleteDatabase(id) {
+  const manifest = loadManifest();
+  if (manifest.databases.length <= 1) {
+    throw new Error("Cannot delete the only database");
+  }
+  const targetIdx = manifest.databases.findIndex((d) => d.id === id);
+  if (targetIdx === -1) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+  const target = manifest.databases[targetIdx];
+  const targetFilePath = import_path.default.join(getDbDir(), target.filename);
+  const targetBakPath = `${targetFilePath}.bak`;
+  try {
+    if (import_fs.default.existsSync(targetFilePath)) import_fs.default.unlinkSync(targetFilePath);
+    if (import_fs.default.existsSync(targetBakPath)) import_fs.default.unlinkSync(targetBakPath);
+  } catch (err) {
+    console.error("Failed to unlink db file during deletion:", err);
+  }
+  manifest.databases.splice(targetIdx, 1);
+  const firstDb = manifest.databases[0];
+  manifest.activeId = firstDb.id;
+  saveManifest(manifest);
+  currentDbId = firstDb.id;
+  currentDbFilePath = import_path.default.join(getDbDir(), firstDb.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, firstDb.name);
+  saveDatabase();
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings
+  };
+}
 function isMatchingGroupAttributes(movieA, movieB, keyFields) {
   if ((movieA.title || null) !== (movieB.title || null)) return false;
   if ((movieA.genre || null) !== (movieB.genre || null)) return false;
@@ -156,74 +411,25 @@ function buildKeyCombinations(movie, keyFields) {
   }
   return combinations;
 }
-function initDatabase() {
-  const userDataPath = import_electron.app.getPath("userData");
-  const dbDir = import_path.default.join(userDataPath, "db");
-  if (!import_fs.default.existsSync(dbDir)) {
-    import_fs.default.mkdirSync(dbDir, { recursive: true });
-  }
-  dbFilePath = import_path.default.join(dbDir, "movie_manager.json");
-  if (import_fs.default.existsSync(dbFilePath)) {
-    try {
-      jsonDb = JSON.parse(import_fs.default.readFileSync(dbFilePath, "utf-8"));
-    } catch (err) {
-      console.error("Failed to parse database file, attempting recovery from backup:", err);
-      const bakFilePath = `${dbFilePath}.bak`;
-      if (import_fs.default.existsSync(bakFilePath)) {
-        try {
-          jsonDb = JSON.parse(import_fs.default.readFileSync(bakFilePath, "utf-8"));
-          console.warn("Successfully recovered database from backup:", bakFilePath);
-          saveDatabase();
-        } catch (bakErr) {
-          console.error("Failed to parse backup database file:", bakErr);
-          jsonDb = null;
-        }
-      } else {
-        jsonDb = null;
-      }
-    }
-  }
-  if (!jsonDb) {
-    jsonDb = {
-      settings: { ...DEFAULT_APP_SETTINGS },
-      movies: [],
-      keyRatings: {},
-      keyTags: {}
-    };
-    saveDatabase();
-  }
-  console.log("Database initialized successfully at:", dbFilePath);
-}
-function saveDatabase() {
-  if (jsonDb && dbFilePath) {
-    const tmpFilePath = `${dbFilePath}.tmp`;
-    const jsonStr = JSON.stringify(jsonDb, null, 2);
-    try {
-      import_fs.default.writeFileSync(tmpFilePath, jsonStr, "utf-8");
-      import_fs.default.renameSync(tmpFilePath, dbFilePath);
-      try {
-        import_fs.default.copyFileSync(dbFilePath, `${dbFilePath}.bak`);
-      } catch {
-      }
-    } catch (err) {
-      console.error("Failed to atomically save database, falling back to direct write:", err);
-      try {
-        import_fs.default.writeFileSync(dbFilePath, jsonStr, "utf-8");
-      } catch (writeErr) {
-        console.error("Direct database write failed:", writeErr);
-      }
-    }
-  }
-}
 function getAppSettings() {
   if (!jsonDb) initDatabase();
   return jsonDb.settings;
 }
 function saveAppSettings(input) {
   if (!jsonDb) initDatabase();
+  const newDatabaseName = input.database_name !== void 0 ? input.database_name.trim() : jsonDb.settings.database_name;
+  if (newDatabaseName) {
+    const manifest = loadManifest();
+    const currentMeta = manifest.databases.find((d) => d.id === currentDbId);
+    if (currentMeta && currentMeta.name !== newDatabaseName) {
+      currentMeta.name = newDatabaseName;
+      saveManifest(manifest);
+    }
+  }
   jsonDb.settings = {
     ...jsonDb.settings,
     ...input,
+    database_name: newDatabaseName,
     is_initialized: input.is_initialized !== void 0 ? input.is_initialized : jsonDb.settings.is_initialized,
     custom_field_1_display_in_list: input.custom_field_1_display_in_list !== void 0 ? input.custom_field_1_display_in_list : jsonDb.settings.custom_field_1_display_in_list !== false,
     custom_field_2_display_in_list: input.custom_field_2_display_in_list !== void 0 ? input.custom_field_2_display_in_list : jsonDb.settings.custom_field_2_display_in_list !== false,
@@ -435,17 +641,12 @@ function updateKeyItemDetails(input) {
 }
 function resetAllData() {
   if (!jsonDb) initDatabase();
-  try {
-    const userDataPath = import_electron.app.getPath("userData");
-    const thumbDir = import_path.default.join(userDataPath, "thumbnails");
-    if (import_fs.default.existsSync(thumbDir)) {
-      import_fs.default.rmSync(thumbDir, { recursive: true, force: true });
-    }
-  } catch (err) {
-    console.error("Failed to clear thumbnails directory:", err);
-  }
+  const currentDbName = jsonDb.settings.database_name || "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00";
   jsonDb = {
-    settings: { ...DEFAULT_APP_SETTINGS },
+    settings: {
+      ...DEFAULT_APP_SETTINGS,
+      database_name: currentDbName
+    },
     movies: [],
     keyRatings: {},
     keyTags: {}
@@ -1099,6 +1300,10 @@ import_electron3.app.on("window-all-closed", () => {
 });
 import_electron3.ipcMain.handle("settings:get", async () => getAppSettings());
 import_electron3.ipcMain.handle("settings:save", async (_, input) => saveAppSettings(input));
+import_electron3.ipcMain.handle("databases:getState", async () => getDatabaseState());
+import_electron3.ipcMain.handle("databases:switch", async (_, id) => switchDatabase(id));
+import_electron3.ipcMain.handle("databases:create", async (_, name) => createDatabase(name));
+import_electron3.ipcMain.handle("databases:delete", async (_, id) => deleteDatabase(id));
 import_electron3.ipcMain.handle("movies:getAll", async () => getAllMovies());
 import_electron3.ipcMain.handle("movies:getById", async (_, id) => getMovieById(id));
 import_electron3.ipcMain.handle("movies:getByPath", async (_, filePath) => getMovieByFilePath(filePath));

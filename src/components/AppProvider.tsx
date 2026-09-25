@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppSettings, Movie, KeyItemGroup } from '../lib/types';
+import { AppSettings, Movie, KeyItemGroup, DatabaseInfo, DatabaseState } from '../lib/types';
 import { Navbar } from './Navbar';
 import { TitleBar } from './TitleBar';
 import { InitialSetupModal } from './InitialSetupModal';
@@ -17,11 +17,15 @@ interface AppContextType {
   settings: AppSettings | null;
   movies: Movie[];
   keyGroups: KeyItemGroup[];
+  databaseState: DatabaseState;
   loading: boolean;
   lang: Language;
   showKana: boolean;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   refreshData: () => Promise<void>;
+  switchDatabase: (id: string) => Promise<void>;
+  createDatabase: (name?: string) => Promise<void>;
+  deleteDatabase: (id: string) => Promise<void>;
   updateMovieRating: (id: number, rating: number) => Promise<void>;
   updateKeyItemRating: (signature: string, rating: number) => Promise<void>;
   openMoviePlayer: (filePath: string) => Promise<void>;
@@ -50,6 +54,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [keyGroups, setKeyGroups] = useState<KeyItemGroup[]>([]);
+  const [databaseState, setDatabaseState] = useState<DatabaseState>({ databases: [], activeId: '' });
   const [loading, setLoading] = useState(true);
   const [headerMovieCount, setHeaderMovieCount] = useState<number | null>(null);
   const [headerFilterText, setHeaderFilterText] = useState<string | null>(null);
@@ -98,6 +103,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
+      if (window.api.getDatabaseState) {
+        const dbState = await window.api.getDatabaseState();
+        setDatabaseState(dbState);
+      }
+
       const currentSettings = await window.api.getSettings();
       setSettings(currentSettings);
 
@@ -120,6 +130,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     refreshData();
   }, []);
+
+  const handleSwitchDatabase = async (id: string) => {
+    if (window.api?.switchDatabase) {
+      setLoading(true);
+      try {
+        const res = await window.api.switchDatabase(id);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to switch database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleCreateDatabase = async (name?: string) => {
+    if (window.api?.createDatabase) {
+      setLoading(true);
+      try {
+        const res = await window.api.createDatabase(name);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to create database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteDatabase = async (id: string) => {
+    if (window.api?.deleteDatabase) {
+      setLoading(true);
+      try {
+        const res = await window.api.deleteDatabase(id);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to delete database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   const handleSaveSettings = async (newSettings: any) => {
     if (window.api) {
@@ -247,11 +305,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings,
         movies,
         keyGroups,
+        databaseState,
         loading,
         lang: currentLang,
         showKana,
         t: tFunc,
         refreshData,
+        switchDatabase: handleSwitchDatabase,
+        createDatabase: handleCreateDatabase,
+        deleteDatabase: handleDeleteDatabase,
         updateMovieRating,
         updateKeyItemRating,
         openMoviePlayer,
@@ -274,6 +336,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         <InitialSetupModal
           isOpen={isSettingsOpen}
           currentSettings={settings}
+          databaseState={databaseState}
+          onSwitchDatabase={handleSwitchDatabase}
+          onCreateDatabase={handleCreateDatabase}
+          onDeleteDatabase={handleDeleteDatabase}
           onSave={handleSaveSettings}
           onResetData={handleResetData}
           onClose={settings?.is_initialized ? () => setIsSettingsOpen(false) : undefined}

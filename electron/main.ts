@@ -18,6 +18,10 @@ import {
   updateKeyItemRating,
   updateKeyItemDetails,
   resetAllData,
+  getDatabaseState,
+  switchDatabase,
+  createDatabase,
+  deleteDatabase,
 } from './db';
 import { extractVideoMetadata } from './metadataParser';
 import { getFFmpegPath } from './ffmpegPath';
@@ -232,6 +236,11 @@ app.on('window-all-closed', () => {
 // IPC Handlers
 ipcMain.handle('settings:get', async () => getAppSettings());
 ipcMain.handle('settings:save', async (_, input) => saveAppSettings(input));
+
+ipcMain.handle('databases:getState', async () => getDatabaseState());
+ipcMain.handle('databases:switch', async (_, id: string) => switchDatabase(id));
+ipcMain.handle('databases:create', async (_, name?: string) => createDatabase(name));
+ipcMain.handle('databases:delete', async (_, id: string) => deleteDatabase(id));
 
 ipcMain.handle('movies:getAll', async () => getAllMovies());
 ipcMain.handle('movies:getById', async (_, id: number) => getMovieById(id));

@@ -10,6 +10,17 @@ export interface AppSettings {
   key_fields: string[]; // JSON array stored in DB
   field_order?: string[]; // Order of metadata fields
   language?: 'auto' | 'ja' | 'en' | null; // Language setting
+  database_name?: string;
+}
+
+export interface DatabaseInfo {
+  id: string;
+  name: string;
+}
+
+export interface DatabaseState {
+  databases: DatabaseInfo[];
+  activeId: string;
 }
 
 export type SaveSettingsInput = Partial<Omit<AppSettings, 'id'>>;
@@ -36,6 +47,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     'custom_field_3',
   ],
   language: 'auto',
+  database_name: '設定ファイル_00',
 };
 
 export interface Movie {

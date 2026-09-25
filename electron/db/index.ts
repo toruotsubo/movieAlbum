@@ -11,6 +11,8 @@ import {
   SaveSettingsInput,
   DEFAULT_APP_SETTINGS,
   DEFAULT_FIELD_ORDER,
+  DatabaseInfo,
+  DatabaseState,
 } from '../../src/lib/types';
 import { getSplitValues, getKanaForCast } from '../../src/lib/utils';
 
@@ -21,8 +23,318 @@ interface JsonDatabaseSchema {
   keyTags: Record<string, string>;
 }
 
+export interface DatabaseMeta {
+  id: string; // e.g. "db_00"
+  name: string; // e.g. "設定ファイル_00"
+  filename: string; // e.g. "db_00.json"
+  created_at: string;
+}
+
+export interface DatabaseManifest {
+  activeId: string;
+  databases: DatabaseMeta[];
+}
+
 let jsonDb: JsonDatabaseSchema | null = null;
-let dbFilePath = '';
+let currentDbId = '';
+let currentDbFilePath = '';
+
+function getDbDir(): string {
+  const userDataPath = app.getPath('userData');
+  const dbDir = path.join(userDataPath, 'db');
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+  return dbDir;
+}
+
+function getManifestPath(): string {
+  return path.join(getDbDir(), 'databases.json');
+}
+
+function loadManifest(): DatabaseManifest {
+  const manifestPath = getManifestPath();
+  const dbDir = getDbDir();
+
+  if (fs.existsSync(manifestPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      if (data && Array.isArray(data.databases) && data.databases.length > 0) {
+        return data as DatabaseManifest;
+      }
+    } catch (err) {
+      console.error('Failed to parse databases.json, recreating manifest:', err);
+    }
+  }
+
+  // Migrate from legacy single db (movie_manager.json) or create new default
+  const legacyFilePath = path.join(dbDir, 'movie_manager.json');
+  const initialId = 'db_00';
+  const initialName = '設定ファイル_00';
+  const initialFilename = 'db_00.json';
+  const targetInitialPath = path.join(dbDir, initialFilename);
+
+  if (fs.existsSync(legacyFilePath) && !fs.existsSync(targetInitialPath)) {
+    try {
+      fs.copyFileSync(legacyFilePath, targetInitialPath);
+    } catch (e) {
+      console.error('Failed to copy legacy movie_manager.json to db_00.json:', e);
+    }
+  }
+
+  const manifest: DatabaseManifest = {
+    activeId: initialId,
+    databases: [
+      {
+        id: initialId,
+        name: initialName,
+        filename: initialFilename,
+        created_at: new Date().toISOString(),
+      },
+    ],
+  };
+
+  saveManifest(manifest);
+  return manifest;
+}
+
+function saveManifest(manifest: DatabaseManifest): void {
+  const manifestPath = getManifestPath();
+  const tmpPath = `${manifestPath}.tmp`;
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, manifestPath);
+  } catch (err) {
+    console.error('Failed to save databases manifest:', err);
+    try {
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    } catch (directErr) {
+      console.error('Direct manifest write failed:', directErr);
+    }
+  }
+}
+
+function getNextDatabaseNumber(manifest: DatabaseManifest): string {
+  const usedNumbers = new Set<number>();
+  for (const db of manifest.databases) {
+    const nameMatch = db.name.match(/設定ファイル_(\d+)/);
+    if (nameMatch) {
+      usedNumbers.add(parseInt(nameMatch[1], 10));
+    }
+    const idMatch = db.id.match(/db_(\d+)/);
+    if (idMatch) {
+      usedNumbers.add(parseInt(idMatch[1], 10));
+    }
+  }
+  let nextNum = 0;
+  while (usedNumbers.has(nextNum)) {
+    nextNum++;
+  }
+  return String(nextNum).padStart(2, '0');
+}
+
+function loadDatabaseFile(filePath: string, defaultName: string): JsonDatabaseSchema {
+  let loadedDb: JsonDatabaseSchema | null = null;
+  if (fs.existsSync(filePath)) {
+    try {
+      loadedDb = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    } catch (err) {
+      console.error(`Failed to parse db file ${filePath}, attempting backup:`, err);
+      const bakPath = `${filePath}.bak`;
+      if (fs.existsSync(bakPath)) {
+        try {
+          loadedDb = JSON.parse(fs.readFileSync(bakPath, 'utf-8'));
+          console.warn('Successfully recovered from backup:', bakPath);
+        } catch (bakErr) {
+          console.error('Failed to recover from backup:', bakErr);
+        }
+      }
+    }
+  }
+
+  if (!loadedDb) {
+    loadedDb = {
+      settings: {
+        ...DEFAULT_APP_SETTINGS,
+        database_name: defaultName,
+      },
+      movies: [],
+      keyRatings: {},
+      keyTags: {},
+    };
+  }
+
+  // Ensure default values
+  if (!loadedDb.settings.database_name) {
+    loadedDb.settings.database_name = defaultName;
+  }
+  if (!loadedDb.settings.field_order) {
+    loadedDb.settings.field_order = [...DEFAULT_FIELD_ORDER];
+  }
+  if (!loadedDb.settings.key_fields || loadedDb.settings.key_fields.length === 0) {
+    loadedDb.settings.key_fields = ['genre'];
+  }
+  if (!loadedDb.keyRatings) loadedDb.keyRatings = {};
+  if (!loadedDb.keyTags) loadedDb.keyTags = {};
+
+  return loadedDb;
+}
+
+export function initDatabase() {
+  const manifest = loadManifest();
+  let activeMeta = manifest.databases.find((d) => d.id === manifest.activeId);
+  if (!activeMeta) {
+    activeMeta = manifest.databases[0];
+    manifest.activeId = activeMeta.id;
+    saveManifest(manifest);
+  }
+
+  currentDbId = activeMeta.id;
+  currentDbFilePath = path.join(getDbDir(), activeMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, activeMeta.name);
+  saveDatabase();
+
+  console.log(`Database initialized: [${activeMeta.id}] ${activeMeta.name} at ${currentDbFilePath}`);
+}
+
+function saveDatabase() {
+  if (jsonDb && currentDbFilePath) {
+    const tmpFilePath = `${currentDbFilePath}.tmp`;
+    const jsonStr = JSON.stringify(jsonDb, null, 2);
+    try {
+      fs.writeFileSync(tmpFilePath, jsonStr, 'utf-8');
+      fs.renameSync(tmpFilePath, currentDbFilePath);
+
+      try {
+        fs.copyFileSync(currentDbFilePath, `${currentDbFilePath}.bak`);
+      } catch {
+        // Backup non-fatal
+      }
+    } catch (err) {
+      console.error('Failed to save database atomically, falling back:', err);
+      try {
+        fs.writeFileSync(currentDbFilePath, jsonStr, 'utf-8');
+      } catch (writeErr) {
+        console.error('Direct database write failed:', writeErr);
+      }
+    }
+  }
+}
+
+export function getDatabaseState(): DatabaseState {
+  const manifest = loadManifest();
+  return {
+    databases: manifest.databases.map((d) => ({
+      id: d.id,
+      name: d.name,
+    })),
+    activeId: manifest.activeId,
+  };
+}
+
+export function switchDatabase(id: string): { state: DatabaseState; settings: AppSettings } {
+  const manifest = loadManifest();
+  const targetMeta = manifest.databases.find((d) => d.id === id);
+  if (!targetMeta) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+
+  // Save current database before switching
+  saveDatabase();
+
+  manifest.activeId = id;
+  saveManifest(manifest);
+
+  currentDbId = targetMeta.id;
+  currentDbFilePath = path.join(getDbDir(), targetMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, targetMeta.name);
+  saveDatabase();
+
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings,
+  };
+}
+
+export function createDatabase(nameInput?: string): { state: DatabaseState; settings: AppSettings } {
+  saveDatabase();
+
+  const manifest = loadManifest();
+  const numStr = getNextDatabaseNumber(manifest);
+  const id = `db_${numStr}`;
+  const name = nameInput?.trim() || `設定ファイル_${numStr}`;
+  const filename = `${id}.json`;
+  const filePath = path.join(getDbDir(), filename);
+
+  const newDb: JsonDatabaseSchema = {
+    settings: {
+      ...DEFAULT_APP_SETTINGS,
+      database_name: name,
+    },
+    movies: [],
+    keyRatings: {},
+    keyTags: {},
+  };
+
+  fs.writeFileSync(filePath, JSON.stringify(newDb, null, 2), 'utf-8');
+
+  manifest.databases.push({
+    id,
+    name,
+    filename,
+    created_at: new Date().toISOString(),
+  });
+  manifest.activeId = id;
+  saveManifest(manifest);
+
+  currentDbId = id;
+  currentDbFilePath = filePath;
+  jsonDb = newDb;
+
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings,
+  };
+}
+
+export function deleteDatabase(id: string): { state: DatabaseState; settings: AppSettings } {
+  const manifest = loadManifest();
+  if (manifest.databases.length <= 1) {
+    throw new Error('Cannot delete the only database');
+  }
+
+  const targetIdx = manifest.databases.findIndex((d) => d.id === id);
+  if (targetIdx === -1) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+
+  const target = manifest.databases[targetIdx];
+  const targetFilePath = path.join(getDbDir(), target.filename);
+  const targetBakPath = `${targetFilePath}.bak`;
+
+  try {
+    if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+    if (fs.existsSync(targetBakPath)) fs.unlinkSync(targetBakPath);
+  } catch (err) {
+    console.error('Failed to unlink db file during deletion:', err);
+  }
+
+  manifest.databases.splice(targetIdx, 1);
+  // 要件: 現在選択中のデータベースファイルが消去され、最初のデータベースファイルが選択される
+  const firstDb = manifest.databases[0];
+  manifest.activeId = firstDb.id;
+  saveManifest(manifest);
+
+  currentDbId = firstDb.id;
+  currentDbFilePath = path.join(getDbDir(), firstDb.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, firstDb.name);
+  saveDatabase();
+
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings,
+  };
+}
 
 /**
  * Check if two movies have matching group attributes
@@ -82,75 +394,6 @@ function buildKeyCombinations(movie: Movie, keyFields: string[]): Record<string,
   return combinations;
 }
 
-export function initDatabase() {
-  const userDataPath = app.getPath('userData');
-  const dbDir = path.join(userDataPath, 'db');
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
-
-  dbFilePath = path.join(dbDir, 'movie_manager.json');
-
-  if (fs.existsSync(dbFilePath)) {
-    try {
-      jsonDb = JSON.parse(fs.readFileSync(dbFilePath, 'utf-8'));
-    } catch (err) {
-      console.error('Failed to parse database file, attempting recovery from backup:', err);
-      const bakFilePath = `${dbFilePath}.bak`;
-      if (fs.existsSync(bakFilePath)) {
-        try {
-          jsonDb = JSON.parse(fs.readFileSync(bakFilePath, 'utf-8'));
-          console.warn('Successfully recovered database from backup:', bakFilePath);
-          saveDatabase();
-        } catch (bakErr) {
-          console.error('Failed to parse backup database file:', bakErr);
-          jsonDb = null;
-        }
-      } else {
-        jsonDb = null;
-      }
-    }
-  }
-
-  if (!jsonDb) {
-    jsonDb = {
-      settings: { ...DEFAULT_APP_SETTINGS },
-      movies: [],
-      keyRatings: {},
-      keyTags: {},
-    };
-    saveDatabase();
-  }
-
-  console.log('Database initialized successfully at:', dbFilePath);
-}
-
-function saveDatabase() {
-  if (jsonDb && dbFilePath) {
-    const tmpFilePath = `${dbFilePath}.tmp`;
-    const jsonStr = JSON.stringify(jsonDb, null, 2);
-    try {
-      // Atomic write using temp file and rename
-      fs.writeFileSync(tmpFilePath, jsonStr, 'utf-8');
-      fs.renameSync(tmpFilePath, dbFilePath);
-
-      // Create backup copy for recovery
-      try {
-        fs.copyFileSync(dbFilePath, `${dbFilePath}.bak`);
-      } catch {
-        // Backup failure is non-fatal
-      }
-    } catch (err) {
-      console.error('Failed to atomically save database, falling back to direct write:', err);
-      try {
-        fs.writeFileSync(dbFilePath, jsonStr, 'utf-8');
-      } catch (writeErr) {
-        console.error('Direct database write failed:', writeErr);
-      }
-    }
-  }
-}
-
 // === Settings Helpers ===
 export function getAppSettings(): AppSettings {
   if (!jsonDb) initDatabase();
@@ -159,9 +402,22 @@ export function getAppSettings(): AppSettings {
 
 export function saveAppSettings(input: SaveSettingsInput): AppSettings {
   if (!jsonDb) initDatabase();
+
+  const newDatabaseName = input.database_name !== undefined ? input.database_name.trim() : jsonDb!.settings.database_name;
+
+  if (newDatabaseName) {
+    const manifest = loadManifest();
+    const currentMeta = manifest.databases.find((d) => d.id === currentDbId);
+    if (currentMeta && currentMeta.name !== newDatabaseName) {
+      currentMeta.name = newDatabaseName;
+      saveManifest(manifest);
+    }
+  }
+
   jsonDb!.settings = {
     ...jsonDb!.settings,
     ...input,
+    database_name: newDatabaseName,
     is_initialized: input.is_initialized !== undefined ? input.is_initialized : jsonDb!.settings.is_initialized,
     custom_field_1_display_in_list:
       input.custom_field_1_display_in_list !== undefined
@@ -206,7 +462,6 @@ export function addMovie(movie: CreateMovieInput): Movie {
     return updateMovie({ ...movie, id: existing.id });
   }
 
-  // Safe ID generation without array spread limits
   const maxId = jsonDb!.movies.reduce((max, m) => Math.max(max, m.id), 0);
   const newId = maxId + 1;
 
@@ -266,7 +521,6 @@ export function deleteMovie(id: number): boolean {
   if (!jsonDb) initDatabase();
   const index = jsonDb!.movies.findIndex((m) => m.id === id);
   if (index !== -1) {
-    // Clear parent_movie_id for any sibling movies referencing this deleted movie
     for (const m of jsonDb!.movies) {
       if (m.parent_movie_id === id) {
         m.parent_movie_id = null;
@@ -424,18 +678,13 @@ export function updateKeyItemDetails(input: UpdateKeyItemInput): void {
 export function resetAllData(): AppSettings {
   if (!jsonDb) initDatabase();
 
-  try {
-    const userDataPath = app.getPath('userData');
-    const thumbDir = path.join(userDataPath, 'thumbnails');
-    if (fs.existsSync(thumbDir)) {
-      fs.rmSync(thumbDir, { recursive: true, force: true });
-    }
-  } catch (err) {
-    console.error('Failed to clear thumbnails directory:', err);
-  }
+  const currentDbName = jsonDb!.settings.database_name || '設定ファイル_00';
 
   jsonDb = {
-    settings: { ...DEFAULT_APP_SETTINGS },
+    settings: {
+      ...DEFAULT_APP_SETTINGS,
+      database_name: currentDbName,
+    },
     movies: [],
     keyRatings: {},
     keyTags: {},

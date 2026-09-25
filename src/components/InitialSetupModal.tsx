@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER } from '../lib/types';
-import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock } from 'lucide-react';
+import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
+import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -11,6 +11,10 @@ import { ConfirmModal } from './ConfirmModal';
 interface InitialSetupModalProps {
   isOpen: boolean;
   currentSettings: AppSettings | null;
+  databaseState?: DatabaseState;
+  onSwitchDatabase?: (id: string) => Promise<void>;
+  onCreateDatabase?: (name?: string) => Promise<void>;
+  onDeleteDatabase?: (id: string) => Promise<void>;
   onSave: (settings: {
     is_initialized: boolean;
     custom_field_1_name: string | null;
@@ -22,6 +26,7 @@ interface InitialSetupModalProps {
     key_fields: string[];
     field_order?: string[];
     language?: LanguageSetting;
+    database_name?: string;
   }) => void;
   onResetData?: () => Promise<void>;
   onClose?: () => void;
@@ -30,11 +35,16 @@ interface InitialSetupModalProps {
 export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   isOpen,
   currentSettings,
+  databaseState,
+  onSwitchDatabase,
+  onCreateDatabase,
+  onDeleteDatabase,
   onSave,
   onResetData,
   onClose,
 }) => {
   const { t } = useApp();
+  const [databaseName, setDatabaseName] = useState('設定ファイル_00');
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
   const [custom3, setCustom3] = useState('');
@@ -59,18 +69,16 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showDeleteDbConfirm, setShowDeleteDbConfirm] = useState(false);
 
-  const isLoadedRef = React.useRef(false);
-
-  // Sync settings when modal opens so values are initialized once when opened
+  // Sync settings when modal opens or currentSettings changes
   useEffect(() => {
     if (!isOpen) {
-      isLoadedRef.current = false;
       return;
     }
 
-    if (isOpen && currentSettings && !isLoadedRef.current) {
-      isLoadedRef.current = true;
+    if (isOpen && currentSettings) {
+      setDatabaseName(currentSettings.database_name || '設定ファイル_00');
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
       setCustom3(currentSettings.custom_field_3_name || '');
@@ -153,10 +161,35 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setDragOverIndex(null);
   };
 
+  const hasMultipleDbs = Boolean(databaseState && databaseState.databases && databaseState.databases.length > 1);
+  const currentDbItem = databaseState?.databases.find((d) => d.id === databaseState?.activeId);
+  const currentDbDisplayName = currentDbItem?.name || databaseName;
+
+  const handleDbSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newId = e.target.value;
+    if (newId && onSwitchDatabase) {
+      await onSwitchDatabase(newId);
+    }
+  };
+
+  const handleAddDatabase = async () => {
+    if (onCreateDatabase) {
+      await onCreateDatabase();
+    }
+  };
+
+  const executeDeleteDb = async () => {
+    setShowDeleteDbConfirm(false);
+    if (onDeleteDatabase && databaseState?.activeId) {
+      await onDeleteDatabase(databaseState.activeId);
+    }
+  };
+
   const handleSave = () => {
     const fullFieldOrder = ['title', 'rating', ...reorderableFieldIds];
     onSave({
       is_initialized: true,
+      database_name: databaseName.trim() || '設定ファイル_00',
       custom_field_1_name: custom1.trim() || null,
       custom_field_2_name: custom2.trim() || null,
       custom_field_3_name: custom3.trim() || null,
@@ -199,6 +232,36 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">{t('settings_title')}</h2>
+          </div>
+        </div>
+
+        {/* Database File Section (Always at the top) */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-blue-400 block">
+            {t('settings_db_name')}
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={databaseName}
+              onChange={(e) => setDatabaseName(e.target.value)}
+              placeholder="例: 設定ファイル_00"
+              className="flex-1 bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
+            {hasMultipleDbs && databaseState && (
+              <select
+                value={databaseState.activeId}
+                onChange={handleDbSelectChange}
+                className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                title={t('settings_db_select')}
+              >
+                {databaseState.databases.map((db) => (
+                  <option key={db.id} value={db.id}>
+                    {db.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -415,15 +478,39 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
         {/* Footer actions */}
         <div className="pt-4 border-t border-slate-700/60 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleResetData}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
-            title={t('settings_reset_data_tooltip')}
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>{t('resetData')}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {!hasMultipleDbs ? (
+              <button
+                type="button"
+                onClick={handleResetData}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                title={t('settings_reset_data_tooltip')}
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>{t('resetData')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeleteDbConfirm(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                title={t('settings_delete_db')}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{t('settings_delete_db')}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleAddDatabase}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
+              title={t('settings_add_db')}
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t('settings_add_db')}</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-3">
             {onClose && (
@@ -456,6 +543,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         variant="danger"
         onConfirm={executeResetData}
         onClose={() => setShowResetConfirm(false)}
+      />
+
+      <ConfirmModal
+        isOpen={showDeleteDbConfirm}
+        title={t('settings_delete_db')}
+        description={t('confirmDeleteDb', { name: currentDbDisplayName })}
+        confirmText={t('delete')}
+        cancelText={t('cancel')}
+        variant="danger"
+        onConfirm={executeDeleteDb}
+        onClose={() => setShowDeleteDbConfirm(false)}
       />
     </div>
   );
