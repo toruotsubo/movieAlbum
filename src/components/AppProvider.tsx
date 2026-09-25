@@ -131,9 +131,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     refreshData();
   }, []);
 
+  const clearPageFilters = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('movie_manager_key_items_page_state');
+        sessionStorage.removeItem('movie_manager_movies_page_state');
+      } catch (e) {
+        console.error('Failed to clear sessionStorage filters:', e);
+      }
+    }
+    setHeaderFilterText(null);
+  };
+
   const handleSwitchDatabase = async (id: string) => {
     if (window.api?.switchDatabase) {
       setLoading(true);
+      clearPageFilters();
       try {
         const res = await window.api.switchDatabase(id);
         setDatabaseState(res.state);
@@ -150,6 +163,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleCreateDatabase = async (name?: string) => {
     if (window.api?.createDatabase) {
       setLoading(true);
+      clearPageFilters();
       try {
         const res = await window.api.createDatabase(name);
         setDatabaseState(res.state);
@@ -166,6 +180,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleDeleteDatabase = async (id: string) => {
     if (window.api?.deleteDatabase) {
       setLoading(true);
+      clearPageFilters();
       try {
         const res = await window.api.deleteDatabase(id);
         setDatabaseState(res.state);
@@ -273,6 +288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleResetData = async () => {
     if (window.api) {
+      clearPageFilters();
       const resetSettings = await window.api.resetData();
       setSettings(resetSettings);
       await refreshData();

@@ -23,7 +23,7 @@ import { clsx } from 'clsx';
 type SortKey = 'title' | 'genre' | 'key_field' | 'release';
 
 function MoviesContent() {
-  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language, setHeaderMovieCount, setHeaderFilterText } = useApp();
+  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language, setHeaderMovieCount, setHeaderFilterText, databaseState } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterSignature = searchParams.get('filter');
@@ -44,10 +44,13 @@ function MoviesContent() {
       const savedStateStr = sessionStorage.getItem('movie_manager_movies_page_state');
       if (savedStateStr) {
         const savedState = JSON.parse(savedStateStr);
-        if (savedState.sortKey) setSortKey(savedState.sortKey);
-        if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
-        if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
-        if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+        // Only restore if the saved state belongs to the current database
+        if (!savedState.dbId || !databaseState.activeId || savedState.dbId === databaseState.activeId) {
+          if (savedState.sortKey) setSortKey(savedState.sortKey);
+          if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
+          if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
+          if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+        }
       }
     } catch (e) {
       console.error('Failed to load filter state from sessionStorage:', e);
@@ -58,13 +61,14 @@ function MoviesContent() {
     }
 
     setIsInitialized(true);
-  }, [queryTag]);
+  }, [queryTag, databaseState.activeId]);
 
   // Save filter/sort state to sessionStorage when changed
   useEffect(() => {
     if (!isInitialized) return;
     try {
       const stateToSave = {
+        dbId: databaseState.activeId,
         sortKey,
         sortOrder,
         ratingFilter,
@@ -74,7 +78,23 @@ function MoviesContent() {
     } catch (e) {
       console.error('Failed to save filter state to sessionStorage:', e);
     }
-  }, [sortKey, sortOrder, ratingFilter, tagFilter, isInitialized]);
+  }, [sortKey, sortOrder, ratingFilter, tagFilter, isInitialized, databaseState.activeId]);
+
+  // Reset filters and URL query parameters when active database changes
+  const prevActiveDbRef = React.useRef(databaseState.activeId);
+  useEffect(() => {
+    if (prevActiveDbRef.current && databaseState.activeId && prevActiveDbRef.current !== databaseState.activeId) {
+      setRatingFilter('all');
+      setTagFilter('all');
+      try {
+        sessionStorage.removeItem('movie_manager_movies_page_state');
+      } catch (e) {}
+      if (filterSignature || queryTag) {
+        router.replace('/movies');
+      }
+    }
+    prevActiveDbRef.current = databaseState.activeId;
+  }, [databaseState.activeId, filterSignature, queryTag, router]);
 
   const keyFields = settings?.key_fields || [];
   const keyFieldId = keyFields.length > 0 ? keyFields[0] : 'genre';

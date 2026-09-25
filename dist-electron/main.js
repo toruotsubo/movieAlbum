@@ -427,6 +427,9 @@ function saveAppSettings(input) {
       saveManifest(manifest);
     }
   }
+  const oldKeyFields = jsonDb.settings.key_fields || ["genre"];
+  const newKeyFields = input.key_fields || oldKeyFields;
+  const keyFieldsChanged = JSON.stringify(oldKeyFields) !== JSON.stringify(newKeyFields);
   jsonDb.settings = {
     ...jsonDb.settings,
     ...input,
@@ -435,10 +438,15 @@ function saveAppSettings(input) {
     custom_field_1_display_in_list: input.custom_field_1_display_in_list !== void 0 ? input.custom_field_1_display_in_list : jsonDb.settings.custom_field_1_display_in_list !== false,
     custom_field_2_display_in_list: input.custom_field_2_display_in_list !== void 0 ? input.custom_field_2_display_in_list : jsonDb.settings.custom_field_2_display_in_list !== false,
     custom_field_3_display_in_list: input.custom_field_3_display_in_list !== void 0 ? input.custom_field_3_display_in_list : jsonDb.settings.custom_field_3_display_in_list !== false,
-    key_fields: input.key_fields || jsonDb.settings.key_fields,
+    key_fields: newKeyFields,
     field_order: input.field_order || jsonDb.settings.field_order || DEFAULT_FIELD_ORDER,
     language: input.language !== void 0 ? input.language : jsonDb.settings.language || "auto"
   };
+  if (keyFieldsChanged) {
+    for (const m of jsonDb.movies) {
+      syncGroupingForMovie(m);
+    }
+  }
   saveDatabase();
   return jsonDb.settings;
 }

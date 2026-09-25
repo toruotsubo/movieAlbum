@@ -68,16 +68,25 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   // Drag state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [canDragIndex, setCanDragIndex] = useState<number | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDeleteDbConfirm, setShowDeleteDbConfirm] = useState(false);
 
-  // Sync settings when modal opens or currentSettings changes
+  const isLoadedRef = React.useRef(false);
+  const loadedDbIdRef = React.useRef<string | null>(null);
+
+  // Sync settings when modal opens or current DB switches
   useEffect(() => {
     if (!isOpen) {
+      isLoadedRef.current = false;
+      loadedDbIdRef.current = null;
       return;
     }
 
-    if (isOpen && currentSettings) {
+    const currentDbId = databaseState?.activeId || 'default';
+    if (isOpen && currentSettings && (!isLoadedRef.current || loadedDbIdRef.current !== currentDbId)) {
+      isLoadedRef.current = true;
+      loadedDbIdRef.current = currentDbId;
       setDatabaseName(currentSettings.database_name || '設定ファイル_00');
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
@@ -104,7 +113,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         setReorderableFieldIds(defaultNonFixed);
       }
     }
-  }, [isOpen, currentSettings]);
+  }, [isOpen, currentSettings, databaseState?.activeId]);
 
   if (!isOpen) return null;
 
@@ -372,7 +381,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 return (
                   <div
                     key={fieldId}
-                    draggable
+                    draggable={canDragIndex === index}
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
@@ -391,6 +400,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                       <div
                         className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 rounded transition-colors"
                         title={t('settings_drag_to_reorder')}
+                        onMouseEnter={() => setCanDragIndex(index)}
+                        onMouseLeave={() => setCanDragIndex(null)}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <GripVertical className="w-4 h-4" />

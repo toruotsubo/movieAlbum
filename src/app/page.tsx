@@ -10,7 +10,7 @@ import { clsx } from 'clsx';
 import { KeyItemGroup } from '@/lib/types';
 
 export default function KeyItemsPage() {
-  const { keyGroups, settings, updateKeyItemRating, openEditKeyItemModal, loading, t } = useApp();
+  const { keyGroups, settings, updateKeyItemRating, openEditKeyItemModal, loading, t, databaseState } = useApp();
   const router = useRouter();
 
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -25,21 +25,25 @@ export default function KeyItemsPage() {
       const savedStateStr = sessionStorage.getItem('movie_manager_key_items_page_state');
       if (savedStateStr) {
         const savedState = JSON.parse(savedStateStr);
-        if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
-        if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
-        if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+        // Only restore if the saved state belongs to the current database
+        if (!savedState.dbId || !databaseState.activeId || savedState.dbId === databaseState.activeId) {
+          if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
+          if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
+          if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+        }
       }
     } catch (e) {
       console.error('Failed to load filter state from sessionStorage:', e);
     }
     setIsInitialized(true);
-  }, []);
+  }, [databaseState.activeId]);
 
   // Save filter/sort state to sessionStorage when changed
   useEffect(() => {
     if (!isInitialized) return;
     try {
       const stateToSave = {
+        dbId: databaseState.activeId,
         sortOrder,
         ratingFilter,
         tagFilter,
@@ -48,7 +52,33 @@ export default function KeyItemsPage() {
     } catch (e) {
       console.error('Failed to save filter state to sessionStorage:', e);
     }
-  }, [sortOrder, ratingFilter, tagFilter, isInitialized]);
+  }, [sortOrder, ratingFilter, tagFilter, isInitialized, databaseState.activeId]);
+
+  const keyFieldId = settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre';
+  const keyLabel = getKeyFieldLabel(keyFieldId, settings, t);
+
+  // Reset tagFilter and ratingFilter when keyFieldId changes
+  const prevKeyFieldRef = React.useRef(keyFieldId);
+  useEffect(() => {
+    if (prevKeyFieldRef.current !== keyFieldId) {
+      prevKeyFieldRef.current = keyFieldId;
+      setTagFilter('all');
+      setRatingFilter('all');
+    }
+  }, [keyFieldId]);
+
+  // Reset filters when active database changes
+  const prevActiveDbRef = React.useRef(databaseState.activeId);
+  useEffect(() => {
+    if (prevActiveDbRef.current && databaseState.activeId && prevActiveDbRef.current !== databaseState.activeId) {
+      setTagFilter('all');
+      setRatingFilter('all');
+      try {
+        sessionStorage.removeItem('movie_manager_key_items_page_state');
+      } catch (e) {}
+    }
+    prevActiveDbRef.current = databaseState.activeId;
+  }, [databaseState.activeId]);
 
   if (loading) {
     return (
@@ -72,9 +102,6 @@ export default function KeyItemsPage() {
       </div>
     );
   }
-
-  const keyFieldId = settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre';
-  const keyLabel = getKeyFieldLabel(keyFieldId, settings, t);
 
   // Extract all unique tags
   const availableTags = Array.from(
