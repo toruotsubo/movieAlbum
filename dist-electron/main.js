@@ -37,6 +37,7 @@ var import_electron3 = require("electron");
 var import_path4 = __toESM(require("path"));
 var import_fs4 = __toESM(require("fs"));
 var import_url = __toESM(require("url"));
+var import_stream = require("stream");
 var import_child_process2 = require("child_process");
 
 // electron/db/index.ts
@@ -1218,6 +1219,22 @@ function registerAppProtocol() {
     }
   });
 }
+var MIME_TYPES = {
+  ".mp4": "video/mp4",
+  ".m4v": "video/mp4",
+  ".webm": "video/webm",
+  ".ogv": "video/ogg",
+  ".mov": "video/quicktime",
+  ".mkv": "video/x-matroska",
+  ".avi": "video/x-msvideo",
+  ".wmv": "video/x-ms-wmv",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml"
+};
 function registerMediaProtocol() {
   import_electron3.protocol.handle("media", (request) => {
     try {
@@ -1233,7 +1250,46 @@ function registerMediaProtocol() {
       if (!import_fs4.default.existsSync(normalizedPath)) {
         return new Response("Media Not Found", { status: 404 });
       }
-      return import_electron3.net.fetch(import_url.default.pathToFileURL(normalizedPath).toString());
+      const stats = import_fs4.default.statSync(normalizedPath);
+      const ext = import_path4.default.extname(normalizedPath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || "application/octet-stream";
+      const rangeHeader = request.headers.get("range");
+      if (!rangeHeader) {
+        const stream = import_fs4.default.createReadStream(normalizedPath);
+        return new Response(import_stream.Readable.toWeb(stream), {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Content-Length": stats.size.toString(),
+            "Accept-Ranges": "bytes"
+          }
+        });
+      }
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      if (!match) {
+        return new Response("Invalid Range", { status: 416 });
+      }
+      const start = parseInt(match[1], 10);
+      const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
+      if (start >= stats.size || end >= stats.size || start > end) {
+        return new Response("Requested Range Not Satisfiable", {
+          status: 416,
+          headers: {
+            "Content-Range": `bytes */${stats.size}`
+          }
+        });
+      }
+      const chunkSize = end - start + 1;
+      const fileStream = import_fs4.default.createReadStream(normalizedPath, { start, end });
+      return new Response(import_stream.Readable.toWeb(fileStream), {
+        status: 206,
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": chunkSize.toString(),
+          "Content-Range": `bytes ${start}-${end}/${stats.size}`,
+          "Accept-Ranges": "bytes"
+        }
+      });
     } catch (error) {
       console.error("Failed to handle media file protocol:", error);
       return new Response("Internal Server Error", { status: 500 });

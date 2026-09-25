@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, protocol, Menu, net } from 'electro
 import path from 'path';
 import fs from 'fs';
 import url from 'url';
+import { Readable } from 'stream';
 import { execFile } from 'child_process';
 import {
   initDatabase,
@@ -131,7 +132,24 @@ function registerAppProtocol() {
   });
 }
 
-// Setup custom protocol for local media files using net.fetch
+const MIME_TYPES: Record<string, string> = {
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.webm': 'video/webm',
+  '.ogv': 'video/ogg',
+  '.mov': 'video/quicktime',
+  '.mkv': 'video/x-matroska',
+  '.avi': 'video/x-msvideo',
+  '.wmv': 'video/x-ms-wmv',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+};
+
+// Setup custom protocol for local media files supporting HTTP Range requests for video seeking
 function registerMediaProtocol() {
   protocol.handle('media', (request) => {
     try {
@@ -156,7 +174,54 @@ function registerMediaProtocol() {
         return new Response('Media Not Found', { status: 404 });
       }
 
-      return net.fetch(url.pathToFileURL(normalizedPath).toString());
+      const stats = fs.statSync(normalizedPath);
+      const ext = path.extname(normalizedPath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+      const rangeHeader = request.headers.get('range');
+
+      // Non-range request (e.g. images or full file download)
+      if (!rangeHeader) {
+        const stream = fs.createReadStream(normalizedPath);
+        return new Response(Readable.toWeb(stream) as any, {
+          status: 200,
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': stats.size.toString(),
+            'Accept-Ranges': 'bytes',
+          },
+        });
+      }
+
+      // Handle Range request e.g. "bytes=0-" or "bytes=100-200"
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      if (!match) {
+        return new Response('Invalid Range', { status: 416 });
+      }
+
+      const start = parseInt(match[1], 10);
+      const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
+
+      if (start >= stats.size || end >= stats.size || start > end) {
+        return new Response('Requested Range Not Satisfiable', {
+          status: 416,
+          headers: {
+            'Content-Range': `bytes */${stats.size}`,
+          },
+        });
+      }
+
+      const chunkSize = end - start + 1;
+      const fileStream = fs.createReadStream(normalizedPath, { start, end });
+
+      return new Response(Readable.toWeb(fileStream) as any, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Length': chunkSize.toString(),
+          'Content-Range': `bytes ${start}-${end}/${stats.size}`,
+          'Accept-Ranges': 'bytes',
+        },
+      });
     } catch (error) {
       console.error('Failed to handle media file protocol:', error);
       return new Response('Internal Server Error', { status: 500 });

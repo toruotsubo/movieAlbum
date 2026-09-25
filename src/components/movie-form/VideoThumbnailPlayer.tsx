@@ -116,6 +116,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
         video.crossOrigin = 'anonymous';
         video.src = formatMediaUrl(path, false);
         video.preload = 'metadata';
+        video.muted = true;
 
         let timeoutId: NodeJS.Timeout;
         const cleanup = () => {
@@ -131,7 +132,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           cleanup();
           if (window.api?.generateThumbnail) {
             try {
-              const res = await window.api.generateThumbnail(path, dur ? dur * 0.5 : null);
+              const res = await window.api.generateThumbnail(path, (dur && dur > 0) ? dur * 0.5 : null);
               if (res) {
                 resolve({ imagePath: res.imagePath, targetTime: res.targetTime });
                 return;
@@ -187,7 +188,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           cleanup();
           if (window.api?.generateThumbnail) {
             try {
-              const res = await window.api.generateThumbnail(path, dur ? dur * 0.5 : null);
+              const res = await window.api.generateThumbnail(path, (dur && dur > 0) ? dur * 0.5 : null);
               if (res) {
                 resolve({ imagePath: res.imagePath, targetTime: res.targetTime });
                 return;
@@ -399,6 +400,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                   src={videoSrc}
                   preload="auto"
                   playsInline
+                  muted
                   className="w-full h-full object-contain"
                   onTimeUpdate={() => {
                     if (videoRef.current) setCurrentTime(videoRef.current.currentTime);
