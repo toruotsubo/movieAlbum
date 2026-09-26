@@ -36,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
   else if (baseField) keyLabel = t(`field_${baseField.id}` as any);
 
   return (
-    <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-800 bg-slate-900/80 backdrop-blur-md select-none">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
         {/* Navigation Links */}

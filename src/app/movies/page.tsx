@@ -333,7 +333,7 @@ function MoviesContent() {
   return (
     <div className="space-y-6">
       {/* Filter & Sort Controls Row */}
-      <div className="pb-4 border-b border-slate-800">
+      <div className="pb-4 border-b border-slate-800 select-none">
         <div className="flex flex-wrap items-center justify-start gap-4">
           {/* Tag Filter Controls */}
           {availableTags.length > 0 && (
@@ -440,19 +440,20 @@ function MoviesContent() {
               {/* Summary Image (720x405 Aspect Ratio) */}
               <div
                 onClick={() => openMoviePlayer(movie.file_path)}
-                className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer"
+                className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none"
                 title={t('movies_list_play_tooltip')}
               >
                 {imageSrc ? (
                   <img
                     src={imageSrc}
                     alt={movie.title || 'Movie'}
+                    draggable={false}
                     loading="lazy"
                     decoding="async"
-                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300 pointer-events-none"
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900">
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
                     <Film className="w-10 h-10 mb-1 opacity-40" />
                     <span className="text-xs">NO IMAGE</span>
                   </div>
@@ -460,7 +461,7 @@ function MoviesContent() {
 
                 {/* Group count badge */}
                 {groupCount > 1 && (
-                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/20 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 z-10">
+                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/20 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 z-10 select-none">
                     {t('movies_list_group_badge', { count: groupCount })}
                   </div>
                 )}
@@ -654,10 +655,10 @@ function MoviesContent() {
                       onChange={(newRating) => updateMovieRating(movie.id, newRating)}
                     />
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 select-none">
                     <button
                       onClick={() => openEditMovieModal(movie)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/80 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/80 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
                       title={t('edit')}
                     >
                       <Edit className="w-3.5 h-3.5 text-blue-400 shrink-0" />
@@ -672,7 +673,7 @@ function MoviesContent() {
                         }
                         router.push(`/movies/detail?${params.toString()}`);
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
                     >
                       <span>{t('movies_list_detail_btn')}</span>
                     </button>

@@ -65,7 +65,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="glass-card w-full max-w-md rounded-2xl border border-slate-700/60 shadow-2xl p-6 space-y-5 text-slate-100 relative">
+      <div className="glass-card w-full max-w-md rounded-2xl border border-slate-700/60 shadow-2xl p-6 space-y-5 text-slate-100 relative select-none">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"

@@ -148,7 +148,7 @@ export default function KeyItemsPage() {
     <>
       <div className="space-y-6">
         {/* Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-800/80 select-none">
           <div className="flex flex-wrap items-center gap-4">
             {/* Tag Filter Controls */}
             {availableTags.length > 0 && (
@@ -252,23 +252,24 @@ export default function KeyItemsPage() {
                 {/* Summary Image (720x405 Aspect Ratio) */}
                 <div
                   onClick={() => handleRowClick(group)}
-                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer"
+                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none"
                 >
                   {imageSrc ? (
                     <img
                       src={imageSrc}
                       alt="Group Summary"
-                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                      draggable={false}
+                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300 pointer-events-none"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/80 gap-1.5">
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/80 gap-1.5 select-none">
                       <Film className="w-10 h-10 opacity-40" />
                       <span className="text-xs font-medium tracking-wider">NO IMAGE</span>
                     </div>
                   )}
 
                   {/* Badge count */}
-                  <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-slate-950/20 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 shadow-sm z-10">
+                  <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-slate-950/20 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 shadow-sm z-10 select-none">
                     {t('key_list_movies_count', { count: group.movie_count })}
                   </div>
                 </div>
@@ -320,10 +321,10 @@ export default function KeyItemsPage() {
                       />
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 select-none">
                       <button
                         onClick={() => openEditKeyItemModal(group)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-slate-100 text-xs font-medium border border-slate-800 hover:border-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-slate-100 text-xs font-medium border border-slate-800 hover:border-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0 select-none"
                         title={t('edit')}
                       >
                         <Edit className="w-3.5 h-3.5 text-blue-400 shrink-0" />
@@ -332,7 +333,7 @@ export default function KeyItemsPage() {
 
                       <button
                         onClick={() => handleRowClick(group)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0 select-none"
                       >
                         <span>{t('movies_list_title')}</span>
                       </button>
@@ -351,7 +352,7 @@ export default function KeyItemsPage() {
           <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-              <h3 className="text-base font-semibold text-slate-100">{t('key_list_text_display')}</h3>
+              <h3 className="text-base font-semibold text-slate-100 select-none">{t('key_list_text_display')}</h3>
               <button
                 onClick={() => setIsTextListModalOpen(false)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"

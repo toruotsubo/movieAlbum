@@ -233,7 +233,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto">
+      <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-slate-700/60 pb-4">
           <div className="p-3 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
@@ -255,7 +255,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               value={databaseName}
               onChange={(e) => setDatabaseName(e.target.value)}
               placeholder="例: 設定ファイル_00"
-              className="flex-1 bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="flex-1 bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
             />
             {hasMultipleDbs && databaseState && (
               <select
@@ -287,7 +287,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 value={custom1}
                 onChange={(e) => setCustom1(e.target.value)}
                 placeholder={t('settings_custom_item1_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
             <div className="space-y-2">
@@ -297,7 +297,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 value={custom2}
                 onChange={(e) => setCustom2(e.target.value)}
                 placeholder={t('settings_custom_item2_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
             <div className="space-y-2">
@@ -307,7 +307,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 value={custom3}
                 onChange={(e) => setCustom3(e.target.value)}
                 placeholder={t('settings_custom_item3_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
           </div>
