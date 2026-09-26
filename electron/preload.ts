@@ -1,5 +1,15 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import { AppSettings, Movie, KeyItemGroup, CreateMovieInput, UpdateMovieInput, UpdateKeyItemInput } from '../src/lib/types';
+import {
+  AppSettings,
+  Movie,
+  KeyItemGroup,
+  CreateMovieInput,
+  UpdateMovieInput,
+  UpdateKeyItemInput,
+  SaveSettingsInput,
+  DatabaseInfo,
+  DatabaseState,
+} from '../src/lib/types';
 
 export const api = {
   getPathForFile: (file: File): string => {
@@ -11,8 +21,16 @@ export const api = {
     }
   },
 
+  getDatabaseState: (): Promise<DatabaseState> => ipcRenderer.invoke('databases:getState'),
+  switchDatabase: (id: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
+    ipcRenderer.invoke('databases:switch', id),
+  createDatabase: (name?: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
+    ipcRenderer.invoke('databases:create', name),
+  deleteDatabase: (id: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
+    ipcRenderer.invoke('databases:delete', id),
+
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
-  saveSettings: (input: any): Promise<AppSettings> => ipcRenderer.invoke('settings:save', input),
+  saveSettings: (input: SaveSettingsInput): Promise<AppSettings> => ipcRenderer.invoke('settings:save', input),
 
   getMovies: (): Promise<Movie[]> => ipcRenderer.invoke('movies:getAll'),
   getMovieById: (id: number): Promise<Movie | null> => ipcRenderer.invoke('movies:getById', id),

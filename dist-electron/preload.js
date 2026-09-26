@@ -33,6 +33,10 @@ var api = {
       return file.path || "";
     }
   },
+  getDatabaseState: () => import_electron.ipcRenderer.invoke("databases:getState"),
+  switchDatabase: (id) => import_electron.ipcRenderer.invoke("databases:switch", id),
+  createDatabase: (name) => import_electron.ipcRenderer.invoke("databases:create", name),
+  deleteDatabase: (id) => import_electron.ipcRenderer.invoke("databases:delete", id),
   getSettings: () => import_electron.ipcRenderer.invoke("settings:get"),
   saveSettings: (input) => import_electron.ipcRenderer.invoke("settings:save", input),
   getMovies: () => import_electron.ipcRenderer.invoke("movies:getAll"),

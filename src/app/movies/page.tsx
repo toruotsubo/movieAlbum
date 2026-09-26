@@ -3,9 +3,9 @@
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, getSplitValues, formatReleaseDate } from '@/lib/utils';
+import { formatMediaUrl, getSplitValues, formatReleaseDate, getKeyFieldLabel, getGroupMatches } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ALL_BASE_FIELDS, AppSettings, Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
+import { Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
 import {
   Play,
   ArrowUpDown,
@@ -22,34 +22,21 @@ import { clsx } from 'clsx';
 
 type SortKey = 'title' | 'genre' | 'key_field' | 'release';
 
-const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k: any) => string): string => {
-  if (keyId === 'title') return tFunc('field_title');
-  if (keyId === 'genre') return tFunc('field_genre');
-  if (keyId === 'cast') return tFunc('field_cast');
-  if (keyId === 'release_year') return tFunc('field_release_year');
-  if (keyId === 'release_date') return tFunc('field_release_date');
-  if (keyId === 'rating') return tFunc('field_rating');
-
-  if (keyId === 'custom_field_1') return settings?.custom_field_1_name || tFunc('field_custom_1_default');
-  if (keyId === 'custom_field_2') return settings?.custom_field_2_name || tFunc('field_custom_2_default');
-  if (keyId === 'custom_field_3') return settings?.custom_field_3_name || tFunc('field_custom_3_default');
-
-  const base = ALL_BASE_FIELDS.find((f) => f.id === keyId);
-  return base ? tFunc(`field_${base.id}` as any) : tFunc('field_key_item');
-};
-
 function MoviesContent() {
-  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language, setHeaderMovieCount, setHeaderFilterText } = useApp();
+  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language, setHeaderMovieCount, setHeaderFilterText, databaseState } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
   const filterSignature = searchParams.get('filter');
   const queryTag = searchParams.get('tag');
 
+  const PAGE_SIZE = 36;
   const [sortKey, setSortKey] = useState<SortKey>('title');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [ratingFilter, setRatingFilter] = useState<string | number>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [isInitialized, setIsInitialized] = useState(false);
+  const loadMoreRef = React.useRef<HTMLDivElement>(null);
 
   // Restore filter/sort state from sessionStorage on mount
   useEffect(() => {
@@ -57,10 +44,13 @@ function MoviesContent() {
       const savedStateStr = sessionStorage.getItem('movie_manager_movies_page_state');
       if (savedStateStr) {
         const savedState = JSON.parse(savedStateStr);
-        if (savedState.sortKey) setSortKey(savedState.sortKey);
-        if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
-        if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
-        if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+        // Only restore if the saved state belongs to the current database
+        if (!savedState.dbId || !databaseState.activeId || savedState.dbId === databaseState.activeId) {
+          if (savedState.sortKey) setSortKey(savedState.sortKey);
+          if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
+          if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
+          if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+        }
       }
     } catch (e) {
       console.error('Failed to load filter state from sessionStorage:', e);
@@ -71,13 +61,14 @@ function MoviesContent() {
     }
 
     setIsInitialized(true);
-  }, [queryTag]);
+  }, [queryTag, databaseState.activeId]);
 
   // Save filter/sort state to sessionStorage when changed
   useEffect(() => {
     if (!isInitialized) return;
     try {
       const stateToSave = {
+        dbId: databaseState.activeId,
         sortKey,
         sortOrder,
         ratingFilter,
@@ -87,7 +78,23 @@ function MoviesContent() {
     } catch (e) {
       console.error('Failed to save filter state to sessionStorage:', e);
     }
-  }, [sortKey, sortOrder, ratingFilter, tagFilter, isInitialized]);
+  }, [sortKey, sortOrder, ratingFilter, tagFilter, isInitialized, databaseState.activeId]);
+
+  // Reset filters and URL query parameters when active database changes
+  const prevActiveDbRef = React.useRef(databaseState.activeId);
+  useEffect(() => {
+    if (prevActiveDbRef.current && databaseState.activeId && prevActiveDbRef.current !== databaseState.activeId) {
+      setRatingFilter('all');
+      setTagFilter('all');
+      try {
+        sessionStorage.removeItem('movie_manager_movies_page_state');
+      } catch (e) {}
+      if (filterSignature || queryTag) {
+        router.replace('/movies');
+      }
+    }
+    prevActiveDbRef.current = databaseState.activeId;
+  }, [databaseState.activeId, filterSignature, queryTag, router]);
 
   const keyFields = settings?.key_fields || [];
   const keyFieldId = keyFields.length > 0 ? keyFields[0] : 'genre';
@@ -136,44 +143,27 @@ function MoviesContent() {
     ).sort((a, b) => a.localeCompare(b, 'ja'));
   }, [movies]);
 
-  // Map of movie ID to group count and deduplicated tags of all movies in the group
+  // Map of movie ID to group count and deduplicated tags of all movies in the group: O(N)
   const groupDataMap = useMemo(() => {
-    const keyFields = settings?.key_fields || ['genre'];
+    const childrenMap = new Map<number, Movie[]>();
+    for (const m of movies) {
+      if (m.parent_movie_id) {
+        let list = childrenMap.get(m.parent_movie_id);
+        if (!list) {
+          list = [];
+          childrenMap.set(m.parent_movie_id, list);
+        }
+        list.push(m);
+      }
+    }
+
     const map = new Map<number, { count: number; tags: string[] }>();
 
     for (const movie of movies) {
       if (movie.parent_movie_id) continue;
 
-      const parentId = movie.parent_movie_id || (movie.is_grouped ? movie.id : null);
-      let groupMovies: Movie[] = [movie];
-
-      if (parentId || movie.is_grouped) {
-        const matches = movies.filter((m) => {
-          if (parentId && (m.id === parentId || m.parent_movie_id === parentId)) {
-            return true;
-          }
-          if (m.parent_movie_id === movie.id || movie.parent_movie_id === m.id) {
-            return true;
-          }
-          if (movie.is_grouped && m.is_grouped) {
-            if ((m.title || null) !== (movie.title || null)) return false;
-            if ((m.genre || null) !== (movie.genre || null)) return false;
-            if ((m.release_year || null) !== (movie.release_year || null)) return false;
-            if ((m.release_date || null) !== (movie.release_date || null)) return false;
-
-            for (const kf of keyFields) {
-              if (((m as any)[kf] || null) !== ((movie as any)[kf] || null)) return false;
-            }
-            return true;
-          }
-          return false;
-        });
-
-        const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
-        if (uniqueMatches.length > 0) {
-          groupMovies = uniqueMatches;
-        }
-      }
+      const children = childrenMap.get(movie.id);
+      const groupMovies: Movie[] = children ? [movie, ...children] : [movie];
 
       // Collect all tags from the group movies without duplicates, preserving order
       const tagSet = new Set<string>();
@@ -196,7 +186,7 @@ function MoviesContent() {
     }
 
     return map;
-  }, [movies, settings]);
+  }, [movies]);
 
   const filteredMovies = useMemo(() => {
     // Exclude sibling movies (movies with a parent_movie_id)
@@ -271,6 +261,40 @@ function MoviesContent() {
     };
   }, [sortedMovies.length, setHeaderMovieCount]);
 
+  // Reset pagination when filter/sort conditions change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filterSignature, ratingFilter, tagFilter, sortKey, sortOrder]);
+
+  // Infinite scroll observer: load next batch when scrolling near bottom
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => {
+            if (prev < sortedMovies.length) {
+              return Math.min(prev + PAGE_SIZE, sortedMovies.length);
+            }
+            return prev;
+          });
+        }
+      },
+      { rootMargin: '400px' }
+    );
+
+    observer.observe(target);
+    return () => {
+      observer.unobserve(target);
+    };
+  }, [sortedMovies.length]);
+
+  const displayedMovies = useMemo(() => {
+    return sortedMovies.slice(0, visibleCount);
+  }, [sortedMovies, visibleCount]);
+
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -309,7 +333,7 @@ function MoviesContent() {
   return (
     <div className="space-y-6">
       {/* Filter & Sort Controls Row */}
-      <div className="pb-4 border-b border-slate-800">
+      <div className="pb-4 border-b border-slate-800 select-none">
         <div className="flex flex-wrap items-center justify-start gap-4">
           {/* Tag Filter Controls */}
           {availableTags.length > 0 && (
@@ -402,7 +426,7 @@ function MoviesContent() {
 
       {/* Movies Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sortedMovies.map((movie) => {
+        {displayedMovies.map((movie) => {
           const imageSrc = formatMediaUrl(movie.summary_image_path);
           const groupInfo = groupDataMap.get(movie.id);
           const groupCount = groupInfo?.count || 1;
@@ -416,17 +440,20 @@ function MoviesContent() {
               {/* Summary Image (720x405 Aspect Ratio) */}
               <div
                 onClick={() => openMoviePlayer(movie.file_path)}
-                className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer"
+                className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none"
                 title={t('movies_list_play_tooltip')}
               >
                 {imageSrc ? (
                   <img
                     src={imageSrc}
                     alt={movie.title || 'Movie'}
-                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300"
+                    draggable={false}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300 pointer-events-none"
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900">
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
                     <Film className="w-10 h-10 mb-1 opacity-40" />
                     <span className="text-xs">NO IMAGE</span>
                   </div>
@@ -434,7 +461,7 @@ function MoviesContent() {
 
                 {/* Group count badge */}
                 {groupCount > 1 && (
-                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/20 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 z-10">
+                  <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/20 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 z-10 select-none">
                     {t('movies_list_group_badge', { count: groupCount })}
                   </div>
                 )}
@@ -628,10 +655,10 @@ function MoviesContent() {
                       onChange={(newRating) => updateMovieRating(movie.id, newRating)}
                     />
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 select-none">
                     <button
                       onClick={() => openEditMovieModal(movie)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/80 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/80 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
                       title={t('edit')}
                     >
                       <Edit className="w-3.5 h-3.5 text-blue-400 shrink-0" />
@@ -646,7 +673,7 @@ function MoviesContent() {
                         }
                         router.push(`/movies/detail?${params.toString()}`);
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
                     >
                       <span>{t('movies_list_detail_btn')}</span>
                     </button>
@@ -657,6 +684,13 @@ function MoviesContent() {
           );
         })}
       </div>
+
+      {/* Infinite Scroll Sentinel */}
+      {visibleCount < sortedMovies.length && (
+        <div ref={loadMoreRef} className="py-8 flex justify-center items-center">
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
     </div>
   );
 }

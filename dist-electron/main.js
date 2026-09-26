@@ -37,6 +37,8 @@ var import_electron3 = require("electron");
 var import_path4 = __toESM(require("path"));
 var import_fs4 = __toESM(require("fs"));
 var import_url = __toESM(require("url"));
+var import_stream = require("stream");
+var import_child_process2 = require("child_process");
 
 // electron/db/index.ts
 var import_path = __toESM(require("path"));
@@ -44,6 +46,30 @@ var import_fs = __toESM(require("fs"));
 var import_electron = require("electron");
 
 // src/lib/types.ts
+var DEFAULT_APP_SETTINGS = {
+  id: 1,
+  is_initialized: false,
+  custom_field_1_name: null,
+  custom_field_2_name: null,
+  custom_field_3_name: null,
+  custom_field_1_display_in_list: true,
+  custom_field_2_display_in_list: true,
+  custom_field_3_display_in_list: true,
+  key_fields: ["genre"],
+  field_order: [
+    "title",
+    "rating",
+    "genre",
+    "cast",
+    "release_year",
+    "release_date",
+    "custom_field_1",
+    "custom_field_2",
+    "custom_field_3"
+  ],
+  language: "auto",
+  database_name: "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00"
+};
 var DEFAULT_FIELD_ORDER = [
   "title",
   "rating",
@@ -87,49 +113,304 @@ function getKanaForCast(cast, castKana, targetCastVal) {
 
 // electron/db/index.ts
 var jsonDb = null;
-var dbFilePath = "";
-function initDatabase() {
+var currentDbId = "";
+var currentDbFilePath = "";
+function getDbDir() {
   const userDataPath = import_electron.app.getPath("userData");
   const dbDir = import_path.default.join(userDataPath, "db");
   if (!import_fs.default.existsSync(dbDir)) {
     import_fs.default.mkdirSync(dbDir, { recursive: true });
   }
-  dbFilePath = import_path.default.join(dbDir, "movie_manager.json");
-  if (import_fs.default.existsSync(dbFilePath)) {
+  return dbDir;
+}
+function getManifestPath() {
+  return import_path.default.join(getDbDir(), "databases.json");
+}
+function loadManifest() {
+  const manifestPath = getManifestPath();
+  const dbDir = getDbDir();
+  if (import_fs.default.existsSync(manifestPath)) {
     try {
-      jsonDb = JSON.parse(import_fs.default.readFileSync(dbFilePath, "utf-8"));
+      const data = JSON.parse(import_fs.default.readFileSync(manifestPath, "utf-8"));
+      if (data && Array.isArray(data.databases) && data.databases.length > 0) {
+        return data;
+      }
     } catch (err) {
-      console.error("Failed to parse database file, resetting:", err);
-      jsonDb = null;
+      console.error("Failed to parse databases.json, recreating manifest:", err);
     }
   }
-  if (!jsonDb) {
-    jsonDb = {
+  const legacyFilePath = import_path.default.join(dbDir, "movie_manager.json");
+  const initialId = "db_00";
+  const initialName = "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00";
+  const initialFilename = "db_00.json";
+  const targetInitialPath = import_path.default.join(dbDir, initialFilename);
+  if (import_fs.default.existsSync(legacyFilePath) && !import_fs.default.existsSync(targetInitialPath)) {
+    try {
+      import_fs.default.copyFileSync(legacyFilePath, targetInitialPath);
+    } catch (e) {
+      console.error("Failed to copy legacy movie_manager.json to db_00.json:", e);
+    }
+  }
+  const manifest = {
+    activeId: initialId,
+    databases: [
+      {
+        id: initialId,
+        name: initialName,
+        filename: initialFilename,
+        created_at: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    ]
+  };
+  saveManifest(manifest);
+  return manifest;
+}
+function saveManifest(manifest) {
+  const manifestPath = getManifestPath();
+  const tmpPath = `${manifestPath}.tmp`;
+  try {
+    import_fs.default.writeFileSync(tmpPath, JSON.stringify(manifest, null, 2), "utf-8");
+    import_fs.default.renameSync(tmpPath, manifestPath);
+  } catch (err) {
+    console.error("Failed to save databases manifest:", err);
+    try {
+      import_fs.default.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), "utf-8");
+    } catch (directErr) {
+      console.error("Direct manifest write failed:", directErr);
+    }
+  }
+}
+function getNextDatabaseNumber(manifest) {
+  const usedNumbers = /* @__PURE__ */ new Set();
+  for (const db of manifest.databases) {
+    const nameMatch = db.name.match(/設定ファイル_(\d+)/);
+    if (nameMatch) {
+      usedNumbers.add(parseInt(nameMatch[1], 10));
+    }
+    const idMatch = db.id.match(/db_(\d+)/);
+    if (idMatch) {
+      usedNumbers.add(parseInt(idMatch[1], 10));
+    }
+  }
+  let nextNum = 0;
+  while (usedNumbers.has(nextNum)) {
+    nextNum++;
+  }
+  return String(nextNum).padStart(2, "0");
+}
+function loadDatabaseFile(filePath, defaultName) {
+  let loadedDb = null;
+  if (import_fs.default.existsSync(filePath)) {
+    try {
+      loadedDb = JSON.parse(import_fs.default.readFileSync(filePath, "utf-8"));
+    } catch (err) {
+      console.error(`Failed to parse db file ${filePath}, attempting backup:`, err);
+      const bakPath = `${filePath}.bak`;
+      if (import_fs.default.existsSync(bakPath)) {
+        try {
+          loadedDb = JSON.parse(import_fs.default.readFileSync(bakPath, "utf-8"));
+          console.warn("Successfully recovered from backup:", bakPath);
+        } catch (bakErr) {
+          console.error("Failed to recover from backup:", bakErr);
+        }
+      }
+    }
+  }
+  if (!loadedDb) {
+    loadedDb = {
       settings: {
-        id: 1,
-        is_initialized: false,
-        custom_field_1_name: null,
-        custom_field_2_name: null,
-        custom_field_3_name: null,
-        custom_field_1_display_in_list: true,
-        custom_field_2_display_in_list: true,
-        custom_field_3_display_in_list: true,
-        key_fields: ["genre", "cast"],
-        field_order: DEFAULT_FIELD_ORDER,
-        language: "auto"
+        ...DEFAULT_APP_SETTINGS,
+        database_name: defaultName
       },
       movies: [],
       keyRatings: {},
       keyTags: {}
     };
-    saveDatabase();
   }
-  console.log("Database initialized successfully at:", dbFilePath);
+  if (!loadedDb.settings.database_name) {
+    loadedDb.settings.database_name = defaultName;
+  }
+  if (!loadedDb.settings.field_order) {
+    loadedDb.settings.field_order = [...DEFAULT_FIELD_ORDER];
+  }
+  if (!loadedDb.settings.key_fields || loadedDb.settings.key_fields.length === 0) {
+    loadedDb.settings.key_fields = ["genre"];
+  }
+  if (!loadedDb.keyRatings) loadedDb.keyRatings = {};
+  if (!loadedDb.keyTags) loadedDb.keyTags = {};
+  return loadedDb;
+}
+function initDatabase() {
+  const manifest = loadManifest();
+  let activeMeta = manifest.databases.find((d) => d.id === manifest.activeId);
+  if (!activeMeta) {
+    activeMeta = manifest.databases[0];
+    manifest.activeId = activeMeta.id;
+    saveManifest(manifest);
+  }
+  currentDbId = activeMeta.id;
+  currentDbFilePath = import_path.default.join(getDbDir(), activeMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, activeMeta.name);
+  saveDatabase();
+  console.log(`Database initialized: [${activeMeta.id}] ${activeMeta.name} at ${currentDbFilePath}`);
 }
 function saveDatabase() {
-  if (jsonDb && dbFilePath) {
-    import_fs.default.writeFileSync(dbFilePath, JSON.stringify(jsonDb, null, 2), "utf-8");
+  if (jsonDb && currentDbFilePath) {
+    const tmpFilePath = `${currentDbFilePath}.tmp`;
+    const jsonStr = JSON.stringify(jsonDb, null, 2);
+    try {
+      import_fs.default.writeFileSync(tmpFilePath, jsonStr, "utf-8");
+      import_fs.default.renameSync(tmpFilePath, currentDbFilePath);
+      try {
+        import_fs.default.copyFileSync(currentDbFilePath, `${currentDbFilePath}.bak`);
+      } catch {
+      }
+    } catch (err) {
+      console.error("Failed to save database atomically, falling back:", err);
+      try {
+        import_fs.default.writeFileSync(currentDbFilePath, jsonStr, "utf-8");
+      } catch (writeErr) {
+        console.error("Direct database write failed:", writeErr);
+      }
+    }
   }
+}
+function getDatabaseState() {
+  const manifest = loadManifest();
+  return {
+    databases: manifest.databases.map((d) => ({
+      id: d.id,
+      name: d.name
+    })),
+    activeId: manifest.activeId
+  };
+}
+function switchDatabase(id) {
+  const manifest = loadManifest();
+  const targetMeta = manifest.databases.find((d) => d.id === id);
+  if (!targetMeta) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+  saveDatabase();
+  manifest.activeId = id;
+  saveManifest(manifest);
+  currentDbId = targetMeta.id;
+  currentDbFilePath = import_path.default.join(getDbDir(), targetMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, targetMeta.name);
+  saveDatabase();
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings
+  };
+}
+function createDatabase(nameInput) {
+  saveDatabase();
+  const manifest = loadManifest();
+  const numStr = getNextDatabaseNumber(manifest);
+  const id = `db_${numStr}`;
+  const name = nameInput?.trim() || `\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_${numStr}`;
+  const filename = `${id}.json`;
+  const filePath = import_path.default.join(getDbDir(), filename);
+  const newDb = {
+    settings: {
+      ...DEFAULT_APP_SETTINGS,
+      database_name: name
+    },
+    movies: [],
+    keyRatings: {},
+    keyTags: {}
+  };
+  import_fs.default.writeFileSync(filePath, JSON.stringify(newDb, null, 2), "utf-8");
+  manifest.databases.push({
+    id,
+    name,
+    filename,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  manifest.activeId = id;
+  saveManifest(manifest);
+  currentDbId = id;
+  currentDbFilePath = filePath;
+  jsonDb = newDb;
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings
+  };
+}
+function deleteDatabase(id) {
+  const manifest = loadManifest();
+  if (manifest.databases.length <= 1) {
+    throw new Error("Cannot delete the only database");
+  }
+  const targetIdx = manifest.databases.findIndex((d) => d.id === id);
+  if (targetIdx === -1) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+  const target = manifest.databases[targetIdx];
+  const targetFilePath = import_path.default.join(getDbDir(), target.filename);
+  const targetBakPath = `${targetFilePath}.bak`;
+  try {
+    if (import_fs.default.existsSync(targetFilePath)) import_fs.default.unlinkSync(targetFilePath);
+    if (import_fs.default.existsSync(targetBakPath)) import_fs.default.unlinkSync(targetBakPath);
+  } catch (err) {
+    console.error("Failed to unlink db file during deletion:", err);
+  }
+  manifest.databases.splice(targetIdx, 1);
+  const firstDb = manifest.databases[0];
+  manifest.activeId = firstDb.id;
+  saveManifest(manifest);
+  currentDbId = firstDb.id;
+  currentDbFilePath = import_path.default.join(getDbDir(), firstDb.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, firstDb.name);
+  saveDatabase();
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings
+  };
+}
+function isMatchingGroupAttributes(movieA, movieB, keyFields) {
+  if ((movieA.title || null) !== (movieB.title || null)) return false;
+  if ((movieA.genre || null) !== (movieB.genre || null)) return false;
+  if ((movieA.release_year || null) !== (movieB.release_year || null)) return false;
+  if ((movieA.release_date || null) !== (movieB.release_date || null)) return false;
+  for (const kf of keyFields) {
+    if ((movieA[kf] || null) !== (movieB[kf] || null)) return false;
+  }
+  return true;
+}
+function syncGroupingForMovie(movie) {
+  if (!jsonDb) return;
+  const keyFields = jsonDb.settings.key_fields || ["genre"];
+  if (movie.is_grouped) {
+    for (const m of jsonDb.movies) {
+      if (m.id === movie.id) continue;
+      if (isMatchingGroupAttributes(movie, m, keyFields)) {
+        m.parent_movie_id = movie.id;
+        m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      }
+    }
+  } else {
+    for (const m of jsonDb.movies) {
+      if (m.parent_movie_id === movie.id) {
+        m.parent_movie_id = null;
+        m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      }
+    }
+  }
+}
+function buildKeyCombinations(movie, keyFields) {
+  let combinations = [{}];
+  for (const kf of keyFields) {
+    const values = getSplitValues(movie[kf]);
+    const nextCombinations = [];
+    for (const comb of combinations) {
+      for (const val of values) {
+        nextCombinations.push({ ...comb, [kf]: val });
+      }
+    }
+    combinations = nextCombinations;
+  }
+  return combinations;
 }
 function getAppSettings() {
   if (!jsonDb) initDatabase();
@@ -137,17 +418,35 @@ function getAppSettings() {
 }
 function saveAppSettings(input) {
   if (!jsonDb) initDatabase();
+  const newDatabaseName = input.database_name !== void 0 ? input.database_name.trim() : jsonDb.settings.database_name;
+  if (newDatabaseName) {
+    const manifest = loadManifest();
+    const currentMeta = manifest.databases.find((d) => d.id === currentDbId);
+    if (currentMeta && currentMeta.name !== newDatabaseName) {
+      currentMeta.name = newDatabaseName;
+      saveManifest(manifest);
+    }
+  }
+  const oldKeyFields = jsonDb.settings.key_fields || ["genre"];
+  const newKeyFields = input.key_fields || oldKeyFields;
+  const keyFieldsChanged = JSON.stringify(oldKeyFields) !== JSON.stringify(newKeyFields);
   jsonDb.settings = {
     ...jsonDb.settings,
     ...input,
+    database_name: newDatabaseName,
     is_initialized: input.is_initialized !== void 0 ? input.is_initialized : jsonDb.settings.is_initialized,
     custom_field_1_display_in_list: input.custom_field_1_display_in_list !== void 0 ? input.custom_field_1_display_in_list : jsonDb.settings.custom_field_1_display_in_list !== false,
     custom_field_2_display_in_list: input.custom_field_2_display_in_list !== void 0 ? input.custom_field_2_display_in_list : jsonDb.settings.custom_field_2_display_in_list !== false,
     custom_field_3_display_in_list: input.custom_field_3_display_in_list !== void 0 ? input.custom_field_3_display_in_list : jsonDb.settings.custom_field_3_display_in_list !== false,
-    key_fields: input.key_fields || jsonDb.settings.key_fields,
+    key_fields: newKeyFields,
     field_order: input.field_order || jsonDb.settings.field_order || DEFAULT_FIELD_ORDER,
     language: input.language !== void 0 ? input.language : jsonDb.settings.language || "auto"
   };
+  if (keyFieldsChanged) {
+    for (const m of jsonDb.movies) {
+      syncGroupingForMovie(m);
+    }
+  }
   saveDatabase();
   return jsonDb.settings;
 }
@@ -169,7 +468,8 @@ function addMovie(movie) {
   if (existing) {
     return updateMovie({ ...movie, id: existing.id });
   }
-  const newId = jsonDb.movies.length > 0 ? Math.max(...jsonDb.movies.map((m) => m.id)) + 1 : 1;
+  const maxId = jsonDb.movies.reduce((max, m) => Math.max(max, m.id), 0);
+  const newId = maxId + 1;
   const newMovie = {
     id: newId,
     file_path: movie.file_path,
@@ -199,6 +499,7 @@ function addMovie(movie) {
     updated_at: (/* @__PURE__ */ new Date()).toISOString()
   };
   jsonDb.movies.push(newMovie);
+  syncGroupingForMovie(newMovie);
   saveDatabase();
   return newMovie;
 }
@@ -206,18 +507,26 @@ function updateMovie(movie) {
   if (!jsonDb) initDatabase();
   const index = jsonDb.movies.findIndex((m) => m.id === movie.id);
   if (index === -1) throw new Error(`Movie with id ${movie.id} not found.`);
-  jsonDb.movies[index] = {
+  const updatedMovie = {
     ...jsonDb.movies[index],
     ...movie,
     updated_at: (/* @__PURE__ */ new Date()).toISOString()
   };
+  jsonDb.movies[index] = updatedMovie;
+  syncGroupingForMovie(updatedMovie);
   saveDatabase();
-  return jsonDb.movies[index];
+  return updatedMovie;
 }
 function deleteMovie(id) {
   if (!jsonDb) initDatabase();
   const index = jsonDb.movies.findIndex((m) => m.id === id);
   if (index !== -1) {
+    for (const m of jsonDb.movies) {
+      if (m.parent_movie_id === id) {
+        m.parent_movie_id = null;
+        m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+      }
+    }
     jsonDb.movies.splice(index, 1);
     saveDatabase();
     return true;
@@ -240,17 +549,7 @@ function getKeyItemGroups() {
   if (keyFields.length === 0) return [];
   const groupsMap = /* @__PURE__ */ new Map();
   for (const movie of movies) {
-    let combinations = [{}];
-    for (const kf of keyFields) {
-      const values = getSplitValues(movie[kf]);
-      const nextCombinations = [];
-      for (const comb of combinations) {
-        for (const val of values) {
-          nextCombinations.push({ ...comb, [kf]: val });
-        }
-      }
-      combinations = nextCombinations;
-    }
+    const combinations = buildKeyCombinations(movie, keyFields);
     for (const keyValues of combinations) {
       const signature = JSON.stringify(keyValues);
       if (!groupsMap.has(signature)) {
@@ -322,17 +621,7 @@ function updateKeyItemDetails(input) {
       console.error("Failed to parse key_signature in updateKeyItemDetails:", e);
     }
     for (const movie of movies) {
-      let combinations = [{}];
-      for (const kf of keyFields) {
-        const values = getSplitValues(movie[kf]);
-        const nextCombinations = [];
-        for (const comb of combinations) {
-          for (const val of values) {
-            nextCombinations.push({ ...comb, [kf]: val });
-          }
-        }
-        combinations = nextCombinations;
-      }
+      const combinations = buildKeyCombinations(movie, keyFields);
       const isMatch = combinations.some((comb) => JSON.stringify(comb) === key_signature);
       if (isMatch) {
         if (targetCastVal && movie.cast) {
@@ -361,28 +650,11 @@ function updateKeyItemDetails(input) {
 }
 function resetAllData() {
   if (!jsonDb) initDatabase();
-  try {
-    const userDataPath = import_electron.app.getPath("userData");
-    const thumbDir = import_path.default.join(userDataPath, "thumbnails");
-    if (import_fs.default.existsSync(thumbDir)) {
-      import_fs.default.rmSync(thumbDir, { recursive: true, force: true });
-    }
-  } catch (err) {
-    console.error("Failed to clear thumbnails directory:", err);
-  }
+  const currentDbName = jsonDb.settings.database_name || "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00";
   jsonDb = {
     settings: {
-      id: 1,
-      is_initialized: false,
-      custom_field_1_name: null,
-      custom_field_2_name: null,
-      custom_field_3_name: null,
-      custom_field_1_display_in_list: true,
-      custom_field_2_display_in_list: true,
-      custom_field_3_display_in_list: true,
-      key_fields: ["genre"],
-      field_order: DEFAULT_FIELD_ORDER,
-      language: "auto"
+      ...DEFAULT_APP_SETTINGS,
+      database_name: currentDbName
     },
     movies: [],
     keyRatings: {},
@@ -430,7 +702,7 @@ function getFFmpegPath() {
 }
 
 // electron/metadataParser.ts
-function extractVideoMetadata(filePath) {
+async function extractVideoMetadata(filePath) {
   try {
     if (!import_fs3.default.existsSync(filePath)) {
       return null;
@@ -456,7 +728,7 @@ function extractVideoMetadata(filePath) {
       }
     }
     if (!meta || !meta.duration || !meta.width) {
-      const ffmpegMeta = extractMetadataWithFFmpeg(filePath);
+      const ffmpegMeta = await extractMetadataWithFFmpeg(filePath);
       if (ffmpegMeta) {
         meta = {
           duration: meta?.duration ?? ffmpegMeta.duration,
@@ -478,46 +750,49 @@ function extractVideoMetadata(filePath) {
     return null;
   }
 }
-function extractMetadataWithFFmpeg(filePath) {
-  try {
-    let output = "";
-    try {
-      output = (0, import_child_process.execFileSync)(getFFmpegPath(), ["-hide_banner", "-i", filePath], {
+async function extractMetadataWithFFmpeg(filePath) {
+  return new Promise((resolve) => {
+    (0, import_child_process.execFile)(
+      getFFmpegPath(),
+      ["-hide_banner", "-i", filePath],
+      {
         encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: 5e3
-      }).toString();
-    } catch (err) {
-      output = err.stderr ? err.stderr.toString() : err.output ? err.output.toString() : "";
-    }
-    if (!output) return null;
-    let duration;
-    let width;
-    let height;
-    let frameRate;
-    const durMatch = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
-    if (durMatch) {
-      const h = parseFloat(durMatch[1]);
-      const m = parseFloat(durMatch[2]);
-      const s = parseFloat(durMatch[3]);
-      duration = Math.round((h * 3600 + m * 60 + s) * 100) / 100;
-    }
-    const streamMatch = output.match(/Stream #\d+:\d+.*?: Video:.*? (\d{2,5})x(\d{2,5})/);
-    if (streamMatch) {
-      width = parseInt(streamMatch[1], 10);
-      height = parseInt(streamMatch[2], 10);
-    }
-    const fpsMatch = output.match(/(\d+(?:\.\d+)?)\s*fps/);
-    if (fpsMatch) {
-      frameRate = Math.round(parseFloat(fpsMatch[1]) * 100) / 100;
-    }
-    if (duration || width || height) {
-      return { duration, width, height, frameRate };
-    }
-  } catch (err) {
-    console.warn("FFmpeg metadata extraction fallback failed:", err);
-  }
-  return null;
+        timeout: 8e3
+      },
+      (err, _stdout, stderr) => {
+        const output = (stderr || "") + (_stdout || "") + (err?.message || "");
+        if (!output) {
+          resolve(null);
+          return;
+        }
+        let duration;
+        let width;
+        let height;
+        let frameRate;
+        const durMatch = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
+        if (durMatch) {
+          const h = parseFloat(durMatch[1]);
+          const m = parseFloat(durMatch[2]);
+          const s = parseFloat(durMatch[3]);
+          duration = Math.round((h * 3600 + m * 60 + s) * 100) / 100;
+        }
+        const streamMatch = output.match(/Stream #\d+:\d+.*?: Video:.*? (\d{2,5})x(\d{2,5})/);
+        if (streamMatch) {
+          width = parseInt(streamMatch[1], 10);
+          height = parseInt(streamMatch[2], 10);
+        }
+        const fpsMatch = output.match(/(\d+(?:\.\d+)?)\s*fps/);
+        if (fpsMatch) {
+          frameRate = Math.round(parseFloat(fpsMatch[1]) * 100) / 100;
+        }
+        if (duration || width || height) {
+          resolve({ duration, width, height, frameRate });
+        } else {
+          resolve(null);
+        }
+      }
+    );
+  });
 }
 function extractMp4MetadataNative(filePath, fileSize) {
   let fd = null;
@@ -862,7 +1137,6 @@ function extractAviMetadataNative(filePath) {
 }
 
 // electron/main.ts
-var import_child_process2 = require("child_process");
 import_electron3.protocol.registerSchemesAsPrivileged([
   {
     scheme: "app",
@@ -911,7 +1185,7 @@ function createWindow() {
       preload: import_path4.default.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false
+      webSecurity: true
     }
   });
   mainWindow.setMenu(null);
@@ -953,8 +1227,24 @@ function registerAppProtocol() {
     }
   });
 }
+var MIME_TYPES = {
+  ".mp4": "video/mp4",
+  ".m4v": "video/mp4",
+  ".webm": "video/webm",
+  ".ogv": "video/ogg",
+  ".mov": "video/quicktime",
+  ".mkv": "video/x-matroska",
+  ".avi": "video/x-msvideo",
+  ".wmv": "video/x-ms-wmv",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml"
+};
 function registerMediaProtocol() {
-  import_electron3.protocol.registerFileProtocol("media", (request, callback) => {
+  import_electron3.protocol.handle("media", (request) => {
     try {
       let rawUrl = request.url.replace(/^media:\/\/(local\/)?/, "");
       let cleanUrl = rawUrl.split("?")[0].split("#")[0];
@@ -965,11 +1255,98 @@ function registerMediaProtocol() {
         }
       }
       const normalizedPath = import_path4.default.normalize(decodedPath);
-      callback({ path: normalizedPath });
+      if (!import_fs4.default.existsSync(normalizedPath)) {
+        return new Response("Media Not Found", { status: 404 });
+      }
+      const stats = import_fs4.default.statSync(normalizedPath);
+      const ext = import_path4.default.extname(normalizedPath).toLowerCase();
+      const contentType = MIME_TYPES[ext] || "application/octet-stream";
+      const rangeHeader = request.headers.get("range");
+      if (!rangeHeader) {
+        const stream = import_fs4.default.createReadStream(normalizedPath);
+        return new Response(import_stream.Readable.toWeb(stream), {
+          status: 200,
+          headers: {
+            "Content-Type": contentType,
+            "Content-Length": stats.size.toString(),
+            "Accept-Ranges": "bytes"
+          }
+        });
+      }
+      const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      if (!match) {
+        return new Response("Invalid Range", { status: 416 });
+      }
+      const start = parseInt(match[1], 10);
+      const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
+      if (start >= stats.size || end >= stats.size || start > end) {
+        return new Response("Requested Range Not Satisfiable", {
+          status: 416,
+          headers: {
+            "Content-Range": `bytes */${stats.size}`
+          }
+        });
+      }
+      const chunkSize = end - start + 1;
+      const fileStream = import_fs4.default.createReadStream(normalizedPath, { start, end });
+      return new Response(import_stream.Readable.toWeb(fileStream), {
+        status: 206,
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": chunkSize.toString(),
+          "Content-Range": `bytes ${start}-${end}/${stats.size}`,
+          "Accept-Ranges": "bytes"
+        }
+      });
     } catch (error) {
       console.error("Failed to handle media file protocol:", error);
-      callback({ error: -6 });
+      return new Response("Internal Server Error", { status: 500 });
     }
+  });
+}
+async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
+  if (!import_fs4.default.existsSync(filePath)) {
+    return null;
+  }
+  const meta = await extractVideoMetadata(filePath);
+  const duration = meta?.duration || null;
+  let targetTime = targetTimeInput;
+  if (targetTime === void 0 || targetTime === null || isNaN(targetTime)) {
+    targetTime = duration && duration > 0 ? duration * 0.5 : 0;
+  }
+  return new Promise((resolve) => {
+    const userDataPath = import_electron3.app.getPath("userData");
+    const thumbDir = import_path4.default.join(userDataPath, "thumbnails");
+    if (!import_fs4.default.existsSync(thumbDir)) {
+      import_fs4.default.mkdirSync(thumbDir, { recursive: true });
+    }
+    const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
+    const fullPath = import_path4.default.join(thumbDir, filename);
+    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : "0";
+    (0, import_child_process2.execFile)(
+      getFFmpegPath(),
+      [
+        "-y",
+        "-ss",
+        seekArg,
+        "-i",
+        filePath,
+        "-vframes",
+        "1",
+        "-vf",
+        "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
+        fullPath
+      ],
+      { timeout: 15e3 },
+      (err) => {
+        if (!err && import_fs4.default.existsSync(fullPath)) {
+          resolve({ imagePath: fullPath, duration, targetTime });
+        } else {
+          console.error("FFmpeg thumbnail generation error:", err);
+          resolve(null);
+        }
+      }
+    );
   });
 }
 import_electron3.app.whenReady().then(() => {
@@ -987,6 +1364,10 @@ import_electron3.app.on("window-all-closed", () => {
 });
 import_electron3.ipcMain.handle("settings:get", async () => getAppSettings());
 import_electron3.ipcMain.handle("settings:save", async (_, input) => saveAppSettings(input));
+import_electron3.ipcMain.handle("databases:getState", async () => getDatabaseState());
+import_electron3.ipcMain.handle("databases:switch", async (_, id) => switchDatabase(id));
+import_electron3.ipcMain.handle("databases:create", async (_, name) => createDatabase(name));
+import_electron3.ipcMain.handle("databases:delete", async (_, id) => deleteDatabase(id));
 import_electron3.ipcMain.handle("movies:getAll", async () => getAllMovies());
 import_electron3.ipcMain.handle("movies:getById", async (_, id) => getMovieById(id));
 import_electron3.ipcMain.handle("movies:getByPath", async (_, filePath) => getMovieByFilePath(filePath));
@@ -1049,52 +1430,6 @@ import_electron3.ipcMain.handle("app:saveSummaryImage", async (_, base64Data) =>
     throw new Error("SAVE_SUMMARY_FAILED");
   }
 });
-async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
-  return new Promise((resolve) => {
-    if (!import_fs4.default.existsSync(filePath)) {
-      resolve(null);
-      return;
-    }
-    const meta = extractVideoMetadata(filePath);
-    const duration = meta?.duration || null;
-    let targetTime = targetTimeInput;
-    if (targetTime === void 0 || targetTime === null || isNaN(targetTime)) {
-      targetTime = duration && duration > 0 ? duration * 0.5 : 0;
-    }
-    const userDataPath = import_electron3.app.getPath("userData");
-    const thumbDir = import_path4.default.join(userDataPath, "thumbnails");
-    if (!import_fs4.default.existsSync(thumbDir)) {
-      import_fs4.default.mkdirSync(thumbDir, { recursive: true });
-    }
-    const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
-    const fullPath = import_path4.default.join(thumbDir, filename);
-    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : "0";
-    (0, import_child_process2.execFile)(
-      getFFmpegPath(),
-      [
-        "-y",
-        "-ss",
-        seekArg,
-        "-i",
-        filePath,
-        "-vframes",
-        "1",
-        "-vf",
-        "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
-        fullPath
-      ],
-      { timeout: 15e3 },
-      (err) => {
-        if (!err && import_fs4.default.existsSync(fullPath)) {
-          resolve({ imagePath: fullPath, duration, targetTime });
-        } else {
-          console.error("FFmpeg thumbnail generation error:", err);
-          resolve(null);
-        }
-      }
-    );
-  });
-}
 import_electron3.ipcMain.handle("app:generateThumbnail", async (_, { filePath, targetTime }) => {
   return generateThumbnailWithFFmpeg(filePath, targetTime);
 });

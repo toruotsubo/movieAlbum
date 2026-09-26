@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { KeyItemGroup, ALL_BASE_FIELDS, AppSettings } from '@/lib/types';
+import { KeyItemGroup } from '@/lib/types';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
+import { getKeyFieldLabel } from '@/lib/utils';
 import { X, Save } from 'lucide-react';
 
 interface KeyItemFormModalProps {
@@ -13,22 +14,6 @@ interface KeyItemFormModalProps {
   onSave: (data: { key_signature: string; cast_kana: string; tags: string; rating?: number }) => Promise<void>;
   onClose: () => void;
 }
-
-const getKeyFieldLabel = (keyId: string, settings: AppSettings | null, tFunc: (k: any) => string): string => {
-  if (keyId === 'title') return tFunc('field_title');
-  if (keyId === 'genre') return tFunc('field_genre');
-  if (keyId === 'cast') return tFunc('field_cast');
-  if (keyId === 'release_year') return tFunc('field_release_year');
-  if (keyId === 'release_date') return tFunc('field_release_date');
-  if (keyId === 'rating') return tFunc('field_rating');
-
-  if (keyId === 'custom_field_1') return settings?.custom_field_1_name || tFunc('field_custom_1_default');
-  if (keyId === 'custom_field_2') return settings?.custom_field_2_name || tFunc('field_custom_2_default');
-  if (keyId === 'custom_field_3') return settings?.custom_field_3_name || tFunc('field_custom_3_default');
-
-  const base = ALL_BASE_FIELDS.find((f) => f.id === keyId);
-  return base ? tFunc(`field_${base.id}` as any) : tFunc('field_key_item');
-};
 
 export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
   isOpen,
@@ -106,7 +91,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
 
           {/* Rating Field (Key Item Specific) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 block">
+            <label className="text-xs font-semibold text-slate-300 block select-none">
               {t('key_modal_rating_label')} ({keyLabel})
             </label>
             <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
@@ -121,7 +106,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
           {/* Cast Kana Field (Only shown in Japanese when key field is 'cast') */}
           {showKana && isCastKey && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block">
+              <label className="text-xs font-semibold text-slate-300 block select-none">
                 {t('key_modal_cast_kana_label')}
               </label>
               <input
@@ -131,7 +116,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
                 placeholder={t('key_modal_cast_kana_placeholder')}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               />
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 select-none">
                 {t('key_modal_cast_kana_note', { title: titleString })}
               </p>
             </div>
@@ -139,7 +124,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
 
           {/* Tags Field (Key Item Specific) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 block">
+            <label className="text-xs font-semibold text-slate-300 block select-none">
               {t('key_modal_tags_label')} ({keyLabel})
             </label>
             <input
@@ -156,14 +141,14 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors select-none"
             >
               {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 shadow-lg shadow-blue-600/30 transition-colors cursor-pointer"
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 shadow-lg shadow-blue-600/30 transition-colors cursor-pointer select-none"
             >
               <Save className="w-4 h-4" />
               <span>{saving ? t('saving') : t('save')}</span>

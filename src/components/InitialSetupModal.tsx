@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER } from '../lib/types';
-import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock } from 'lucide-react';
+import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
+import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -11,6 +11,10 @@ import { ConfirmModal } from './ConfirmModal';
 interface InitialSetupModalProps {
   isOpen: boolean;
   currentSettings: AppSettings | null;
+  databaseState?: DatabaseState;
+  onSwitchDatabase?: (id: string) => Promise<void>;
+  onCreateDatabase?: (name?: string) => Promise<void>;
+  onDeleteDatabase?: (id: string) => Promise<void>;
   onSave: (settings: {
     is_initialized: boolean;
     custom_field_1_name: string | null;
@@ -22,6 +26,7 @@ interface InitialSetupModalProps {
     key_fields: string[];
     field_order?: string[];
     language?: LanguageSetting;
+    database_name?: string;
   }) => void;
   onResetData?: () => Promise<void>;
   onClose?: () => void;
@@ -30,11 +35,16 @@ interface InitialSetupModalProps {
 export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   isOpen,
   currentSettings,
+  databaseState,
+  onSwitchDatabase,
+  onCreateDatabase,
+  onDeleteDatabase,
   onSave,
   onResetData,
   onClose,
 }) => {
   const { t } = useApp();
+  const [databaseName, setDatabaseName] = useState('設定ファイル_00');
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
   const [custom3, setCustom3] = useState('');
@@ -58,19 +68,26 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   // Drag state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [canDragIndex, setCanDragIndex] = useState<number | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showDeleteDbConfirm, setShowDeleteDbConfirm] = useState(false);
 
   const isLoadedRef = React.useRef(false);
+  const loadedDbIdRef = React.useRef<string | null>(null);
 
-  // Sync settings when modal opens so values are initialized once when opened
+  // Sync settings when modal opens or current DB switches
   useEffect(() => {
     if (!isOpen) {
       isLoadedRef.current = false;
+      loadedDbIdRef.current = null;
       return;
     }
 
-    if (isOpen && currentSettings && !isLoadedRef.current) {
+    const currentDbId = databaseState?.activeId || 'default';
+    if (isOpen && currentSettings && (!isLoadedRef.current || loadedDbIdRef.current !== currentDbId)) {
       isLoadedRef.current = true;
+      loadedDbIdRef.current = currentDbId;
+      setDatabaseName(currentSettings.database_name || '設定ファイル_00');
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
       setCustom3(currentSettings.custom_field_3_name || '');
@@ -96,7 +113,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         setReorderableFieldIds(defaultNonFixed);
       }
     }
-  }, [isOpen, currentSettings]);
+  }, [isOpen, currentSettings, databaseState?.activeId]);
 
   if (!isOpen) return null;
 
@@ -153,10 +170,35 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setDragOverIndex(null);
   };
 
+  const hasMultipleDbs = Boolean(databaseState && databaseState.databases && databaseState.databases.length > 1);
+  const currentDbItem = databaseState?.databases.find((d) => d.id === databaseState?.activeId);
+  const currentDbDisplayName = currentDbItem?.name || databaseName;
+
+  const handleDbSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newId = e.target.value;
+    if (newId && onSwitchDatabase) {
+      await onSwitchDatabase(newId);
+    }
+  };
+
+  const handleAddDatabase = async () => {
+    if (onCreateDatabase) {
+      await onCreateDatabase();
+    }
+  };
+
+  const executeDeleteDb = async () => {
+    setShowDeleteDbConfirm(false);
+    if (onDeleteDatabase && databaseState?.activeId) {
+      await onDeleteDatabase(databaseState.activeId);
+    }
+  };
+
   const handleSave = () => {
     const fullFieldOrder = ['title', 'rating', ...reorderableFieldIds];
     onSave({
       is_initialized: true,
+      database_name: databaseName.trim() || '設定ファイル_00',
       custom_field_1_name: custom1.trim() || null,
       custom_field_2_name: custom2.trim() || null,
       custom_field_3_name: custom3.trim() || null,
@@ -191,7 +233,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto">
+      <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-slate-700/60 pb-4">
           <div className="p-3 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
@@ -199,6 +241,36 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">{t('settings_title')}</h2>
+          </div>
+        </div>
+
+        {/* Database File Section (Always at the top) */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-blue-400 block">
+            {t('settings_db_name')}
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={databaseName}
+              onChange={(e) => setDatabaseName(e.target.value)}
+              placeholder="例: 設定ファイル_00"
+              className="flex-1 bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
+            />
+            {hasMultipleDbs && databaseState && (
+              <select
+                value={databaseState.activeId}
+                onChange={handleDbSelectChange}
+                className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                title={t('settings_db_select')}
+              >
+                {databaseState.databases.map((db) => (
+                  <option key={db.id} value={db.id}>
+                    {db.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -215,7 +287,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 value={custom1}
                 onChange={(e) => setCustom1(e.target.value)}
                 placeholder={t('settings_custom_item1_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
             <div className="space-y-2">
@@ -225,7 +297,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 value={custom2}
                 onChange={(e) => setCustom2(e.target.value)}
                 placeholder={t('settings_custom_item2_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
             <div className="space-y-2">
@@ -235,7 +307,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 value={custom3}
                 onChange={(e) => setCustom3(e.target.value)}
                 placeholder={t('settings_custom_item3_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
           </div>
@@ -309,7 +381,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 return (
                   <div
                     key={fieldId}
-                    draggable
+                    draggable={canDragIndex === index}
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
@@ -328,6 +400,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                       <div
                         className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 rounded transition-colors"
                         title={t('settings_drag_to_reorder')}
+                        onMouseEnter={() => setCanDragIndex(index)}
+                        onMouseLeave={() => setCanDragIndex(null)}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <GripVertical className="w-4 h-4" />
@@ -415,15 +489,39 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
         {/* Footer actions */}
         <div className="pt-4 border-t border-slate-700/60 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={handleResetData}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
-            title={t('settings_reset_data_tooltip')}
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>{t('resetData')}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {!hasMultipleDbs ? (
+              <button
+                type="button"
+                onClick={handleResetData}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                title={t('settings_reset_data_tooltip')}
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>{t('resetData')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowDeleteDbConfirm(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                title={t('settings_delete_db')}
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{t('settings_delete_db')}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleAddDatabase}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
+              title={t('settings_add_db')}
+            >
+              <Plus className="w-4 h-4" />
+              <span>{t('settings_add_db')}</span>
+            </button>
+          </div>
 
           <div className="flex items-center gap-3">
             {onClose && (
@@ -456,6 +554,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         variant="danger"
         onConfirm={executeResetData}
         onClose={() => setShowResetConfirm(false)}
+      />
+
+      <ConfirmModal
+        isOpen={showDeleteDbConfirm}
+        title={t('settings_delete_db')}
+        description={t('confirmDeleteDb', { name: currentDbDisplayName })}
+        confirmText={t('delete')}
+        cancelText={t('cancel')}
+        variant="danger"
+        onConfirm={executeDeleteDb}
+        onClose={() => setShowDeleteDbConfirm(false)}
       />
     </div>
   );

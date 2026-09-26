@@ -10,7 +10,45 @@ export interface AppSettings {
   key_fields: string[]; // JSON array stored in DB
   field_order?: string[]; // Order of metadata fields
   language?: 'auto' | 'ja' | 'en' | null; // Language setting
+  database_name?: string;
 }
+
+export interface DatabaseInfo {
+  id: string;
+  name: string;
+}
+
+export interface DatabaseState {
+  databases: DatabaseInfo[];
+  activeId: string;
+}
+
+export type SaveSettingsInput = Partial<Omit<AppSettings, 'id'>>;
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  id: 1,
+  is_initialized: false,
+  custom_field_1_name: null,
+  custom_field_2_name: null,
+  custom_field_3_name: null,
+  custom_field_1_display_in_list: true,
+  custom_field_2_display_in_list: true,
+  custom_field_3_display_in_list: true,
+  key_fields: ['genre'],
+  field_order: [
+    'title',
+    'rating',
+    'genre',
+    'cast',
+    'release_year',
+    'release_date',
+    'custom_field_1',
+    'custom_field_2',
+    'custom_field_3',
+  ],
+  language: 'auto',
+  database_name: '設定ファイル_00',
+};
 
 export interface Movie {
   id: number;

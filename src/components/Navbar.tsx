@@ -15,7 +15,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
   const router = useRouter();
   const pathname = usePathname();
-  const { settings, t, headerMovieCount, headerFilterText } = useApp();
+  const { settings, t, headerMovieCount, headerFilterText, databaseState, switchDatabase } = useApp();
 
   const isKeyItemsActive = pathname === '/';
   const isMoviesActive = pathname === '/movies' || pathname.startsWith('/movies/');
@@ -36,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
   else if (baseField) keyLabel = t(`field_${baseField.id}` as any);
 
   return (
-    <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-800 bg-slate-900/80 backdrop-blur-md select-none">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
 
         {/* Navigation Links */}
@@ -85,11 +85,27 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenSettings }) => {
         </nav>
 
         {/* Actions & Drop Hint */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40">
             <DatabasePlus className="w-4 h-4 text-blue-400 animate-pulse" />
             <span>{t('drag_drop_overlay_title')}</span>
           </div>
+
+          {/* Database file selection dropdown (when multiple databases exist) */}
+          {databaseState && databaseState.databases && databaseState.databases.length > 1 && (
+            <select
+              value={databaseState.activeId}
+              onChange={(e) => switchDatabase(e.target.value)}
+              className="bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors max-w-[160px] truncate"
+              title={t('settings_db_select')}
+            >
+              {databaseState.databases.map((db) => (
+                <option key={db.id} value={db.id}>
+                  {db.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           <button
             onClick={onOpenSettings}

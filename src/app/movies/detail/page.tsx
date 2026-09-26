@@ -3,7 +3,7 @@
 import React, { Suspense, useMemo, useEffect } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, formatReleaseDate, getSplitValues } from '@/lib/utils';
+import { formatMediaUrl, formatReleaseDate, getSplitValues, getGroupMatches } from '@/lib/utils';
 import { formatDuration, formatResolution, formatFrameRate, formatFileSize } from '@/lib/metadataExtractor';
 import { ensureLegacyMovieMetadata } from '@/lib/legacyMetadataFetcher';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -59,34 +59,7 @@ function MovieDetailContent() {
     if (!movie) return [];
 
     const keyFields = settings?.key_fields || ['genre'];
-    const parentId = movie.parent_movie_id || (movie.is_grouped ? movie.id : null);
-
-    const matches = movies.filter((m) => {
-      // 1. Check parent-child relationships
-      if (parentId && (m.id === parentId || m.parent_movie_id === parentId)) {
-        return true;
-      }
-      if (m.parent_movie_id === movie.id || movie.parent_movie_id === m.id) {
-        return true;
-      }
-
-      // 2. Check matching attributes if both are grouped
-      if (movie.is_grouped && m.is_grouped) {
-        if ((m.title || null) !== (movie.title || null)) return false;
-        if ((m.genre || null) !== (movie.genre || null)) return false;
-        if ((m.release_year || null) !== (movie.release_year || null)) return false;
-        if ((m.release_date || null) !== (movie.release_date || null)) return false;
-
-        for (const kf of keyFields) {
-          if (((m as any)[kf] || null) !== ((movie as any)[kf] || null)) return false;
-        }
-        return true;
-      }
-
-      return false;
-    });
-
-    const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
+    const uniqueMatches = getGroupMatches(movie, movies, keyFields);
 
     return uniqueMatches.sort((a, b) => {
       const fileA = a.file_name || a.title || '';
@@ -133,10 +106,10 @@ function MovieDetailContent() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 select-none">
           <button
             onClick={() => openEditMovieModal(movie)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm shadow-lg shadow-blue-500/20 transition-all whitespace-nowrap"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm shadow-lg shadow-blue-500/20 transition-all whitespace-nowrap select-none"
           >
             <Edit className="w-4 h-4" />
             <span>{t('edit')}</span>
@@ -144,7 +117,7 @@ function MovieDetailContent() {
 
           <button
             onClick={handleBack}
-            className="flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-sm font-medium border border-blue-500/40 transition-colors whitespace-nowrap"
+            className="flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-sm font-medium border border-blue-500/40 transition-colors whitespace-nowrap select-none"
           >
             <span>{t('back')}</span>
           </button>
@@ -155,24 +128,27 @@ function MovieDetailContent() {
       <div className="glass-card rounded-2xl p-6 border border-slate-800 space-y-6">
         <div
           onClick={() => openMoviePlayer(movie.file_path)}
-          className="relative aspect-video w-full max-w-[720px] mx-auto rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group shadow-2xl"
+          className="relative aspect-video w-full max-w-[720px] mx-auto rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group shadow-2xl select-none"
           title={t('movies_list_play_tooltip')}
         >
           {imageSrc ? (
             <img
               src={imageSrc}
               alt={movie.title || 'Summary'}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              draggable={false}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900">
+            <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
               <Film className="w-12 h-12 mb-2 opacity-40" />
               <span className="text-sm">{t('detail_no_summary_img')}</span>
             </div>
           )}
 
           {/* Play Overlay */}
-          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center select-none">
             <div className="p-3 rounded-full bg-blue-600/90 text-white shadow-lg backdrop-blur-sm transform group-hover:scale-110 transition-transform">
               <Play className="w-6 h-6 fill-current" />
             </div>
@@ -180,7 +156,7 @@ function MovieDetailContent() {
         </div>
 
         {/* Technical Properties Bar (動画の長さ, 画面サイズ, フレームレート, ファイルサイズ) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 shadow-inner">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 shadow-inner select-none">
           {/* Duration */}
           <div className="flex items-center gap-2.5">
             <Clock className="w-4 h-4 text-slate-500 shrink-0" />
@@ -228,7 +204,7 @@ function MovieDetailContent() {
 
         {/* Grouped Siblings Image Gallery */}
         {groupMovies.length > 1 && (
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3 pt-2 select-none">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-blue-400" />
@@ -246,7 +222,7 @@ function MovieDetailContent() {
                   <div key={gMovie.id} className="flex flex-col gap-1.5">
                     <div
                       onClick={() => openMoviePlayer(gMovie.file_path)}
-                      className={`relative aspect-video rounded-xl overflow-hidden bg-slate-950 border cursor-pointer group transition-all ${isCurrent
+                      className={`relative aspect-video rounded-xl overflow-hidden bg-slate-950 border cursor-pointer group transition-all select-none ${isCurrent
                           ? 'border-blue-500 ring-2 ring-blue-500/50'
                           : 'border-slate-800 hover:border-slate-600'
                         }`}
@@ -256,28 +232,29 @@ function MovieDetailContent() {
                         <img
                           src={gImgSrc}
                           alt={gMovie.title || 'Group item'}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          draggable={false}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform pointer-events-none"
                         />
                       ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900">
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
                           <Film className="w-6 h-6 opacity-40" />
                         </div>
                       )}
 
                       {isCurrent && (
-                        <div className="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                        <div className="absolute top-1 right-1 bg-blue-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded select-none">
                           {t('detail_displaying')}
                         </div>
                       )}
 
-                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center select-none">
                         <Play className="w-4 h-4 text-white fill-current" />
                       </div>
                     </div>
 
                     {/* Tags for this group movie */}
                     {gTags.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1 select-none">
                         <Tag className="w-3 h-3 text-slate-400 flex-shrink-0" />
                         {gTags.map((tag, idx) => (
                           <span
@@ -297,7 +274,7 @@ function MovieDetailContent() {
         )}
 
         {/* Rating Header */}
-        <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+        <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800 select-none">
           <span className="text-sm font-semibold text-slate-200">{t('field_rating')}</span>
           <RatingStars
             rating={movie.rating}
@@ -318,7 +295,7 @@ function MovieDetailContent() {
               if (fieldId === 'genre') {
                 return (
                   <div key="genre" className="space-y-1">
-                    <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
                       <Shapes className="w-3.5 h-3.5" /> {t('field_genre')}
                     </span>
                     <p className="text-sm font-medium text-slate-200">{movie.genre || '-'}</p>
@@ -329,7 +306,7 @@ function MovieDetailContent() {
               if (fieldId === 'cast') {
                 return (
                   <div key="cast" className="space-y-1">
-                    <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
                       <User className="w-3.5 h-3.5" /> {t('field_cast')}
                     </span>
                     <p className="text-sm font-medium text-slate-200">
@@ -345,7 +322,7 @@ function MovieDetailContent() {
                 releaseDateRendered = true;
                 return (
                   <div key="release" className="space-y-1">
-                    <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                    <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
                       <Calendar className="w-3.5 h-3.5" /> {t('field_release_full')}
                     </span>
                     <p className="text-sm font-medium text-slate-200">
@@ -363,7 +340,7 @@ function MovieDetailContent() {
 
                 return (
                   <div key={fieldId} className="space-y-1">
-                    <span className="text-xs text-slate-500 font-medium">{customName}</span>
+                    <span className="text-xs text-slate-500 font-medium select-none">{customName}</span>
                     <p className="text-sm font-medium text-slate-200">{val || '-'}</p>
                   </div>
                 );
@@ -375,7 +352,7 @@ function MovieDetailContent() {
 
           {/* Comment */}
           <div className="md:col-span-2 space-y-1">
-            <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
               <MessageSquare className="w-3.5 h-3.5" /> {t('field_comment')}
             </span>
             <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 min-h-[80px]">
@@ -388,7 +365,7 @@ function MovieDetailContent() {
           {/* Tags (Moved under Comment) */}
           {movie.tags && (
             <div className="md:col-span-2 space-y-1.5">
-              <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+              <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
                 <Tags className="w-3.5 h-3.5" /> {t('field_tags')}
               </span>
               <div className="flex flex-wrap gap-1.5">
@@ -406,7 +383,7 @@ function MovieDetailContent() {
 
           {/* File Path */}
           <div className="md:col-span-2 space-y-1">
-            <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+            <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
               <FileText className="w-3.5 h-3.5" /> {t('field_file_path')}
             </span>
             <p className="text-sm font-mono bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-slate-300 break-all">

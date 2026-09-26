@@ -33,10 +33,19 @@ body {
 // #############################################################################################
 .header {
 	margin: 2em 0;
-	text-align: center;
 
 	.title {
 		font-size: 2em;
+		text-align: center;
+	}
+
+	.language {
+		margin: 1em 0 0;
+		text-align: right;
+
+		a {
+			text-decoration: underline;
+		}
 	}
 }
 
@@ -76,6 +85,16 @@ body {
 						content: ',';
 					}
 				}
+			}
+		}
+
+		dl {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 1em;
+
+			ul:not(.horizontal) {
+				margin: 0;
 			}
 		}
 

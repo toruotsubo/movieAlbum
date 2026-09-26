@@ -1,7 +1,19 @@
 import path from 'path';
 import fs from 'fs';
 import { app } from 'electron';
-import { AppSettings, Movie, KeyItemGroup, CreateMovieInput, UpdateMovieInput, UpdateKeyItemInput, DEFAULT_FIELD_ORDER } from '../../src/lib/types';
+import {
+  AppSettings,
+  Movie,
+  KeyItemGroup,
+  CreateMovieInput,
+  UpdateMovieInput,
+  UpdateKeyItemInput,
+  SaveSettingsInput,
+  DEFAULT_APP_SETTINGS,
+  DEFAULT_FIELD_ORDER,
+  DatabaseInfo,
+  DatabaseState,
+} from '../../src/lib/types';
 import { getSplitValues, getKanaForCast } from '../../src/lib/utils';
 
 interface JsonDatabaseSchema {
@@ -11,56 +23,375 @@ interface JsonDatabaseSchema {
   keyTags: Record<string, string>;
 }
 
-let jsonDb: JsonDatabaseSchema | null = null;
-let dbFilePath = '';
+export interface DatabaseMeta {
+  id: string; // e.g. "db_00"
+  name: string; // e.g. "設定ファイル_00"
+  filename: string; // e.g. "db_00.json"
+  created_at: string;
+}
 
-export function initDatabase() {
+export interface DatabaseManifest {
+  activeId: string;
+  databases: DatabaseMeta[];
+}
+
+let jsonDb: JsonDatabaseSchema | null = null;
+let currentDbId = '';
+let currentDbFilePath = '';
+
+function getDbDir(): string {
   const userDataPath = app.getPath('userData');
   const dbDir = path.join(userDataPath, 'db');
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
+  return dbDir;
+}
 
-  dbFilePath = path.join(dbDir, 'movie_manager.json');
+function getManifestPath(): string {
+  return path.join(getDbDir(), 'databases.json');
+}
 
-  if (fs.existsSync(dbFilePath)) {
+function loadManifest(): DatabaseManifest {
+  const manifestPath = getManifestPath();
+  const dbDir = getDbDir();
+
+  if (fs.existsSync(manifestPath)) {
     try {
-      jsonDb = JSON.parse(fs.readFileSync(dbFilePath, 'utf-8'));
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      if (data && Array.isArray(data.databases) && data.databases.length > 0) {
+        return data as DatabaseManifest;
+      }
     } catch (err) {
-      console.error('Failed to parse database file, resetting:', err);
-      jsonDb = null;
+      console.error('Failed to parse databases.json, recreating manifest:', err);
     }
   }
 
-  if (!jsonDb) {
-    jsonDb = {
+  // Migrate from legacy single db (movie_manager.json) or create new default
+  const legacyFilePath = path.join(dbDir, 'movie_manager.json');
+  const initialId = 'db_00';
+  const initialName = '設定ファイル_00';
+  const initialFilename = 'db_00.json';
+  const targetInitialPath = path.join(dbDir, initialFilename);
+
+  if (fs.existsSync(legacyFilePath) && !fs.existsSync(targetInitialPath)) {
+    try {
+      fs.copyFileSync(legacyFilePath, targetInitialPath);
+    } catch (e) {
+      console.error('Failed to copy legacy movie_manager.json to db_00.json:', e);
+    }
+  }
+
+  const manifest: DatabaseManifest = {
+    activeId: initialId,
+    databases: [
+      {
+        id: initialId,
+        name: initialName,
+        filename: initialFilename,
+        created_at: new Date().toISOString(),
+      },
+    ],
+  };
+
+  saveManifest(manifest);
+  return manifest;
+}
+
+function saveManifest(manifest: DatabaseManifest): void {
+  const manifestPath = getManifestPath();
+  const tmpPath = `${manifestPath}.tmp`;
+  try {
+    fs.writeFileSync(tmpPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, manifestPath);
+  } catch (err) {
+    console.error('Failed to save databases manifest:', err);
+    try {
+      fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    } catch (directErr) {
+      console.error('Direct manifest write failed:', directErr);
+    }
+  }
+}
+
+function getNextDatabaseNumber(manifest: DatabaseManifest): string {
+  const usedNumbers = new Set<number>();
+  for (const db of manifest.databases) {
+    const nameMatch = db.name.match(/設定ファイル_(\d+)/);
+    if (nameMatch) {
+      usedNumbers.add(parseInt(nameMatch[1], 10));
+    }
+    const idMatch = db.id.match(/db_(\d+)/);
+    if (idMatch) {
+      usedNumbers.add(parseInt(idMatch[1], 10));
+    }
+  }
+  let nextNum = 0;
+  while (usedNumbers.has(nextNum)) {
+    nextNum++;
+  }
+  return String(nextNum).padStart(2, '0');
+}
+
+function loadDatabaseFile(filePath: string, defaultName: string): JsonDatabaseSchema {
+  let loadedDb: JsonDatabaseSchema | null = null;
+  if (fs.existsSync(filePath)) {
+    try {
+      loadedDb = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    } catch (err) {
+      console.error(`Failed to parse db file ${filePath}, attempting backup:`, err);
+      const bakPath = `${filePath}.bak`;
+      if (fs.existsSync(bakPath)) {
+        try {
+          loadedDb = JSON.parse(fs.readFileSync(bakPath, 'utf-8'));
+          console.warn('Successfully recovered from backup:', bakPath);
+        } catch (bakErr) {
+          console.error('Failed to recover from backup:', bakErr);
+        }
+      }
+    }
+  }
+
+  if (!loadedDb) {
+    loadedDb = {
       settings: {
-        id: 1,
-        is_initialized: false,
-        custom_field_1_name: null,
-        custom_field_2_name: null,
-        custom_field_3_name: null,
-        custom_field_1_display_in_list: true,
-        custom_field_2_display_in_list: true,
-        custom_field_3_display_in_list: true,
-        key_fields: ['genre', 'cast'],
-        field_order: DEFAULT_FIELD_ORDER,
-        language: 'auto',
+        ...DEFAULT_APP_SETTINGS,
+        database_name: defaultName,
       },
       movies: [],
       keyRatings: {},
       keyTags: {},
     };
-    saveDatabase();
   }
 
-  console.log('Database initialized successfully at:', dbFilePath);
+  // Ensure default values
+  if (!loadedDb.settings.database_name) {
+    loadedDb.settings.database_name = defaultName;
+  }
+  if (!loadedDb.settings.field_order) {
+    loadedDb.settings.field_order = [...DEFAULT_FIELD_ORDER];
+  }
+  if (!loadedDb.settings.key_fields || loadedDb.settings.key_fields.length === 0) {
+    loadedDb.settings.key_fields = ['genre'];
+  }
+  if (!loadedDb.keyRatings) loadedDb.keyRatings = {};
+  if (!loadedDb.keyTags) loadedDb.keyTags = {};
+
+  return loadedDb;
+}
+
+export function initDatabase() {
+  const manifest = loadManifest();
+  let activeMeta = manifest.databases.find((d) => d.id === manifest.activeId);
+  if (!activeMeta) {
+    activeMeta = manifest.databases[0];
+    manifest.activeId = activeMeta.id;
+    saveManifest(manifest);
+  }
+
+  currentDbId = activeMeta.id;
+  currentDbFilePath = path.join(getDbDir(), activeMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, activeMeta.name);
+  saveDatabase();
+
+  console.log(`Database initialized: [${activeMeta.id}] ${activeMeta.name} at ${currentDbFilePath}`);
 }
 
 function saveDatabase() {
-  if (jsonDb && dbFilePath) {
-    fs.writeFileSync(dbFilePath, JSON.stringify(jsonDb, null, 2), 'utf-8');
+  if (jsonDb && currentDbFilePath) {
+    const tmpFilePath = `${currentDbFilePath}.tmp`;
+    const jsonStr = JSON.stringify(jsonDb, null, 2);
+    try {
+      fs.writeFileSync(tmpFilePath, jsonStr, 'utf-8');
+      fs.renameSync(tmpFilePath, currentDbFilePath);
+
+      try {
+        fs.copyFileSync(currentDbFilePath, `${currentDbFilePath}.bak`);
+      } catch {
+        // Backup non-fatal
+      }
+    } catch (err) {
+      console.error('Failed to save database atomically, falling back:', err);
+      try {
+        fs.writeFileSync(currentDbFilePath, jsonStr, 'utf-8');
+      } catch (writeErr) {
+        console.error('Direct database write failed:', writeErr);
+      }
+    }
   }
+}
+
+export function getDatabaseState(): DatabaseState {
+  const manifest = loadManifest();
+  return {
+    databases: manifest.databases.map((d) => ({
+      id: d.id,
+      name: d.name,
+    })),
+    activeId: manifest.activeId,
+  };
+}
+
+export function switchDatabase(id: string): { state: DatabaseState; settings: AppSettings } {
+  const manifest = loadManifest();
+  const targetMeta = manifest.databases.find((d) => d.id === id);
+  if (!targetMeta) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+
+  // Save current database before switching
+  saveDatabase();
+
+  manifest.activeId = id;
+  saveManifest(manifest);
+
+  currentDbId = targetMeta.id;
+  currentDbFilePath = path.join(getDbDir(), targetMeta.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, targetMeta.name);
+  saveDatabase();
+
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings,
+  };
+}
+
+export function createDatabase(nameInput?: string): { state: DatabaseState; settings: AppSettings } {
+  saveDatabase();
+
+  const manifest = loadManifest();
+  const numStr = getNextDatabaseNumber(manifest);
+  const id = `db_${numStr}`;
+  const name = nameInput?.trim() || `設定ファイル_${numStr}`;
+  const filename = `${id}.json`;
+  const filePath = path.join(getDbDir(), filename);
+
+  const newDb: JsonDatabaseSchema = {
+    settings: {
+      ...DEFAULT_APP_SETTINGS,
+      database_name: name,
+    },
+    movies: [],
+    keyRatings: {},
+    keyTags: {},
+  };
+
+  fs.writeFileSync(filePath, JSON.stringify(newDb, null, 2), 'utf-8');
+
+  manifest.databases.push({
+    id,
+    name,
+    filename,
+    created_at: new Date().toISOString(),
+  });
+  manifest.activeId = id;
+  saveManifest(manifest);
+
+  currentDbId = id;
+  currentDbFilePath = filePath;
+  jsonDb = newDb;
+
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings,
+  };
+}
+
+export function deleteDatabase(id: string): { state: DatabaseState; settings: AppSettings } {
+  const manifest = loadManifest();
+  if (manifest.databases.length <= 1) {
+    throw new Error('Cannot delete the only database');
+  }
+
+  const targetIdx = manifest.databases.findIndex((d) => d.id === id);
+  if (targetIdx === -1) {
+    throw new Error(`Database with id ${id} not found`);
+  }
+
+  const target = manifest.databases[targetIdx];
+  const targetFilePath = path.join(getDbDir(), target.filename);
+  const targetBakPath = `${targetFilePath}.bak`;
+
+  try {
+    if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);
+    if (fs.existsSync(targetBakPath)) fs.unlinkSync(targetBakPath);
+  } catch (err) {
+    console.error('Failed to unlink db file during deletion:', err);
+  }
+
+  manifest.databases.splice(targetIdx, 1);
+  // 要件: 現在選択中のデータベースファイルが消去され、最初のデータベースファイルが選択される
+  const firstDb = manifest.databases[0];
+  manifest.activeId = firstDb.id;
+  saveManifest(manifest);
+
+  currentDbId = firstDb.id;
+  currentDbFilePath = path.join(getDbDir(), firstDb.filename);
+  jsonDb = loadDatabaseFile(currentDbFilePath, firstDb.name);
+  saveDatabase();
+
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings,
+  };
+}
+
+/**
+ * Check if two movies have matching group attributes
+ */
+function isMatchingGroupAttributes(movieA: Movie, movieB: Movie, keyFields: string[]): boolean {
+  if ((movieA.title || null) !== (movieB.title || null)) return false;
+  if ((movieA.genre || null) !== (movieB.genre || null)) return false;
+  if ((movieA.release_year || null) !== (movieB.release_year || null)) return false;
+  if ((movieA.release_date || null) !== (movieB.release_date || null)) return false;
+
+  for (const kf of keyFields) {
+    if (((movieA as any)[kf] || null) !== ((movieB as any)[kf] || null)) return false;
+  }
+  return true;
+}
+
+/**
+ * Synchronize grouping relationships for a movie
+ */
+function syncGroupingForMovie(movie: Movie): void {
+  if (!jsonDb) return;
+  const keyFields = jsonDb.settings.key_fields || ['genre'];
+
+  if (movie.is_grouped) {
+    for (const m of jsonDb.movies) {
+      if (m.id === movie.id) continue;
+      if (isMatchingGroupAttributes(movie, m, keyFields)) {
+        m.parent_movie_id = movie.id;
+        m.updated_at = new Date().toISOString();
+      }
+    }
+  } else {
+    for (const m of jsonDb.movies) {
+      if (m.parent_movie_id === movie.id) {
+        m.parent_movie_id = null;
+        m.updated_at = new Date().toISOString();
+      }
+    }
+  }
+}
+
+/**
+ * Build combinations of key field values for a movie
+ */
+function buildKeyCombinations(movie: Movie, keyFields: string[]): Record<string, string>[] {
+  let combinations: Record<string, string>[] = [{}];
+  for (const kf of keyFields) {
+    const values = getSplitValues((movie as any)[kf]);
+    const nextCombinations: Record<string, string>[] = [];
+    for (const comb of combinations) {
+      for (const val of values) {
+        nextCombinations.push({ ...comb, [kf]: val });
+      }
+    }
+    combinations = nextCombinations;
+  }
+  return combinations;
 }
 
 // === Settings Helpers ===
@@ -69,30 +400,52 @@ export function getAppSettings(): AppSettings {
   return jsonDb!.settings;
 }
 
-export function saveAppSettings(input: {
-  is_initialized?: boolean;
-  custom_field_1_name?: string | null;
-  custom_field_2_name?: string | null;
-  custom_field_3_name?: string | null;
-  custom_field_1_display_in_list?: boolean;
-  custom_field_2_display_in_list?: boolean;
-  custom_field_3_display_in_list?: boolean;
-  key_fields?: string[];
-  field_order?: string[];
-  language?: 'auto' | 'ja' | 'en' | null;
-}): AppSettings {
+export function saveAppSettings(input: SaveSettingsInput): AppSettings {
   if (!jsonDb) initDatabase();
+
+  const newDatabaseName = input.database_name !== undefined ? input.database_name.trim() : jsonDb!.settings.database_name;
+
+  if (newDatabaseName) {
+    const manifest = loadManifest();
+    const currentMeta = manifest.databases.find((d) => d.id === currentDbId);
+    if (currentMeta && currentMeta.name !== newDatabaseName) {
+      currentMeta.name = newDatabaseName;
+      saveManifest(manifest);
+    }
+  }
+
+  const oldKeyFields = jsonDb!.settings.key_fields || ['genre'];
+  const newKeyFields = input.key_fields || oldKeyFields;
+  const keyFieldsChanged = JSON.stringify(oldKeyFields) !== JSON.stringify(newKeyFields);
+
   jsonDb!.settings = {
     ...jsonDb!.settings,
     ...input,
+    database_name: newDatabaseName,
     is_initialized: input.is_initialized !== undefined ? input.is_initialized : jsonDb!.settings.is_initialized,
-    custom_field_1_display_in_list: input.custom_field_1_display_in_list !== undefined ? input.custom_field_1_display_in_list : (jsonDb!.settings.custom_field_1_display_in_list !== false),
-    custom_field_2_display_in_list: input.custom_field_2_display_in_list !== undefined ? input.custom_field_2_display_in_list : (jsonDb!.settings.custom_field_2_display_in_list !== false),
-    custom_field_3_display_in_list: input.custom_field_3_display_in_list !== undefined ? input.custom_field_3_display_in_list : (jsonDb!.settings.custom_field_3_display_in_list !== false),
-    key_fields: input.key_fields || jsonDb!.settings.key_fields,
+    custom_field_1_display_in_list:
+      input.custom_field_1_display_in_list !== undefined
+        ? input.custom_field_1_display_in_list
+        : jsonDb!.settings.custom_field_1_display_in_list !== false,
+    custom_field_2_display_in_list:
+      input.custom_field_2_display_in_list !== undefined
+        ? input.custom_field_2_display_in_list
+        : jsonDb!.settings.custom_field_2_display_in_list !== false,
+    custom_field_3_display_in_list:
+      input.custom_field_3_display_in_list !== undefined
+        ? input.custom_field_3_display_in_list
+        : jsonDb!.settings.custom_field_3_display_in_list !== false,
+    key_fields: newKeyFields,
     field_order: input.field_order || jsonDb!.settings.field_order || DEFAULT_FIELD_ORDER,
-    language: input.language !== undefined ? input.language : (jsonDb!.settings.language || 'auto'),
+    language: input.language !== undefined ? input.language : jsonDb!.settings.language || 'auto',
   };
+
+  if (keyFieldsChanged) {
+    for (const m of jsonDb!.movies) {
+      syncGroupingForMovie(m);
+    }
+  }
+
   saveDatabase();
   return jsonDb!.settings;
 }
@@ -120,7 +473,9 @@ export function addMovie(movie: CreateMovieInput): Movie {
     return updateMovie({ ...movie, id: existing.id });
   }
 
-  const newId = jsonDb!.movies.length > 0 ? Math.max(...jsonDb!.movies.map((m) => m.id)) + 1 : 1;
+  const maxId = jsonDb!.movies.reduce((max, m) => Math.max(max, m.id), 0);
+  const newId = maxId + 1;
+
   const newMovie: Movie = {
     id: newId,
     file_path: movie.file_path,
@@ -151,6 +506,7 @@ export function addMovie(movie: CreateMovieInput): Movie {
   };
 
   jsonDb!.movies.push(newMovie);
+  syncGroupingForMovie(newMovie);
   saveDatabase();
   return newMovie;
 }
@@ -160,20 +516,29 @@ export function updateMovie(movie: UpdateMovieInput): Movie {
   const index = jsonDb!.movies.findIndex((m) => m.id === movie.id);
   if (index === -1) throw new Error(`Movie with id ${movie.id} not found.`);
 
-  jsonDb!.movies[index] = {
+  const updatedMovie: Movie = {
     ...jsonDb!.movies[index],
     ...movie,
     updated_at: new Date().toISOString(),
   };
 
+  jsonDb!.movies[index] = updatedMovie;
+  syncGroupingForMovie(updatedMovie);
   saveDatabase();
-  return jsonDb!.movies[index];
+  return updatedMovie;
 }
 
 export function deleteMovie(id: number): boolean {
   if (!jsonDb) initDatabase();
   const index = jsonDb!.movies.findIndex((m) => m.id === id);
   if (index !== -1) {
+    for (const m of jsonDb!.movies) {
+      if (m.parent_movie_id === id) {
+        m.parent_movie_id = null;
+        m.updated_at = new Date().toISOString();
+      }
+    }
+
     jsonDb!.movies.splice(index, 1);
     saveDatabase();
     return true;
@@ -203,19 +568,7 @@ export function getKeyItemGroups(): KeyItemGroup[] {
   const groupsMap = new Map<string, { keyValues: Record<string, string>; movies: Movie[] }>();
 
   for (const movie of movies) {
-    let combinations: Record<string, string>[] = [{}];
-
-    for (const kf of keyFields) {
-      const values = getSplitValues((movie as any)[kf]);
-      const nextCombinations: Record<string, string>[] = [];
-      for (const comb of combinations) {
-        for (const val of values) {
-          nextCombinations.push({ ...comb, [kf]: val });
-        }
-      }
-      combinations = nextCombinations;
-    }
-
+    const combinations = buildKeyCombinations(movie, keyFields);
     for (const keyValues of combinations) {
       const signature = JSON.stringify(keyValues);
       if (!groupsMap.has(signature)) {
@@ -228,7 +581,6 @@ export function getKeyItemGroups(): KeyItemGroup[] {
   const result: KeyItemGroup[] = [];
 
   for (const [signature, group] of groupsMap.entries()) {
-    // "サマリー画像は、項目に紐づいた動画のうち評価が高いもの1点を自動的に選択する。選択はキー項目一覧画面表示時に行われる。"
     const sortedMovies = [...group.movies].sort((a, b) => b.rating - a.rating);
     const topMovie = sortedMovies.find((m) => m.summary_image_path) || sortedMovies[0];
 
@@ -303,18 +655,7 @@ export function updateKeyItemDetails(input: UpdateKeyItemInput): void {
     }
 
     for (const movie of movies) {
-      let combinations: Record<string, string>[] = [{}];
-      for (const kf of keyFields) {
-        const values = getSplitValues((movie as any)[kf]);
-        const nextCombinations: Record<string, string>[] = [];
-        for (const comb of combinations) {
-          for (const val of values) {
-            nextCombinations.push({ ...comb, [kf]: val });
-          }
-        }
-        combinations = nextCombinations;
-      }
-
+      const combinations = buildKeyCombinations(movie, keyFields);
       const isMatch = combinations.some((comb) => JSON.stringify(comb) === key_signature);
       if (isMatch) {
         if (targetCastVal && movie.cast) {
@@ -348,29 +689,12 @@ export function updateKeyItemDetails(input: UpdateKeyItemInput): void {
 export function resetAllData(): AppSettings {
   if (!jsonDb) initDatabase();
 
-  try {
-    const userDataPath = app.getPath('userData');
-    const thumbDir = path.join(userDataPath, 'thumbnails');
-    if (fs.existsSync(thumbDir)) {
-      fs.rmSync(thumbDir, { recursive: true, force: true });
-    }
-  } catch (err) {
-    console.error('Failed to clear thumbnails directory:', err);
-  }
+  const currentDbName = jsonDb!.settings.database_name || '設定ファイル_00';
 
   jsonDb = {
     settings: {
-      id: 1,
-      is_initialized: false,
-      custom_field_1_name: null,
-      custom_field_2_name: null,
-      custom_field_3_name: null,
-      custom_field_1_display_in_list: true,
-      custom_field_2_display_in_list: true,
-      custom_field_3_display_in_list: true,
-      key_fields: ['genre'],
-      field_order: DEFAULT_FIELD_ORDER,
-      language: 'auto',
+      ...DEFAULT_APP_SETTINGS,
+      database_name: currentDbName,
     },
     movies: [],
     keyRatings: {},
@@ -380,4 +704,3 @@ export function resetAllData(): AppSettings {
   saveDatabase();
   return jsonDb.settings;
 }
-

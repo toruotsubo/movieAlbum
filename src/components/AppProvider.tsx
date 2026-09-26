@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppSettings, Movie, KeyItemGroup } from '../lib/types';
+import { AppSettings, Movie, KeyItemGroup, DatabaseInfo, DatabaseState } from '../lib/types';
 import { Navbar } from './Navbar';
 import { TitleBar } from './TitleBar';
 import { InitialSetupModal } from './InitialSetupModal';
@@ -9,7 +9,7 @@ import { MovieFormModal } from './MovieFormModal';
 import { KeyItemFormModal } from './KeyItemFormModal';
 import { ConfirmModal } from './ConfirmModal';
 import { DragDropWrapper } from './DragDropWrapper';
-import { getSplitValues, getKanaForCast, isVideoFile } from '../lib/utils';
+import { isVideoFile, findInitialCastKana } from '../lib/utils';
 
 import { Language, TranslationKey, t as translate } from '../lib/translations';
 
@@ -17,11 +17,15 @@ interface AppContextType {
   settings: AppSettings | null;
   movies: Movie[];
   keyGroups: KeyItemGroup[];
+  databaseState: DatabaseState;
   loading: boolean;
   lang: Language;
   showKana: boolean;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   refreshData: () => Promise<void>;
+  switchDatabase: (id: string) => Promise<void>;
+  createDatabase: (name?: string) => Promise<void>;
+  deleteDatabase: (id: string) => Promise<void>;
   updateMovieRating: (id: number, rating: number) => Promise<void>;
   updateKeyItemRating: (signature: string, rating: number) => Promise<void>;
   openMoviePlayer: (filePath: string) => Promise<void>;
@@ -50,6 +54,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [keyGroups, setKeyGroups] = useState<KeyItemGroup[]>([]);
+  const [databaseState, setDatabaseState] = useState<DatabaseState>({ databases: [], activeId: '' });
   const [loading, setLoading] = useState(true);
   const [headerMovieCount, setHeaderMovieCount] = useState<number | null>(null);
   const [headerFilterText, setHeaderFilterText] = useState<string | null>(null);
@@ -98,6 +103,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
+      if (window.api.getDatabaseState) {
+        const dbState = await window.api.getDatabaseState();
+        setDatabaseState(dbState);
+      }
+
       const currentSettings = await window.api.getSettings();
       setSettings(currentSettings);
 
@@ -120,6 +130,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     refreshData();
   }, []);
+
+  const clearPageFilters = () => {
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('movie_manager_key_items_page_state');
+        sessionStorage.removeItem('movie_manager_movies_page_state');
+      } catch (e) {
+        console.error('Failed to clear sessionStorage filters:', e);
+      }
+    }
+    setHeaderFilterText(null);
+  };
+
+  const handleSwitchDatabase = async (id: string) => {
+    if (window.api?.switchDatabase) {
+      setLoading(true);
+      clearPageFilters();
+      try {
+        const res = await window.api.switchDatabase(id);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to switch database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleCreateDatabase = async (name?: string) => {
+    if (window.api?.createDatabase) {
+      setLoading(true);
+      clearPageFilters();
+      try {
+        const res = await window.api.createDatabase(name);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to create database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDeleteDatabase = async (id: string) => {
+    if (window.api?.deleteDatabase) {
+      setLoading(true);
+      clearPageFilters();
+      try {
+        const res = await window.api.deleteDatabase(id);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to delete database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   const handleSaveSettings = async (newSettings: any) => {
     if (window.api) {
@@ -173,47 +246,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleSaveMovie = async (movieData: Partial<Movie>) => {
     if (!window.api) return;
-    let savedMovie: Movie;
     if (movieData.id) {
-      savedMovie = await window.api.updateMovie(movieData as any);
+      await window.api.updateMovie(movieData as any);
     } else {
-      savedMovie = await window.api.addMovie(movieData as any);
+      await window.api.addMovie(movieData as any);
     }
-
-    // Sync grouping siblings
-    const keyFields = settings?.key_fields || ['genre'];
-    const currentMovies = await window.api.getMovies();
-
-    if (savedMovie.is_grouped) {
-      // Grouping ON: Find matches and set parent_movie_id
-      const matches = currentMovies.filter((m) => {
-        if (m.id === savedMovie.id) return false;
-
-        if ((m.title || null) !== (savedMovie.title || null)) return false;
-        if ((m.genre || null) !== (savedMovie.genre || null)) return false;
-        if ((m.release_year || null) !== (savedMovie.release_year || null)) return false;
-        if ((m.release_date || null) !== (savedMovie.release_date || null)) return false;
-
-        // Check each key field
-        for (const kf of keyFields) {
-          if (((m as any)[kf] || null) !== ((savedMovie as any)[kf] || null)) return false;
-        }
-
-        return true;
-      });
-
-      for (const sibling of matches) {
-        await window.api.updateMovie({ id: sibling.id, parent_movie_id: savedMovie.id });
-      }
-    } else {
-      // Grouping OFF: Clear parent_movie_id for any siblings linked to this parent
-      const siblings = currentMovies.filter((m) => m.parent_movie_id === savedMovie.id);
-      for (const sibling of siblings) {
-        await window.api.updateMovie({ id: sibling.id, parent_movie_id: null });
-      }
-    }
-
-    // Refresh groups and all data
     await refreshData();
   };
 
@@ -251,6 +288,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleResetData = async () => {
     if (window.api) {
+      clearPageFilters();
       const resetSettings = await window.api.resetData();
       setSettings(resetSettings);
       await refreshData();
@@ -271,19 +309,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const handleDeleteMovie = async (id: number) => {
     if (window.api) {
-      // グループ化解除: 親動画に紐づく子動画のparent_movie_idをクリア
-      const currentMovies = await window.api.getMovies();
-      const siblings = currentMovies.filter((m) => m.parent_movie_id === id);
-      for (const sibling of siblings) {
-        await window.api.updateMovie({ id: sibling.id, parent_movie_id: null });
-      }
-
-      // 自身がグループ化されていた場合もグループ化を解除
-      const targetMovie = currentMovies.find((m) => m.id === id);
-      if (targetMovie && (targetMovie.is_grouped || targetMovie.parent_movie_id)) {
-        await window.api.updateMovie({ id, is_grouped: false, parent_movie_id: null });
-      }
-
       await window.api.deleteMovie(id);
       setMovies((prev) => prev.filter((m) => m.id !== id));
       await refreshData();
@@ -296,11 +321,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         settings,
         movies,
         keyGroups,
+        databaseState,
         loading,
         lang: currentLang,
         showKana,
         t: tFunc,
         refreshData,
+        switchDatabase: handleSwitchDatabase,
+        createDatabase: handleCreateDatabase,
+        deleteDatabase: handleDeleteDatabase,
         updateMovieRating,
         updateKeyItemRating,
         openMoviePlayer,
@@ -323,6 +352,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         <InitialSetupModal
           isOpen={isSettingsOpen}
           currentSettings={settings}
+          databaseState={databaseState}
+          onSwitchDatabase={handleSwitchDatabase}
+          onCreateDatabase={handleCreateDatabase}
+          onDeleteDatabase={handleDeleteDatabase}
           onSave={handleSaveSettings}
           onResetData={handleResetData}
           onClose={settings?.is_initialized ? () => setIsSettingsOpen(false) : undefined}
@@ -343,34 +376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         <KeyItemFormModal
           isOpen={isKeyItemFormOpen}
           group={activeKeyGroup}
-          initialCastKana={(() => {
-            if (!activeKeyGroup) return '';
-            const keyFields = settings?.key_fields || ['genre'];
-            const targetCastVal = activeKeyGroup.key_values['cast'];
-
-            for (const m of movies) {
-              let combinations: Record<string, string>[] = [{}];
-              for (const kf of keyFields) {
-                const values = getSplitValues((m as any)[kf]);
-                const nextCombinations: Record<string, string>[] = [];
-                for (const comb of combinations) {
-                  for (const val of values) {
-                    nextCombinations.push({ ...comb, [kf]: val });
-                  }
-                }
-                combinations = nextCombinations;
-              }
-              const isMatch = combinations.some((comb) => JSON.stringify(comb) === activeKeyGroup.key_signature);
-              if (isMatch) {
-                if (targetCastVal && m.cast && m.cast_kana) {
-                  const kana = getKanaForCast(m.cast, m.cast_kana, targetCastVal);
-                  if (kana) return kana;
-                }
-                if (m.cast_kana) return m.cast_kana;
-              }
-            }
-            return '';
-          })()}
+          initialCastKana={findInitialCastKana(activeKeyGroup, movies)}
           onSave={handleSaveKeyItemDetails}
           onClose={() => {
             setIsKeyItemFormOpen(false);
