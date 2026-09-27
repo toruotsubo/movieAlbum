@@ -26,8 +26,9 @@ interface VideoThumbnailPlayerProps {
   summaryImagePath: string | null;
   capturedTime: number | null;
   presetDuration?: number | null;
+  presetFrameRate?: number | null;
   onSummaryImageChange: (imagePath: string | null, capturedTime: number | null) => void;
-  onMetadataExtracted?: (meta: { duration?: number; width?: number; height?: number }) => void;
+  onMetadataExtracted?: (meta: { duration?: number; width?: number; height?: number; frame_rate?: number }) => void;
   onErrorModal: (title: string, description: string) => void;
 }
 
@@ -38,6 +39,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       summaryImagePath,
       capturedTime,
       presetDuration,
+      presetFrameRate,
       onSummaryImageChange,
       onMetadataExtracted,
       onErrorModal,
@@ -50,9 +52,11 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     const [isPlayingVideo, setIsPlayingVideo] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
+    const [currentTime, setCurrentTime] = useState(capturedTime || 0);
     const [duration, setDuration] = useState(presetDuration || 0);
+    const [frameRate, setFrameRate] = useState(presetFrameRate || 30);
     const [isCapturing, setIsCapturing] = useState(false);
+    const [isProcessingFFmpeg, setIsProcessingFFmpeg] = useState(false);
     const [isAutoGeneratingSummary, setIsAutoGeneratingSummary] = useState(false);
     const [videoError, setVideoError] = useState<string | null>(null);
 
@@ -71,6 +75,43 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       return hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
     };
 
+    // Sync props with state
+    useEffect(() => {
+      if (presetDuration && !duration) setDuration(presetDuration);
+    }, [presetDuration]);
+
+    useEffect(() => {
+      if (presetFrameRate && (!frameRate || frameRate === 30)) setFrameRate(presetFrameRate);
+    }, [presetFrameRate]);
+
+    useEffect(() => {
+      if (capturedTime !== null && capturedTime !== undefined && !isNaN(capturedTime)) {
+        setCurrentTime(capturedTime);
+      }
+    }, [capturedTime]);
+
+    // Extract duration & frameRate for unsupported formats if missing
+    useEffect(() => {
+      if (isUnsupportedPlayback && filePath && (!duration || !frameRate)) {
+        if (window.api?.extractMetadata) {
+          window.api.extractMetadata(filePath).then((meta) => {
+            if (meta) {
+              if (meta.duration && !duration) setDuration(meta.duration);
+              if (meta.frame_rate && !frameRate) setFrameRate(meta.frame_rate);
+              if (onMetadataExtracted) {
+                onMetadataExtracted({
+                  duration: meta.duration || undefined,
+                  width: meta.width || undefined,
+                  height: meta.height || undefined,
+                  frame_rate: meta.frame_rate || undefined,
+                });
+              }
+            }
+          }).catch((err) => console.warn('Failed to extract metadata for unsupported video:', err));
+        }
+      }
+    }, [isUnsupportedPlayback, filePath]);
+
     // Auto-generate summary thumbnail if none exists
     useEffect(() => {
       if (!summaryImagePath && filePath) {
@@ -79,6 +120,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           .then(({ imagePath, targetTime }) => {
             if (imagePath) {
               onSummaryImageChange(imagePath, targetTime);
+              setCurrentTime(targetTime);
             }
             setIsAutoGeneratingSummary(false);
           })
@@ -238,7 +280,12 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     // Expose capture methods to parent via ref
     useImperativeHandle(ref, () => ({
-      captureFrame,
+      captureFrame: async () => {
+        if (isUnsupportedPlayback) {
+          return summaryImagePath;
+        }
+        return captureFrame();
+      },
       getCurrentTime: () => (videoRef.current ? videoRef.current.currentTime : currentTime),
     }));
 
@@ -273,12 +320,62 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     const stepFrame = (frames: number) => {
       if (!videoRef.current) return;
-      const fps = 30;
+      const fps = frameRate > 0 ? frameRate : 30;
       if (isPlaying) {
         videoRef.current.pause();
         setIsPlaying(false);
       }
       seekTo(videoRef.current.currentTime + frames / fps);
+    };
+
+    // FFmpeg thumbnail generation for unsupported formats with concurrency lock
+    const generateThumbnailAtTime = async (targetTime: number) => {
+      if (!filePath || isProcessingFFmpeg) return;
+
+      const maxDur = duration > 0 ? duration : 3600;
+      const validTime = Math.max(0, Math.min(maxDur, targetTime));
+
+      setIsProcessingFFmpeg(true);
+      try {
+        if (window.api?.generateThumbnail) {
+          const res = await window.api.generateThumbnail(filePath, validTime);
+          if (res && res.imagePath) {
+            onSummaryImageChange(res.imagePath, validTime);
+            setCurrentTime(validTime);
+            if (res.duration && !duration) setDuration(res.duration);
+          } else {
+            onErrorModal(t('error_title'), t('error_save_summary_failed'));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to generate FFmpeg thumbnail:', err);
+        onErrorModal(t('error_title'), t('error_save_summary_failed'));
+      } finally {
+        setIsProcessingFFmpeg(false);
+      }
+    };
+
+    const handleSeekBy10 = (direction: -1 | 1) => {
+      if (isProcessingFFmpeg) return;
+      const target = currentTime + direction * 10;
+      generateThumbnailAtTime(target);
+    };
+
+    const handleStepFrameUnsupported = (frames: number) => {
+      if (isProcessingFFmpeg) return;
+      const fps = frameRate > 0 ? frameRate : 30;
+      const target = currentTime + frames / fps;
+      generateThumbnailAtTime(target);
+    };
+
+    const handleSeekBarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setCurrentTime(parseFloat(e.target.value));
+    };
+
+    const handleSeekBarCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
+      if (isProcessingFFmpeg) return;
+      const val = parseFloat((e.currentTarget as HTMLInputElement).value);
+      generateThumbnailAtTime(val);
     };
 
     return (
@@ -289,9 +386,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           {!isPlayingVideo ? (
             <button
               type="button"
-              disabled={isUnsupportedPlayback}
               onClick={async () => {
-                if (isUnsupportedPlayback) return;
                 if (filePath && window.api?.checkFileExists) {
                   const exists = await window.api.checkFileExists(filePath);
                   if (!exists) {
@@ -299,12 +394,14 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                     return;
                   }
                 }
+                if (currentTime === 0 && capturedTime) {
+                  setCurrentTime(capturedTime);
+                } else if (currentTime === 0 && duration > 0) {
+                  setCurrentTime(duration * 0.5);
+                }
                 setIsPlayingVideo(true);
               }}
-              className={clsx(
-                'w-full h-full relative flex items-center justify-center group focus:outline-none',
-                isUnsupportedPlayback ? 'cursor-not-allowed' : 'cursor-pointer'
-              )}
+              className="w-full h-full relative flex items-center justify-center group focus:outline-none cursor-pointer"
             >
               {isAutoGeneratingSummary ? (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900/90 text-slate-300 gap-3">
@@ -327,9 +424,9 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
               {!isAutoGeneratingSummary && (
                 <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                   {isUnsupportedPlayback ? (
-                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900/90 text-slate-300 border border-slate-700/80 font-medium text-xs shadow-lg backdrop-blur-sm">
-                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>{t('form_manual_capture_disabled')}</span>
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm">
+                      <Camera className="w-5 h-5" />
+                      <span>{t('form_capture_unsupported_btn')}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm">
@@ -340,6 +437,143 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                 </div>
               )}
             </button>
+          ) : isUnsupportedPlayback ? (
+            /* Unsupported Video: Static Image Preview + FFmpeg Frame Controls */
+            <div className="w-full h-full flex flex-col relative bg-black select-none">
+              <div className="relative w-full h-full flex items-center justify-center bg-slate-950 overflow-hidden">
+                {imageSrc ? (
+                  <img
+                    src={imageSrc}
+                    alt="Frame Preview"
+                    className="w-full h-full object-contain pointer-events-none"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                    <Film className="w-12 h-12 mb-2 opacity-50" />
+                    <span className="text-sm">{t('form_generating_thumbnail')}</span>
+                  </div>
+                )}
+
+                {/* Processing Overlay to prevent user action and show progress */}
+                {isProcessingFFmpeg && (
+                  <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center text-slate-200 gap-2.5 z-10 animate-fade-in">
+                    <div className="w-9 h-9 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-medium text-slate-200 bg-slate-900/90 px-3.5 py-1.5 rounded-full border border-slate-700/80 shadow-lg">
+                      {t('form_capturing_unsupported_notice')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Unsupported Player Controls Bar */}
+              <div className="absolute bottom-0 inset-x-0 z-20 p-2.5 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-transparent flex flex-col gap-1.5 backdrop-blur-xs">
+                {/* Seek Bar Slider (operable only when not processing) */}
+                <div className="flex items-center gap-2.5 text-xs text-slate-200">
+                  <span className="font-mono text-[11px] text-slate-300 shrink-0 min-w-[36px]">
+                    {formatTime(currentTime)}
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 100}
+                    step={1 / (frameRate > 0 ? frameRate : 30)}
+                    value={currentTime}
+                    disabled={isProcessingFFmpeg}
+                    onChange={handleSeekBarChange}
+                    onPointerUp={handleSeekBarCommit}
+                    onTouchEnd={handleSeekBarCommit}
+                    onKeyUp={handleSeekBarCommit}
+                    className={clsx(
+                      'w-full h-1.5 bg-slate-800/80 rounded-lg appearance-none accent-blue-500 transition-all',
+                      isProcessingFFmpeg ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-700/80 cursor-pointer'
+                    )}
+                  />
+                  <span className="text-[11px] font-mono text-slate-300 shrink-0 min-w-[36px] text-right">
+                    {formatTime(duration)}
+                  </span>
+                </div>
+
+                {/* Buttons & Actions */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Rewind / Forward 10s (Play/Pause is NOT displayed) */}
+                    <button
+                      type="button"
+                      disabled={isProcessingFFmpeg}
+                      onClick={() => handleSeekBy10(-1)}
+                      className={clsx(
+                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-1 text-[11px] px-2.5',
+                        isProcessingFFmpeg
+                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
+                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
+                      )}
+                      title={t('form_rewind_10s_tooltip')}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="font-mono font-medium">10s</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isProcessingFFmpeg}
+                      onClick={() => handleSeekBy10(1)}
+                      className={clsx(
+                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-1 text-[11px] px-2.5',
+                        isProcessingFFmpeg
+                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
+                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
+                      )}
+                      title={t('form_forward_10s_tooltip')}
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                      <span className="font-mono font-medium">10s</span>
+                    </button>
+
+                    {/* Step -1 / +1 Frame */}
+                    <button
+                      type="button"
+                      disabled={isProcessingFFmpeg}
+                      onClick={() => handleStepFrameUnsupported(-1)}
+                      className={clsx(
+                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-0.5 text-[11px] px-2',
+                        isProcessingFFmpeg
+                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
+                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
+                      )}
+                      title={t('form_frame_back_tooltip')}
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span className="text-[10px]">{t('form_frame_back')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isProcessingFFmpeg}
+                      onClick={() => handleStepFrameUnsupported(1)}
+                      className={clsx(
+                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-0.5 text-[11px] px-2',
+                        isProcessingFFmpeg
+                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
+                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
+                      )}
+                      title={t('form_frame_forward_tooltip')}
+                    >
+                      <span className="text-[10px]">{t('form_frame_forward')}</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Close Action */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsPlayingVideo(false)}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white text-xs font-medium shadow-md transition-colors cursor-pointer"
+                    >
+                      {t('form_close_player')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="w-full h-full flex flex-col relative bg-black">
               {videoError ? (
@@ -456,8 +690,8 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
             </div>
           )}
 
-          {/* Player Controls Bar */}
-          {isPlayingVideo && !videoError && (
+          {/* Video Player Controls Bar (Only for supported video formats) */}
+          {isPlayingVideo && !isUnsupportedPlayback && !videoError && (
             <div className="absolute bottom-0 inset-x-0 z-20 p-2.5 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent flex flex-col gap-1.5 backdrop-blur-xs">
               {/* Seek Bar Slider */}
               <div className="flex items-center gap-2.5 text-xs text-slate-200">

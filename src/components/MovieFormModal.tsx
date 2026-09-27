@@ -236,6 +236,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
             summaryImagePath={summaryImagePath}
             capturedTime={capturedTime}
             presetDuration={duration}
+            presetFrameRate={frameRate}
             onSummaryImageChange={(img, time) => {
               setSummaryImagePath(img);
               if (time !== null) setCapturedTime(time);
@@ -244,6 +245,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
               if (meta.duration && !duration) setDuration(meta.duration);
               if (meta.width) setWidth(meta.width);
               if (meta.height) setHeight(meta.height);
+              if (meta.frame_rate && !frameRate) setFrameRate(meta.frame_rate);
             }}
             onErrorModal={(title, description) => {
               setErrorModalState({ isOpen: true, title, description });

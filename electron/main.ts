@@ -23,6 +23,7 @@ import {
   switchDatabase,
   createDatabase,
   deleteDatabase,
+  cleanOrphanThumbnails,
 } from './db';
 import { extractVideoMetadata } from './metadataParser';
 import { getFFmpegPath } from './ffmpegPath';
@@ -257,18 +258,26 @@ export async function generateThumbnailWithFFmpeg(
 
     const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
     const fullPath = path.join(thumbDir, filename);
-    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : '0';
+
+    // Two-phase seeking: fast seek before input + small accurate seek after input
+    // Ensures both instant seeking and exact frame-level accuracy
+    const ffmpegArgs: string[] = ['-y'];
+    if (targetTime <= 3) {
+      ffmpegArgs.push('-ss', Math.max(0, targetTime).toFixed(3), '-i', filePath);
+    } else {
+      const fastSeek = (targetTime - 3).toFixed(3);
+      ffmpegArgs.push('-ss', fastSeek, '-i', filePath, '-ss', '3.000');
+    }
+
+    ffmpegArgs.push(
+      '-vframes', '1',
+      '-vf', 'scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2',
+      fullPath
+    );
 
     execFile(
       getFFmpegPath(),
-      [
-        '-y',
-        '-ss', seekArg,
-        '-i', filePath,
-        '-vframes', '1',
-        '-vf', 'scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2',
-        fullPath,
-      ],
+      ffmpegArgs,
       { timeout: 15000 },
       (err) => {
         if (!err && fs.existsSync(fullPath)) {
@@ -288,6 +297,13 @@ app.whenReady().then(() => {
   registerMediaProtocol();
   initDatabase();
   createWindow();
+
+  // Run orphan thumbnail cleanup in background shortly after startup
+  setTimeout(() => {
+    cleanOrphanThumbnails().catch((err) => {
+      console.error('Failed to clean orphan thumbnails:', err);
+    });
+  }, 3000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -382,4 +398,9 @@ ipcMain.handle('app:saveSummaryImage', async (_, base64Data: string) => {
 // Generate thumbnail via FFmpeg IPC handler
 ipcMain.handle('app:generateThumbnail', async (_, { filePath, targetTime }: { filePath: string; targetTime?: number | null }) => {
   return generateThumbnailWithFFmpeg(filePath, targetTime);
+});
+
+// Clean orphan thumbnails IPC handler
+ipcMain.handle('app:cleanThumbnails', async () => {
+  return cleanOrphanThumbnails();
 });

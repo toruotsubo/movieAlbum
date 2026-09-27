@@ -704,3 +704,82 @@ export function resetAllData(): AppSettings {
   saveDatabase();
   return jsonDb.settings;
 }
+
+/**
+ * Scans all database JSON files to collect referenced summary image filenames,
+ * then safely deletes orphan thumbnail files from the thumbnails directory.
+ * A 1-hour grace period is applied to avoid deleting newly created uncommitted images.
+ */
+export async function cleanOrphanThumbnails(): Promise<{ deletedCount: number }> {
+  const thumbDir = path.join(app.getPath('userData'), 'thumbnails');
+  if (!fs.existsSync(thumbDir)) {
+    return { deletedCount: 0 };
+  }
+
+  const dbDir = getDbDir();
+  const usedFilenames = new Set<string>();
+
+  // Collect all summary_image_path references across all database JSON files
+  try {
+    const dbFiles = fs.readdirSync(dbDir).filter((file) => file.endsWith('.json') && file !== 'databases.json');
+    for (const file of dbFiles) {
+      const fullPath = path.join(dbDir, file);
+      try {
+        const raw = fs.readFileSync(fullPath, 'utf-8');
+        const dbContent = JSON.parse(raw);
+        if (dbContent && Array.isArray(dbContent.movies)) {
+          for (const m of dbContent.movies) {
+            if (m.summary_image_path) {
+              const basename = path.basename(m.summary_image_path).toLowerCase();
+              usedFilenames.add(basename);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[cleanOrphanThumbnails] Could not read db file ${file}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('[cleanOrphanThumbnails] Failed to read db directory:', err);
+    return { deletedCount: 0 };
+  }
+
+  let deletedCount = 0;
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+  const now = Date.now();
+
+  try {
+    const files = fs.readdirSync(thumbDir);
+    for (const filename of files) {
+      if (filename.startsWith('.')) continue;
+
+      const lowerName = filename.toLowerCase();
+      // Only check thumbnail image files
+      if (!/\.(png|jpe?g|webp|bmp)$/i.test(lowerName)) continue;
+
+      // If referenced in any database, keep it
+      if (usedFilenames.has(lowerName)) continue;
+
+      const fullThumbPath = path.join(thumbDir, filename);
+      try {
+        const stat = fs.statSync(fullThumbPath);
+        // Only delete files older than 1 hour (grace period)
+        if (now - stat.mtimeMs > ONE_HOUR_MS) {
+          fs.unlinkSync(fullThumbPath);
+          deletedCount++;
+        }
+      } catch (statErr) {
+        console.warn(`[cleanOrphanThumbnails] Failed to inspect/delete ${filename}:`, statErr);
+      }
+    }
+  } catch (err) {
+    console.error('[cleanOrphanThumbnails] Failed to read thumbnails directory:', err);
+  }
+
+  if (deletedCount > 0) {
+    console.log(`[cleanOrphanThumbnails] Cleaned up ${deletedCount} orphan thumbnail image(s).`);
+  }
+
+  return { deletedCount };
+}
+
