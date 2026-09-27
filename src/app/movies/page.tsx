@@ -17,6 +17,8 @@ import {
   FileText,
   Edit,
   Tag,
+  Search,
+  X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -34,6 +36,7 @@ function MoviesContent() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [ratingFilter, setRatingFilter] = useState<string | number>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [isInitialized, setIsInitialized] = useState(false);
   const loadMoreRef = React.useRef<HTMLDivElement>(null);
@@ -50,6 +53,7 @@ function MoviesContent() {
           if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
           if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
           if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+          if (savedState.searchQuery !== undefined) setSearchQuery(savedState.searchQuery);
         }
       }
     } catch (e) {
@@ -73,12 +77,13 @@ function MoviesContent() {
         sortOrder,
         ratingFilter,
         tagFilter,
+        searchQuery,
       };
       sessionStorage.setItem('movie_manager_movies_page_state', JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Failed to save filter state to sessionStorage:', e);
     }
-  }, [sortKey, sortOrder, ratingFilter, tagFilter, isInitialized, databaseState.activeId]);
+  }, [sortKey, sortOrder, ratingFilter, tagFilter, searchQuery, isInitialized, databaseState.activeId]);
 
   // Reset filters and URL query parameters when active database changes
   const prevActiveDbRef = React.useRef(databaseState.activeId);
@@ -86,6 +91,7 @@ function MoviesContent() {
     if (prevActiveDbRef.current && databaseState.activeId && prevActiveDbRef.current !== databaseState.activeId) {
       setRatingFilter('all');
       setTagFilter('all');
+      setSearchQuery('');
       try {
         sessionStorage.removeItem('movie_manager_movies_page_state');
       } catch (e) {}
@@ -143,20 +149,24 @@ function MoviesContent() {
     ).sort((a, b) => a.localeCompare(b, 'ja'));
   }, [movies]);
 
-  // Map of movie ID to group count and deduplicated tags of all movies in the group: O(N)
-  const groupDataMap = useMemo(() => {
-    const childrenMap = new Map<number, Movie[]>();
+  // Map of children movies grouped by parent_movie_id: O(N)
+  const childrenMap = useMemo(() => {
+    const map = new Map<number, Movie[]>();
     for (const m of movies) {
       if (m.parent_movie_id) {
-        let list = childrenMap.get(m.parent_movie_id);
+        let list = map.get(m.parent_movie_id);
         if (!list) {
           list = [];
-          childrenMap.set(m.parent_movie_id, list);
+          map.set(m.parent_movie_id, list);
         }
         list.push(m);
       }
     }
+    return map;
+  }, [movies]);
 
+  // Map of movie ID to group count and deduplicated tags of all movies in the group: O(N)
+  const groupDataMap = useMemo(() => {
     const map = new Map<number, { count: number; tags: string[] }>();
 
     for (const movie of movies) {
@@ -186,7 +196,7 @@ function MoviesContent() {
     }
 
     return map;
-  }, [movies]);
+  }, [movies, childrenMap]);
 
   const filteredMovies = useMemo(() => {
     // Exclude sibling movies (movies with a parent_movie_id)
@@ -214,8 +224,39 @@ function MoviesContent() {
         return tags.includes(tagFilter);
       });
     }
+    if (searchQuery.trim()) {
+      const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const isCustom1Active = Boolean(settings?.custom_field_1_name?.trim() && settings?.custom_field_1_display_in_list !== false);
+      const isCustom2Active = Boolean(settings?.custom_field_2_name?.trim() && settings?.custom_field_2_display_in_list !== false);
+      const isCustom3Active = Boolean(settings?.custom_field_3_name?.trim() && settings?.custom_field_3_display_in_list !== false);
+
+      result = result.filter((movie) => {
+        const children = childrenMap.get(movie.id);
+        const groupMovies = children ? [movie, ...children] : [movie];
+
+        return terms.every((term) => {
+          return groupMovies.some((m) => {
+            // タイトル
+            if (m.title && m.title.toLowerCase().includes(term)) return true;
+            if (m.file_name && m.file_name.toLowerCase().includes(term)) return true;
+            // カテゴリ
+            if (m.genre && m.genre.toLowerCase().includes(term)) return true;
+            // 名前
+            if (m.cast && m.cast.toLowerCase().includes(term)) return true;
+            if (m.cast_kana && m.cast_kana.toLowerCase().includes(term)) return true;
+            // 公開年
+            if (m.release_year && (String(m.release_year).includes(term) || `${m.release_year}年`.includes(term))) return true;
+            // 動画一覧に表示されるユーザー定義項目
+            if (isCustom1Active && m.custom_field_1 && m.custom_field_1.toLowerCase().includes(term)) return true;
+            if (isCustom2Active && m.custom_field_2 && m.custom_field_2.toLowerCase().includes(term)) return true;
+            if (isCustom3Active && m.custom_field_3 && m.custom_field_3.toLowerCase().includes(term)) return true;
+            return false;
+          });
+        });
+      });
+    }
     return result;
-  }, [movies, filterValues, ratingFilter, tagFilter, groupDataMap]);
+  }, [movies, filterValues, ratingFilter, tagFilter, groupDataMap, searchQuery, settings, childrenMap]);
 
   const sortedMovies = useMemo(() => {
     return [...filteredMovies].sort((a, b) => {
@@ -264,7 +305,7 @@ function MoviesContent() {
   // Reset pagination when filter/sort conditions change
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filterSignature, ratingFilter, tagFilter, sortKey, sortOrder]);
+  }, [filterSignature, ratingFilter, tagFilter, sortKey, sortOrder, searchQuery]);
 
   // Infinite scroll observer: load next batch when scrolling near bottom
   useEffect(() => {
@@ -406,6 +447,28 @@ function MoviesContent() {
               </button>
             ))}
           </div>
+
+          {/* Search Form */}
+          <div className="relative flex items-center">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t('movies_list_search_placeholder')}
+              className="pl-8 pr-7 py-1.5 rounded-lg text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors w-40 sm:w-56"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 text-slate-400 hover:text-slate-200 p-0.5 rounded transition-colors"
+                title={t('movies_list_search_clear')}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -417,7 +480,7 @@ function MoviesContent() {
           </div>
           <h3 className="text-lg font-semibold text-slate-200">{t('movies_list_empty')}</h3>
           <p className="text-sm text-slate-400 max-w-md mx-auto">
-            {tagFilter !== 'all' || ratingFilter !== 'all' || filterSignature
+            {tagFilter !== 'all' || ratingFilter !== 'all' || filterSignature || searchQuery.trim() !== ''
               ? t('movies_list_empty_filter_desc')
               : t('movies_list_empty_desc')}
           </p>

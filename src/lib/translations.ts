@@ -102,6 +102,8 @@ export const TRANSLATIONS = {
     filter_by_year: '公開年「{year}年」で絞り込み',
     movies_list_rating_gte4: '★4以上',
     movies_list_rating_gte3: '★3以上',
+    movies_list_search_placeholder: '検索...',
+    movies_list_search_clear: '検索クリア',
 
     // Movie Detail Page
     detail_movie_not_found: '動画が見つかりませんでした',
@@ -274,6 +276,8 @@ export const TRANSLATIONS = {
     filter_by_year: 'Filter by release year "{year}"',
     movies_list_rating_gte4: '★4 and above',
     movies_list_rating_gte3: '★3 and above',
+    movies_list_search_placeholder: 'Search...',
+    movies_list_search_clear: 'Clear search',
 
     // Movie Detail Page
     detail_movie_not_found: 'Video not found',
