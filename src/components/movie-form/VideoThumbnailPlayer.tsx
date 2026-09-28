@@ -77,11 +77,15 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     // Sync props with state
     useEffect(() => {
-      if (presetDuration && !duration) setDuration(presetDuration);
+      if (presetDuration && presetDuration > 0 && presetDuration !== duration) {
+        setDuration(presetDuration);
+      }
     }, [presetDuration]);
 
     useEffect(() => {
-      if (presetFrameRate && (!frameRate || frameRate === 30)) setFrameRate(presetFrameRate);
+      if (presetFrameRate && presetFrameRate > 0 && presetFrameRate !== frameRate) {
+        setFrameRate(presetFrameRate);
+      }
     }, [presetFrameRate]);
 
     useEffect(() => {
@@ -90,20 +94,28 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       }
     }, [capturedTime]);
 
-    // Extract duration & frameRate for unsupported formats if missing
+    // Extract duration & frameRate for unsupported formats if missing or updated
     useEffect(() => {
-      if (isUnsupportedPlayback && filePath && (!duration || !frameRate)) {
+      if (isUnsupportedPlayback && filePath) {
         if (window.api?.extractMetadata) {
           window.api.extractMetadata(filePath).then((meta) => {
             if (meta) {
-              if (meta.duration && !duration) setDuration(meta.duration);
-              if (meta.frame_rate && !frameRate) setFrameRate(meta.frame_rate);
-              if (onMetadataExtracted) {
+              if (meta.duration && meta.duration > 0) {
+                setDuration(meta.duration);
+                if (onMetadataExtracted) {
+                  onMetadataExtracted({ duration: meta.duration });
+                }
+              }
+              if (meta.frame_rate && meta.frame_rate > 0) {
+                setFrameRate(meta.frame_rate);
+                if (onMetadataExtracted) {
+                  onMetadataExtracted({ frame_rate: meta.frame_rate });
+                }
+              }
+              if (meta.width && meta.height && onMetadataExtracted) {
                 onMetadataExtracted({
-                  duration: meta.duration || undefined,
-                  width: meta.width || undefined,
-                  height: meta.height || undefined,
-                  frame_rate: meta.frame_rate || undefined,
+                  width: meta.width,
+                  height: meta.height,
                 });
               }
             }
@@ -117,10 +129,16 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       if (!summaryImagePath && filePath) {
         setIsAutoGeneratingSummary(true);
         generateDefaultSummary(filePath, duration || presetDuration)
-          .then(({ imagePath, targetTime }) => {
+          .then(({ imagePath, targetTime, duration: autoDur }) => {
             if (imagePath) {
               onSummaryImageChange(imagePath, targetTime);
               setCurrentTime(targetTime);
+            }
+            if (autoDur && autoDur > 0) {
+              setDuration(autoDur);
+              if (onMetadataExtracted) {
+                onMetadataExtracted({ duration: autoDur });
+              }
             }
             setIsAutoGeneratingSummary(false);
           })
@@ -134,7 +152,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
     const generateDefaultSummary = (
       path: string,
       dur?: number | null
-    ): Promise<{ imagePath: string | null; targetTime: number }> => {
+    ): Promise<{ imagePath: string | null; targetTime: number; duration?: number | null }> => {
       return new Promise(async (resolve) => {
         if (typeof window === 'undefined') {
           resolve({ imagePath: null, targetTime: 0 });
@@ -146,7 +164,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           try {
             const res = await window.api.generateThumbnail(path, dur ? dur * 0.5 : null);
             if (res) {
-              resolve({ imagePath: res.imagePath, targetTime: res.targetTime });
+              resolve({ imagePath: res.imagePath, targetTime: res.targetTime, duration: res.duration });
               return;
             }
           } catch (e) {
@@ -232,7 +250,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
             try {
               const res = await window.api.generateThumbnail(path, (dur && dur > 0) ? dur * 0.5 : null);
               if (res) {
-                resolve({ imagePath: res.imagePath, targetTime: res.targetTime });
+                resolve({ imagePath: res.imagePath, targetTime: res.targetTime, duration: res.duration });
                 return;
               }
             } catch (e) {
@@ -342,7 +360,12 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           if (res && res.imagePath) {
             onSummaryImageChange(res.imagePath, validTime);
             setCurrentTime(validTime);
-            if (res.duration && !duration) setDuration(res.duration);
+            if (res.duration && res.duration > 0) {
+              setDuration(res.duration);
+              if (onMetadataExtracted) {
+                onMetadataExtracted({ duration: res.duration });
+              }
+            }
           } else {
             onErrorModal(t('error_title'), t('error_save_summary_failed'));
           }
@@ -355,28 +378,65 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       }
     };
 
-    const handleSeekBy10 = (direction: -1 | 1) => {
+    const handleSeekToStart = () => {
       if (isProcessingFFmpeg) return;
-      const target = currentTime + direction * 10;
-      generateThumbnailAtTime(target);
+      generateThumbnailAtTime(0);
+    };
+
+    const handleSeekToEnd = async () => {
+      if (isProcessingFFmpeg) return;
+
+      let validDuration = duration;
+      // If duration is not yet resolved, dynamically extract it first
+      if ((!validDuration || validDuration <= 0) && filePath && window.api?.extractMetadata) {
+        try {
+          const meta = await window.api.extractMetadata(filePath);
+          if (meta?.duration && meta.duration > 0) {
+            validDuration = meta.duration;
+            setDuration(meta.duration);
+            if (onMetadataExtracted) {
+              onMetadataExtracted({ duration: meta.duration });
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to extract metadata in handleSeekToEnd:', e);
+        }
+      }
+
+      if (!validDuration || validDuration <= 0) return;
+
+      const fps = frameRate > 0 ? frameRate : 30;
+      // Prevent EOF demuxer errors by seeking slightly before container end (safe margin)
+      const safetyOffset = Math.max(1 / fps, 0.3);
+      const endTarget = Math.max(0, validDuration - safetyOffset);
+      generateThumbnailAtTime(endTarget);
+    };
+
+    const handleSeekRelative = (seconds: number) => {
+      if (isProcessingFFmpeg) return;
+      generateThumbnailAtTime(currentTime + seconds);
     };
 
     const handleStepFrameUnsupported = (frames: number) => {
       if (isProcessingFFmpeg) return;
       const fps = frameRate > 0 ? frameRate : 30;
-      const target = currentTime + frames / fps;
-      generateThumbnailAtTime(target);
+      generateThumbnailAtTime(currentTime + frames / fps);
     };
 
-    const handleSeekBarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      setCurrentTime(parseFloat(e.target.value));
-    };
-
-    const handleSeekBarCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
-      if (isProcessingFFmpeg) return;
-      const val = parseFloat((e.currentTarget as HTMLInputElement).value);
-      generateThumbnailAtTime(val);
-    };
+    const unsupportedSeekButtons = [
+      { label: t('form_seek_start'), action: handleSeekToStart, title: t('form_seek_start_tooltip') },
+      { label: '<10m', action: () => handleSeekRelative(-600), title: t('form_seek_back_10m_tooltip') },
+      { label: '<1m', action: () => handleSeekRelative(-60), title: t('form_seek_back_1m_tooltip') },
+      { label: '<10s', action: () => handleSeekRelative(-10), title: t('form_seek_back_10s_tooltip') },
+      { label: '<1s', action: () => handleSeekRelative(-1), title: t('form_seek_back_1s_tooltip') },
+      { label: '<1f', action: () => handleStepFrameUnsupported(-1), title: t('form_seek_back_1f_tooltip') },
+      { label: '1f>', action: () => handleStepFrameUnsupported(1), title: t('form_seek_forward_1f_tooltip') },
+      { label: '1s>', action: () => handleSeekRelative(1), title: t('form_seek_forward_1s_tooltip') },
+      { label: '10s>', action: () => handleSeekRelative(10), title: t('form_seek_forward_10s_tooltip') },
+      { label: '1m>', action: () => handleSeekRelative(60), title: t('form_seek_forward_1m_tooltip') },
+      { label: '10m>', action: () => handleSeekRelative(600), title: t('form_seek_forward_10m_tooltip') },
+      { label: t('form_seek_end'), action: handleSeekToEnd, title: t('form_seek_end_tooltip') },
+    ];
 
     return (
       <div className="space-y-2">
@@ -392,6 +452,25 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                   if (!exists) {
                     onErrorModal(t('error_title'), t('error_file_not_found'));
                     return;
+                  }
+                }
+                if (isUnsupportedPlayback && (!duration || duration <= 0) && filePath && window.api?.extractMetadata) {
+                  try {
+                    const meta = await window.api.extractMetadata(filePath);
+                    if (meta?.duration && meta.duration > 0) {
+                      setDuration(meta.duration);
+                      if (onMetadataExtracted) {
+                        onMetadataExtracted({ duration: meta.duration });
+                      }
+                    }
+                    if (meta?.frame_rate && meta.frame_rate > 0) {
+                      setFrameRate(meta.frame_rate);
+                      if (onMetadataExtracted) {
+                        onMetadataExtracted({ frame_rate: meta.frame_rate });
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Failed to extract metadata on open player:', e);
                   }
                 }
                 if (currentTime === 0 && capturedTime) {
@@ -467,102 +546,48 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
               {/* Unsupported Player Controls Bar */}
               <div className="absolute bottom-0 inset-x-0 z-20 p-2.5 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-transparent flex flex-col gap-1.5 backdrop-blur-xs">
-                {/* Seek Bar Slider (operable only when not processing) */}
+                {/* Progress Bar (non-seekable, indicator only) */}
                 <div className="flex items-center gap-2.5 text-xs text-slate-200">
                   <span className="font-mono text-[11px] text-slate-300 shrink-0 min-w-[36px]">
                     {formatTime(currentTime)}
                   </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={duration || 100}
-                    step={1 / (frameRate > 0 ? frameRate : 30)}
-                    value={currentTime}
-                    disabled={isProcessingFFmpeg}
-                    onChange={handleSeekBarChange}
-                    onPointerUp={handleSeekBarCommit}
-                    onTouchEnd={handleSeekBarCommit}
-                    onKeyUp={handleSeekBarCommit}
-                    className={clsx(
-                      'w-full h-1.5 bg-slate-800/80 rounded-lg appearance-none accent-blue-500 transition-all',
-                      isProcessingFFmpeg ? 'cursor-not-allowed opacity-50' : 'hover:bg-slate-700/80 cursor-pointer'
-                    )}
-                  />
+                  <div className="w-full h-1.5 bg-slate-800/80 rounded-lg overflow-hidden relative">
+                    <div
+                      className="h-full bg-blue-500 rounded-lg transition-all duration-150"
+                      style={{
+                        width: `${duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0}%`,
+                      }}
+                    />
+                  </div>
                   <span className="text-[11px] font-mono text-slate-300 shrink-0 min-w-[36px] text-right">
                     {formatTime(duration)}
                   </span>
                 </div>
 
                 {/* Buttons & Actions */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {/* Rewind / Forward 10s (Play/Pause is NOT displayed) */}
-                    <button
-                      type="button"
-                      disabled={isProcessingFFmpeg}
-                      onClick={() => handleSeekBy10(-1)}
-                      className={clsx(
-                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-1 text-[11px] px-2.5',
-                        isProcessingFFmpeg
-                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
-                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
-                      )}
-                      title={t('form_rewind_10s_tooltip')}
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span className="font-mono font-medium">10s</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isProcessingFFmpeg}
-                      onClick={() => handleSeekBy10(1)}
-                      className={clsx(
-                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-1 text-[11px] px-2.5',
-                        isProcessingFFmpeg
-                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
-                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
-                      )}
-                      title={t('form_forward_10s_tooltip')}
-                    >
-                      <RotateCw className="w-3.5 h-3.5" />
-                      <span className="font-mono font-medium">10s</span>
-                    </button>
-
-                    {/* Step -1 / +1 Frame */}
-                    <button
-                      type="button"
-                      disabled={isProcessingFFmpeg}
-                      onClick={() => handleStepFrameUnsupported(-1)}
-                      className={clsx(
-                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-0.5 text-[11px] px-2',
-                        isProcessingFFmpeg
-                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
-                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
-                      )}
-                      title={t('form_frame_back_tooltip')}
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                      <span className="text-[10px]">{t('form_frame_back')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isProcessingFFmpeg}
-                      onClick={() => handleStepFrameUnsupported(1)}
-                      className={clsx(
-                        'p-1.5 rounded-lg border text-slate-300 transition-colors flex items-center gap-0.5 text-[11px] px-2',
-                        isProcessingFFmpeg
-                          ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
-                          : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer'
-                      )}
-                      title={t('form_frame_forward_tooltip')}
-                    >
-                      <span className="text-[10px]">{t('form_frame_forward')}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {unsupportedSeekButtons.map((btn) => (
+                      <button
+                        key={btn.label}
+                        type="button"
+                        disabled={isProcessingFFmpeg}
+                        onClick={btn.action}
+                        title={btn.title}
+                        className={clsx(
+                          'p-1.5 rounded-lg border transition-all flex items-center justify-center text-[11px] px-2 whitespace-nowrap font-medium',
+                          isProcessingFFmpeg
+                            ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
+                            : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer active:scale-95'
+                        )}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
                   </div>
 
                   {/* Close Action */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                     <button
                       type="button"
                       onClick={() => setIsPlayingVideo(false)}
@@ -678,7 +703,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                             onSummaryImageChange(res.imagePath, res.targetTime);
                             if (res.duration && !duration) setDuration(res.duration);
                           }
-                        }).catch(() => {});
+                        }).catch(() => { });
                       }
                     } else {
                       setVideoError(t('error_video_load_failed', { error: errorDetails, path: filePath || '' }));

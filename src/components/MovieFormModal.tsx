@@ -113,10 +113,10 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
         window.api.extractMetadata(movie.file_path).then((meta) => {
           if (meta) {
             if (meta.file_size) setFileSize(meta.file_size);
-            if (meta.duration && !movie.duration) setDuration(meta.duration);
+            if (meta.duration && (!movie.duration || movie.duration <= 0)) setDuration(meta.duration);
             if (meta.width) setWidth(meta.width);
             if (meta.height) setHeight(meta.height);
-            if (meta.frame_rate) setFrameRate(meta.frame_rate);
+            if (meta.frame_rate && (!movie.frame_rate || movie.frame_rate <= 0)) setFrameRate(meta.frame_rate);
           }
         }).catch((err) => console.warn('Failed to extract metadata in modal:', err));
       }
@@ -242,10 +242,10 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
               if (time !== null) setCapturedTime(time);
             }}
             onMetadataExtracted={(meta) => {
-              if (meta.duration && !duration) setDuration(meta.duration);
+              if (meta.duration && meta.duration > 0) setDuration(meta.duration);
               if (meta.width) setWidth(meta.width);
               if (meta.height) setHeight(meta.height);
-              if (meta.frame_rate && !frameRate) setFrameRate(meta.frame_rate);
+              if (meta.frame_rate && meta.frame_rate > 0) setFrameRate(meta.frame_rate);
             }}
             onErrorModal={(title, description) => {
               setErrorModalState({ isOpen: true, title, description });

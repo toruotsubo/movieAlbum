@@ -1373,7 +1373,7 @@ async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
   if (targetTime === void 0 || targetTime === null || isNaN(targetTime)) {
     targetTime = duration && duration > 0 ? duration * 0.5 : 0;
   }
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const userDataPath = import_electron3.app.getPath("userData");
     const thumbDir = import_path4.default.join(userDataPath, "thumbnails");
     if (!import_fs4.default.existsSync(thumbDir)) {
@@ -1381,6 +1381,17 @@ async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
     }
     const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
     const fullPath = import_path4.default.join(thumbDir, filename);
+    const execFFmpeg = (args) => {
+      return new Promise((res) => {
+        (0, import_child_process2.execFile)(getFFmpegPath(), args, { timeout: 15e3 }, (err) => {
+          if (!err && import_fs4.default.existsSync(fullPath)) {
+            res(true);
+          } else {
+            res(false);
+          }
+        });
+      });
+    };
     const ffmpegArgs = ["-y"];
     if (targetTime <= 3) {
       ffmpegArgs.push("-ss", Math.max(0, targetTime).toFixed(3), "-i", filePath);
@@ -1395,19 +1406,48 @@ async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
       "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
       fullPath
     );
-    (0, import_child_process2.execFile)(
-      getFFmpegPath(),
-      ffmpegArgs,
-      { timeout: 15e3 },
-      (err) => {
-        if (!err && import_fs4.default.existsSync(fullPath)) {
-          resolve({ imagePath: fullPath, duration, targetTime });
-        } else {
-          console.error("FFmpeg thumbnail generation error:", err);
-          resolve(null);
-        }
+    const success = await execFFmpeg(ffmpegArgs);
+    if (success) {
+      resolve({ imagePath: fullPath, duration, targetTime });
+      return;
+    }
+    const fallbackDirectArgs = [
+      "-y",
+      "-ss",
+      Math.max(0, targetTime).toFixed(3),
+      "-i",
+      filePath,
+      "-vframes",
+      "1",
+      "-vf",
+      "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
+      fullPath
+    ];
+    if (await execFFmpeg(fallbackDirectArgs)) {
+      resolve({ imagePath: fullPath, duration, targetTime });
+      return;
+    }
+    if (targetTime > 0.5) {
+      const fallbackEarlier = Math.max(0, targetTime - 0.8);
+      const fallbackEarlierArgs = [
+        "-y",
+        "-ss",
+        fallbackEarlier.toFixed(3),
+        "-i",
+        filePath,
+        "-vframes",
+        "1",
+        "-vf",
+        "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
+        fullPath
+      ];
+      if (await execFFmpeg(fallbackEarlierArgs)) {
+        resolve({ imagePath: fullPath, duration, targetTime: fallbackEarlier });
+        return;
       }
-    );
+    }
+    console.error("FFmpeg thumbnail generation failed after fallbacks for:", filePath, "at targetTime:", targetTime);
+    resolve(null);
   });
 }
 import_electron3.app.whenReady().then(() => {

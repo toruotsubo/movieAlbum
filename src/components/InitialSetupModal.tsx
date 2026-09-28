@@ -254,7 +254,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               type="text"
               value={databaseName}
               onChange={(e) => setDatabaseName(e.target.value)}
-              placeholder="例: 設定ファイル_00"
+              placeholder={t('settings_db_placeholder')}
               className="flex-1 bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
             />
             {hasMultipleDbs && databaseState && (
