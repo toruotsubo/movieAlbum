@@ -89,7 +89,7 @@ export default function KeyItemsPage() {
     return (
       <div className="space-y-6">
         <div className="h-10 w-full bg-slate-900/50 rounded-xl animate-pulse" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-[1600px]:grid-cols-4 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="glass-card rounded-xl overflow-hidden border border-slate-800 p-6 space-y-4">
               <div className="aspect-video w-full bg-slate-900 rounded-lg animate-pulse" />
@@ -276,7 +276,7 @@ export default function KeyItemsPage() {
         )}
 
         {/* Key Item Groups List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-[1600px]:grid-cols-4 gap-6">
           {sortedGroups.map((group) => {
             const imageSrc = formatMediaUrl(group.summary_image_path);
 
