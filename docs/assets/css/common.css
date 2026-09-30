@@ -161,6 +161,9 @@ body {
   margin: 0 0 1em;
   font-size: 1.5em;
 }
+.main section p:nth-child(n+2) {
+  margin: 1em 0 0;
+}
 .main section ul:not(.horizontal) {
   margin: 1em 0 0;
   padding: 0 0 0 1.5em;
@@ -176,6 +179,9 @@ body {
 }
 .main section ul.horizontal li:nth-last-child(n+2)::after {
   content: ",";
+}
+.main section figure {
+  margin: 2em 0;
 }
 .main section dl {
   display: grid;
