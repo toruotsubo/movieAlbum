@@ -54,6 +54,7 @@ var api = {
   extractMetadata: (filePath) => import_electron.ipcRenderer.invoke("movies:extractMetadata", filePath),
   saveSummaryImage: (base64Data) => import_electron.ipcRenderer.invoke("app:saveSummaryImage", base64Data),
   generateThumbnail: (filePath, targetTime) => import_electron.ipcRenderer.invoke("app:generateThumbnail", { filePath, targetTime }),
+  cleanThumbnails: () => import_electron.ipcRenderer.invoke("app:cleanThumbnails"),
   resetData: () => import_electron.ipcRenderer.invoke("app:resetData")
 };
 import_electron.contextBridge.exposeInMainWorld("api", api);

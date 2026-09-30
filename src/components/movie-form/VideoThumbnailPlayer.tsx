@@ -26,8 +26,9 @@ interface VideoThumbnailPlayerProps {
   summaryImagePath: string | null;
   capturedTime: number | null;
   presetDuration?: number | null;
+  presetFrameRate?: number | null;
   onSummaryImageChange: (imagePath: string | null, capturedTime: number | null) => void;
-  onMetadataExtracted?: (meta: { duration?: number; width?: number; height?: number }) => void;
+  onMetadataExtracted?: (meta: { duration?: number; width?: number; height?: number; frame_rate?: number }) => void;
   onErrorModal: (title: string, description: string) => void;
 }
 
@@ -38,6 +39,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       summaryImagePath,
       capturedTime,
       presetDuration,
+      presetFrameRate,
       onSummaryImageChange,
       onMetadataExtracted,
       onErrorModal,
@@ -50,9 +52,11 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     const [isPlayingVideo, setIsPlayingVideo] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
+    const [currentTime, setCurrentTime] = useState(capturedTime || 0);
     const [duration, setDuration] = useState(presetDuration || 0);
+    const [frameRate, setFrameRate] = useState(presetFrameRate || 30);
     const [isCapturing, setIsCapturing] = useState(false);
+    const [isProcessingFFmpeg, setIsProcessingFFmpeg] = useState(false);
     const [isAutoGeneratingSummary, setIsAutoGeneratingSummary] = useState(false);
     const [videoError, setVideoError] = useState<string | null>(null);
 
@@ -71,14 +75,70 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       return hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
     };
 
+    // Sync props with state
+    useEffect(() => {
+      if (presetDuration && presetDuration > 0 && presetDuration !== duration) {
+        setDuration(presetDuration);
+      }
+    }, [presetDuration]);
+
+    useEffect(() => {
+      if (presetFrameRate && presetFrameRate > 0 && presetFrameRate !== frameRate) {
+        setFrameRate(presetFrameRate);
+      }
+    }, [presetFrameRate]);
+
+    useEffect(() => {
+      if (capturedTime !== null && capturedTime !== undefined && !isNaN(capturedTime)) {
+        setCurrentTime(capturedTime);
+      }
+    }, [capturedTime]);
+
+    // Extract duration & frameRate for unsupported formats if missing or updated
+    useEffect(() => {
+      if (isUnsupportedPlayback && filePath) {
+        if (window.api?.extractMetadata) {
+          window.api.extractMetadata(filePath).then((meta) => {
+            if (meta) {
+              if (meta.duration && meta.duration > 0) {
+                setDuration(meta.duration);
+                if (onMetadataExtracted) {
+                  onMetadataExtracted({ duration: meta.duration });
+                }
+              }
+              if (meta.frame_rate && meta.frame_rate > 0) {
+                setFrameRate(meta.frame_rate);
+                if (onMetadataExtracted) {
+                  onMetadataExtracted({ frame_rate: meta.frame_rate });
+                }
+              }
+              if (meta.width && meta.height && onMetadataExtracted) {
+                onMetadataExtracted({
+                  width: meta.width,
+                  height: meta.height,
+                });
+              }
+            }
+          }).catch((err) => console.warn('Failed to extract metadata for unsupported video:', err));
+        }
+      }
+    }, [isUnsupportedPlayback, filePath]);
+
     // Auto-generate summary thumbnail if none exists
     useEffect(() => {
       if (!summaryImagePath && filePath) {
         setIsAutoGeneratingSummary(true);
         generateDefaultSummary(filePath, duration || presetDuration)
-          .then(({ imagePath, targetTime }) => {
+          .then(({ imagePath, targetTime, duration: autoDur }) => {
             if (imagePath) {
               onSummaryImageChange(imagePath, targetTime);
+              setCurrentTime(targetTime);
+            }
+            if (autoDur && autoDur > 0) {
+              setDuration(autoDur);
+              if (onMetadataExtracted) {
+                onMetadataExtracted({ duration: autoDur });
+              }
             }
             setIsAutoGeneratingSummary(false);
           })
@@ -92,7 +152,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
     const generateDefaultSummary = (
       path: string,
       dur?: number | null
-    ): Promise<{ imagePath: string | null; targetTime: number }> => {
+    ): Promise<{ imagePath: string | null; targetTime: number; duration?: number | null }> => {
       return new Promise(async (resolve) => {
         if (typeof window === 'undefined') {
           resolve({ imagePath: null, targetTime: 0 });
@@ -104,7 +164,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           try {
             const res = await window.api.generateThumbnail(path, dur ? dur * 0.5 : null);
             if (res) {
-              resolve({ imagePath: res.imagePath, targetTime: res.targetTime });
+              resolve({ imagePath: res.imagePath, targetTime: res.targetTime, duration: res.duration });
               return;
             }
           } catch (e) {
@@ -190,7 +250,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
             try {
               const res = await window.api.generateThumbnail(path, (dur && dur > 0) ? dur * 0.5 : null);
               if (res) {
-                resolve({ imagePath: res.imagePath, targetTime: res.targetTime });
+                resolve({ imagePath: res.imagePath, targetTime: res.targetTime, duration: res.duration });
                 return;
               }
             } catch (e) {
@@ -238,7 +298,12 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     // Expose capture methods to parent via ref
     useImperativeHandle(ref, () => ({
-      captureFrame,
+      captureFrame: async () => {
+        if (isUnsupportedPlayback) {
+          return summaryImagePath;
+        }
+        return captureFrame();
+      },
       getCurrentTime: () => (videoRef.current ? videoRef.current.currentTime : currentTime),
     }));
 
@@ -273,13 +338,105 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     const stepFrame = (frames: number) => {
       if (!videoRef.current) return;
-      const fps = 30;
+      const fps = frameRate > 0 ? frameRate : 30;
       if (isPlaying) {
         videoRef.current.pause();
         setIsPlaying(false);
       }
       seekTo(videoRef.current.currentTime + frames / fps);
     };
+
+    // FFmpeg thumbnail generation for unsupported formats with concurrency lock
+    const generateThumbnailAtTime = async (targetTime: number) => {
+      if (!filePath || isProcessingFFmpeg) return;
+
+      const maxDur = duration > 0 ? duration : 3600;
+      const validTime = Math.max(0, Math.min(maxDur, targetTime));
+
+      setIsProcessingFFmpeg(true);
+      try {
+        if (window.api?.generateThumbnail) {
+          const res = await window.api.generateThumbnail(filePath, validTime);
+          if (res && res.imagePath) {
+            onSummaryImageChange(res.imagePath, validTime);
+            setCurrentTime(validTime);
+            if (res.duration && res.duration > 0) {
+              setDuration(res.duration);
+              if (onMetadataExtracted) {
+                onMetadataExtracted({ duration: res.duration });
+              }
+            }
+          } else {
+            onErrorModal(t('error_title'), t('error_save_summary_failed'));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to generate FFmpeg thumbnail:', err);
+        onErrorModal(t('error_title'), t('error_save_summary_failed'));
+      } finally {
+        setIsProcessingFFmpeg(false);
+      }
+    };
+
+    const handleSeekToStart = () => {
+      if (isProcessingFFmpeg) return;
+      generateThumbnailAtTime(0);
+    };
+
+    const handleSeekToEnd = async () => {
+      if (isProcessingFFmpeg) return;
+
+      let validDuration = duration;
+      // If duration is not yet resolved, dynamically extract it first
+      if ((!validDuration || validDuration <= 0) && filePath && window.api?.extractMetadata) {
+        try {
+          const meta = await window.api.extractMetadata(filePath);
+          if (meta?.duration && meta.duration > 0) {
+            validDuration = meta.duration;
+            setDuration(meta.duration);
+            if (onMetadataExtracted) {
+              onMetadataExtracted({ duration: meta.duration });
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to extract metadata in handleSeekToEnd:', e);
+        }
+      }
+
+      if (!validDuration || validDuration <= 0) return;
+
+      const fps = frameRate > 0 ? frameRate : 30;
+      // Prevent EOF demuxer errors by seeking slightly before container end (safe margin)
+      const safetyOffset = Math.max(1 / fps, 0.3);
+      const endTarget = Math.max(0, validDuration - safetyOffset);
+      generateThumbnailAtTime(endTarget);
+    };
+
+    const handleSeekRelative = (seconds: number) => {
+      if (isProcessingFFmpeg) return;
+      generateThumbnailAtTime(currentTime + seconds);
+    };
+
+    const handleStepFrameUnsupported = (frames: number) => {
+      if (isProcessingFFmpeg) return;
+      const fps = frameRate > 0 ? frameRate : 30;
+      generateThumbnailAtTime(currentTime + frames / fps);
+    };
+
+    const unsupportedSeekButtons = [
+      { label: t('form_seek_start'), action: handleSeekToStart, title: t('form_seek_start_tooltip') },
+      { label: '<10m', action: () => handleSeekRelative(-600), title: t('form_seek_back_10m_tooltip') },
+      { label: '<1m', action: () => handleSeekRelative(-60), title: t('form_seek_back_1m_tooltip') },
+      { label: '<10s', action: () => handleSeekRelative(-10), title: t('form_seek_back_10s_tooltip') },
+      { label: '<1s', action: () => handleSeekRelative(-1), title: t('form_seek_back_1s_tooltip') },
+      { label: '<1f', action: () => handleStepFrameUnsupported(-1), title: t('form_seek_back_1f_tooltip') },
+      { label: '1f>', action: () => handleStepFrameUnsupported(1), title: t('form_seek_forward_1f_tooltip') },
+      { label: '1s>', action: () => handleSeekRelative(1), title: t('form_seek_forward_1s_tooltip') },
+      { label: '10s>', action: () => handleSeekRelative(10), title: t('form_seek_forward_10s_tooltip') },
+      { label: '1m>', action: () => handleSeekRelative(60), title: t('form_seek_forward_1m_tooltip') },
+      { label: '10m>', action: () => handleSeekRelative(600), title: t('form_seek_forward_10m_tooltip') },
+      { label: t('form_seek_end'), action: handleSeekToEnd, title: t('form_seek_end_tooltip') },
+    ];
 
     return (
       <div className="space-y-2">
@@ -289,9 +446,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           {!isPlayingVideo ? (
             <button
               type="button"
-              disabled={isUnsupportedPlayback}
               onClick={async () => {
-                if (isUnsupportedPlayback) return;
                 if (filePath && window.api?.checkFileExists) {
                   const exists = await window.api.checkFileExists(filePath);
                   if (!exists) {
@@ -299,12 +454,33 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                     return;
                   }
                 }
+                if (isUnsupportedPlayback && (!duration || duration <= 0) && filePath && window.api?.extractMetadata) {
+                  try {
+                    const meta = await window.api.extractMetadata(filePath);
+                    if (meta?.duration && meta.duration > 0) {
+                      setDuration(meta.duration);
+                      if (onMetadataExtracted) {
+                        onMetadataExtracted({ duration: meta.duration });
+                      }
+                    }
+                    if (meta?.frame_rate && meta.frame_rate > 0) {
+                      setFrameRate(meta.frame_rate);
+                      if (onMetadataExtracted) {
+                        onMetadataExtracted({ frame_rate: meta.frame_rate });
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Failed to extract metadata on open player:', e);
+                  }
+                }
+                if (currentTime === 0 && capturedTime) {
+                  setCurrentTime(capturedTime);
+                } else if (currentTime === 0 && duration > 0) {
+                  setCurrentTime(duration * 0.5);
+                }
                 setIsPlayingVideo(true);
               }}
-              className={clsx(
-                'w-full h-full relative flex items-center justify-center group focus:outline-none',
-                isUnsupportedPlayback ? 'cursor-not-allowed' : 'cursor-pointer'
-              )}
+              className="w-full h-full relative flex items-center justify-center group focus:outline-none cursor-pointer"
             >
               {isAutoGeneratingSummary ? (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900/90 text-slate-300 gap-3">
@@ -327,9 +503,9 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
               {!isAutoGeneratingSummary && (
                 <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                   {isUnsupportedPlayback ? (
-                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-slate-900/90 text-slate-300 border border-slate-700/80 font-medium text-xs shadow-lg backdrop-blur-sm">
-                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                      <span>{t('form_manual_capture_disabled')}</span>
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm">
+                      <Camera className="w-5 h-5" />
+                      <span>{t('form_capture_unsupported_btn')}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm">
@@ -340,6 +516,89 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                 </div>
               )}
             </button>
+          ) : isUnsupportedPlayback ? (
+            /* Unsupported Video: Static Image Preview + FFmpeg Frame Controls */
+            <div className="w-full h-full flex flex-col relative bg-black select-none">
+              <div className="relative w-full h-full flex items-center justify-center bg-slate-950 overflow-hidden">
+                {imageSrc ? (
+                  <img
+                    src={imageSrc}
+                    alt="Frame Preview"
+                    className="w-full h-full object-contain pointer-events-none"
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                    <Film className="w-12 h-12 mb-2 opacity-50" />
+                    <span className="text-sm">{t('form_generating_thumbnail')}</span>
+                  </div>
+                )}
+
+                {/* Processing Overlay to prevent user action and show progress */}
+                {isProcessingFFmpeg && (
+                  <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs flex flex-col items-center justify-center text-slate-200 gap-2.5 z-10 animate-fade-in">
+                    <div className="w-9 h-9 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs font-medium text-slate-200 bg-slate-900/90 px-3.5 py-1.5 rounded-full border border-slate-700/80 shadow-lg">
+                      {t('form_capturing_unsupported_notice')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Unsupported Player Controls Bar */}
+              <div className="absolute bottom-0 inset-x-0 z-20 p-2.5 bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-transparent flex flex-col gap-1.5 backdrop-blur-xs">
+                {/* Progress Bar (non-seekable, indicator only) */}
+                <div className="flex items-center gap-2.5 text-xs text-slate-200">
+                  <span className="font-mono text-[11px] text-slate-300 shrink-0 min-w-[36px]">
+                    {formatTime(currentTime)}
+                  </span>
+                  <div className="w-full h-1.5 bg-slate-800/80 rounded-lg overflow-hidden relative">
+                    <div
+                      className="h-full bg-blue-500 rounded-lg transition-all duration-150"
+                      style={{
+                        width: `${duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-300 shrink-0 min-w-[36px] text-right">
+                    {formatTime(duration)}
+                  </span>
+                </div>
+
+                {/* Buttons & Actions */}
+                <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {unsupportedSeekButtons.map((btn) => (
+                      <button
+                        key={btn.label}
+                        type="button"
+                        disabled={isProcessingFFmpeg}
+                        onClick={btn.action}
+                        title={btn.title}
+                        className={clsx(
+                          'p-1.5 rounded-lg border transition-all flex items-center justify-center text-[11px] px-2 whitespace-nowrap font-medium',
+                          isProcessingFFmpeg
+                            ? 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
+                            : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/60 text-slate-200 cursor-pointer active:scale-95'
+                        )}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Close Action */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setIsPlayingVideo(false)}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white text-xs font-medium shadow-md transition-colors cursor-pointer"
+                    >
+                      {t('form_close_player')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="w-full h-full flex flex-col relative bg-black">
               {videoError ? (
@@ -444,7 +703,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                             onSummaryImageChange(res.imagePath, res.targetTime);
                             if (res.duration && !duration) setDuration(res.duration);
                           }
-                        }).catch(() => {});
+                        }).catch(() => { });
                       }
                     } else {
                       setVideoError(t('error_video_load_failed', { error: errorDetails, path: filePath || '' }));
@@ -456,8 +715,8 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
             </div>
           )}
 
-          {/* Player Controls Bar */}
-          {isPlayingVideo && !videoError && (
+          {/* Video Player Controls Bar (Only for supported video formats) */}
+          {isPlayingVideo && !isUnsupportedPlayback && !videoError && (
             <div className="absolute bottom-0 inset-x-0 z-20 p-2.5 bg-gradient-to-t from-slate-950/80 via-slate-950/40 to-transparent flex flex-col gap-1.5 backdrop-blur-xs">
               {/* Seek Bar Slider */}
               <div className="flex items-center gap-2.5 text-xs text-slate-200">

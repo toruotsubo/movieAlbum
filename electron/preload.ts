@@ -67,6 +67,7 @@ export const api = {
     targetTime?: number | null
   ): Promise<{ imagePath: string; duration: number | null; targetTime: number } | null> =>
     ipcRenderer.invoke('app:generateThumbnail', { filePath, targetTime }),
+  cleanThumbnails: (): Promise<{ deletedCount: number }> => ipcRenderer.invoke('app:cleanThumbnails'),
   resetData: (): Promise<AppSettings> => ipcRenderer.invoke('app:resetData'),
 };
 

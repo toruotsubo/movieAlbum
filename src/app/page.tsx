@@ -5,7 +5,7 @@ import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
 import { formatMediaUrl, getKeyFieldLabel } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Film, Star, Edit, Tag, X } from 'lucide-react';
+import { ArrowUpDown, Film, Star, Edit, Tag, X, Search } from 'lucide-react';
 import { clsx } from 'clsx';
 import { KeyItemGroup } from '@/lib/types';
 
@@ -16,6 +16,7 @@ export default function KeyItemsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [ratingFilter, setRatingFilter] = useState<string | number>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [isTextListModalOpen, setIsTextListModalOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -30,6 +31,7 @@ export default function KeyItemsPage() {
           if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
           if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
           if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+          if (savedState.searchQuery !== undefined) setSearchQuery(savedState.searchQuery);
         }
       }
     } catch (e) {
@@ -47,12 +49,13 @@ export default function KeyItemsPage() {
         sortOrder,
         ratingFilter,
         tagFilter,
+        searchQuery,
       };
       sessionStorage.setItem('movie_manager_key_items_page_state', JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Failed to save filter state to sessionStorage:', e);
     }
-  }, [sortOrder, ratingFilter, tagFilter, isInitialized, databaseState.activeId]);
+  }, [sortOrder, ratingFilter, tagFilter, searchQuery, isInitialized, databaseState.activeId]);
 
   const keyFieldId = settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre';
   const keyLabel = getKeyFieldLabel(keyFieldId, settings, t);
@@ -64,6 +67,7 @@ export default function KeyItemsPage() {
       prevKeyFieldRef.current = keyFieldId;
       setTagFilter('all');
       setRatingFilter('all');
+      setSearchQuery('');
     }
   }, [keyFieldId]);
 
@@ -73,6 +77,7 @@ export default function KeyItemsPage() {
     if (prevActiveDbRef.current && databaseState.activeId && prevActiveDbRef.current !== databaseState.activeId) {
       setTagFilter('all');
       setRatingFilter('all');
+      setSearchQuery('');
       try {
         sessionStorage.removeItem('movie_manager_key_items_page_state');
       } catch (e) {}
@@ -124,6 +129,15 @@ export default function KeyItemsPage() {
       if (!g.tags) return false;
       const groupTags = g.tags.split(',').map((t) => t.trim());
       if (!groupTags.includes(tagFilter)) return false;
+    }
+    if (searchQuery.trim()) {
+      const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      const matchTargets = [...Object.values(g.key_values)];
+      if (g.sort_key) matchTargets.push(g.sort_key);
+      const targetText = matchTargets.join(' ').toLowerCase();
+      if (!terms.every((term) => targetText.includes(term))) {
+        return false;
+      }
     }
     return true;
   });
@@ -213,6 +227,28 @@ export default function KeyItemsPage() {
                 <ArrowUpDown className="w-3 h-3 text-blue-400" />
               </button>
             </div>
+
+            {/* Search Form */}
+            <div className="relative flex items-center">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('movies_list_search_placeholder')}
+                className="pl-8 pr-7 py-2 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all w-40 sm:w-56 hover:border-slate-700"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 text-slate-400 hover:text-slate-200 p-0.5 rounded transition-colors"
+                  title={t('movies_list_search_clear')}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Text List Button */}
@@ -232,7 +268,7 @@ export default function KeyItemsPage() {
             </div>
             <h3 className="text-lg font-semibold text-slate-200 tracking-tight">{t('key_list_empty')}</h3>
             <p className="text-sm text-slate-400 max-w-md mx-auto">
-              {tagFilter !== 'all' || ratingFilter !== 'all'
+              {tagFilter !== 'all' || ratingFilter !== 'all' || searchQuery.trim() !== ''
                 ? t('movies_list_empty_filter_desc')
                 : t('key_list_empty_desc')}
             </p>

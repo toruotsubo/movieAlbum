@@ -23,6 +23,7 @@ import {
   switchDatabase,
   createDatabase,
   deleteDatabase,
+  cleanOrphanThumbnails,
 } from './db';
 import { extractVideoMetadata } from './metadataParser';
 import { getFFmpegPath } from './ffmpegPath';
@@ -248,7 +249,7 @@ export async function generateThumbnailWithFFmpeg(
     targetTime = duration && duration > 0 ? duration * 0.5 : 0;
   }
 
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const userDataPath = app.getPath('userData');
     const thumbDir = path.join(userDataPath, 'thumbnails');
     if (!fs.existsSync(thumbDir)) {
@@ -257,28 +258,73 @@ export async function generateThumbnailWithFFmpeg(
 
     const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
     const fullPath = path.join(thumbDir, filename);
-    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : '0';
 
-    execFile(
-      getFFmpegPath(),
-      [
+    const execFFmpeg = (args: string[]): Promise<boolean> => {
+      return new Promise((res) => {
+        execFile(getFFmpegPath(), args, { timeout: 15000 }, (err) => {
+          if (!err && fs.existsSync(fullPath)) {
+            res(true);
+          } else {
+            res(false);
+          }
+        });
+      });
+    };
+
+    // Primary attempt: fast seek before input + accurate seek after input
+    const ffmpegArgs: string[] = ['-y'];
+    if (targetTime <= 3) {
+      ffmpegArgs.push('-ss', Math.max(0, targetTime).toFixed(3), '-i', filePath);
+    } else {
+      const fastSeek = (targetTime - 3).toFixed(3);
+      ffmpegArgs.push('-ss', fastSeek, '-i', filePath, '-ss', '3.000');
+    }
+
+    ffmpegArgs.push(
+      '-vframes', '1',
+      '-vf', 'scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2',
+      fullPath
+    );
+
+    const success = await execFFmpeg(ffmpegArgs);
+    if (success) {
+      resolve({ imagePath: fullPath, duration, targetTime });
+      return;
+    }
+
+    // Fallback 1: Direct seek before input with targetTime
+    const fallbackDirectArgs: string[] = [
+      '-y',
+      '-ss', Math.max(0, targetTime).toFixed(3),
+      '-i', filePath,
+      '-vframes', '1',
+      '-vf', 'scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2',
+      fullPath
+    ];
+    if (await execFFmpeg(fallbackDirectArgs)) {
+      resolve({ imagePath: fullPath, duration, targetTime });
+      return;
+    }
+
+    // Fallback 2: Near end-of-file seek (step back 0.5s or 1.0s to avoid EOF demuxer error)
+    if (targetTime > 0.5) {
+      const fallbackEarlier = Math.max(0, targetTime - 0.8);
+      const fallbackEarlierArgs: string[] = [
         '-y',
-        '-ss', seekArg,
+        '-ss', fallbackEarlier.toFixed(3),
         '-i', filePath,
         '-vframes', '1',
         '-vf', 'scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2',
-        fullPath,
-      ],
-      { timeout: 15000 },
-      (err) => {
-        if (!err && fs.existsSync(fullPath)) {
-          resolve({ imagePath: fullPath, duration, targetTime });
-        } else {
-          console.error('FFmpeg thumbnail generation error:', err);
-          resolve(null);
-        }
+        fullPath
+      ];
+      if (await execFFmpeg(fallbackEarlierArgs)) {
+        resolve({ imagePath: fullPath, duration, targetTime: fallbackEarlier });
+        return;
       }
-    );
+    }
+
+    console.error('FFmpeg thumbnail generation failed after fallbacks for:', filePath, 'at targetTime:', targetTime);
+    resolve(null);
   });
 }
 
@@ -288,6 +334,13 @@ app.whenReady().then(() => {
   registerMediaProtocol();
   initDatabase();
   createWindow();
+
+  // Run orphan thumbnail cleanup in background shortly after startup
+  setTimeout(() => {
+    cleanOrphanThumbnails().catch((err) => {
+      console.error('Failed to clean orphan thumbnails:', err);
+    });
+  }, 3000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -382,4 +435,9 @@ ipcMain.handle('app:saveSummaryImage', async (_, base64Data: string) => {
 // Generate thumbnail via FFmpeg IPC handler
 ipcMain.handle('app:generateThumbnail', async (_, { filePath, targetTime }: { filePath: string; targetTime?: number | null }) => {
   return generateThumbnailWithFFmpeg(filePath, targetTime);
+});
+
+// Clean orphan thumbnails IPC handler
+ipcMain.handle('app:cleanThumbnails', async () => {
+  return cleanOrphanThumbnails();
 });

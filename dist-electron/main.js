@@ -663,6 +663,65 @@ function resetAllData() {
   saveDatabase();
   return jsonDb.settings;
 }
+async function cleanOrphanThumbnails() {
+  const thumbDir = import_path.default.join(import_electron.app.getPath("userData"), "thumbnails");
+  if (!import_fs.default.existsSync(thumbDir)) {
+    return { deletedCount: 0 };
+  }
+  const dbDir = getDbDir();
+  const usedFilenames = /* @__PURE__ */ new Set();
+  try {
+    const dbFiles = import_fs.default.readdirSync(dbDir).filter((file) => file.endsWith(".json") && file !== "databases.json");
+    for (const file of dbFiles) {
+      const fullPath = import_path.default.join(dbDir, file);
+      try {
+        const raw = import_fs.default.readFileSync(fullPath, "utf-8");
+        const dbContent = JSON.parse(raw);
+        if (dbContent && Array.isArray(dbContent.movies)) {
+          for (const m of dbContent.movies) {
+            if (m.summary_image_path) {
+              const basename = import_path.default.basename(m.summary_image_path).toLowerCase();
+              usedFilenames.add(basename);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[cleanOrphanThumbnails] Could not read db file ${file}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error("[cleanOrphanThumbnails] Failed to read db directory:", err);
+    return { deletedCount: 0 };
+  }
+  let deletedCount = 0;
+  const ONE_HOUR_MS = 60 * 60 * 1e3;
+  const now = Date.now();
+  try {
+    const files = import_fs.default.readdirSync(thumbDir);
+    for (const filename of files) {
+      if (filename.startsWith(".")) continue;
+      const lowerName = filename.toLowerCase();
+      if (!/\.(png|jpe?g|webp|bmp)$/i.test(lowerName)) continue;
+      if (usedFilenames.has(lowerName)) continue;
+      const fullThumbPath = import_path.default.join(thumbDir, filename);
+      try {
+        const stat = import_fs.default.statSync(fullThumbPath);
+        if (now - stat.mtimeMs > ONE_HOUR_MS) {
+          import_fs.default.unlinkSync(fullThumbPath);
+          deletedCount++;
+        }
+      } catch (statErr) {
+        console.warn(`[cleanOrphanThumbnails] Failed to inspect/delete ${filename}:`, statErr);
+      }
+    }
+  } catch (err) {
+    console.error("[cleanOrphanThumbnails] Failed to read thumbnails directory:", err);
+  }
+  if (deletedCount > 0) {
+    console.log(`[cleanOrphanThumbnails] Cleaned up ${deletedCount} orphan thumbnail image(s).`);
+  }
+  return { deletedCount };
+}
 
 // electron/metadataParser.ts
 var import_fs3 = __toESM(require("fs"));
@@ -1314,7 +1373,7 @@ async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
   if (targetTime === void 0 || targetTime === null || isNaN(targetTime)) {
     targetTime = duration && duration > 0 ? duration * 0.5 : 0;
   }
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const userDataPath = import_electron3.app.getPath("userData");
     const thumbDir = import_path4.default.join(userDataPath, "thumbnails");
     if (!import_fs4.default.existsSync(thumbDir)) {
@@ -1322,13 +1381,58 @@ async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
     }
     const filename = `thumb_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
     const fullPath = import_path4.default.join(thumbDir, filename);
-    const seekArg = targetTime > 0 ? targetTime.toFixed(2) : "0";
-    (0, import_child_process2.execFile)(
-      getFFmpegPath(),
-      [
+    const execFFmpeg = (args) => {
+      return new Promise((res) => {
+        (0, import_child_process2.execFile)(getFFmpegPath(), args, { timeout: 15e3 }, (err) => {
+          if (!err && import_fs4.default.existsSync(fullPath)) {
+            res(true);
+          } else {
+            res(false);
+          }
+        });
+      });
+    };
+    const ffmpegArgs = ["-y"];
+    if (targetTime <= 3) {
+      ffmpegArgs.push("-ss", Math.max(0, targetTime).toFixed(3), "-i", filePath);
+    } else {
+      const fastSeek = (targetTime - 3).toFixed(3);
+      ffmpegArgs.push("-ss", fastSeek, "-i", filePath, "-ss", "3.000");
+    }
+    ffmpegArgs.push(
+      "-vframes",
+      "1",
+      "-vf",
+      "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
+      fullPath
+    );
+    const success = await execFFmpeg(ffmpegArgs);
+    if (success) {
+      resolve({ imagePath: fullPath, duration, targetTime });
+      return;
+    }
+    const fallbackDirectArgs = [
+      "-y",
+      "-ss",
+      Math.max(0, targetTime).toFixed(3),
+      "-i",
+      filePath,
+      "-vframes",
+      "1",
+      "-vf",
+      "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
+      fullPath
+    ];
+    if (await execFFmpeg(fallbackDirectArgs)) {
+      resolve({ imagePath: fullPath, duration, targetTime });
+      return;
+    }
+    if (targetTime > 0.5) {
+      const fallbackEarlier = Math.max(0, targetTime - 0.8);
+      const fallbackEarlierArgs = [
         "-y",
         "-ss",
-        seekArg,
+        fallbackEarlier.toFixed(3),
         "-i",
         filePath,
         "-vframes",
@@ -1336,17 +1440,14 @@ async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
         "-vf",
         "scale=720:405:force_original_aspect_ratio=decrease,pad=720:405:(ow-iw)/2:(oh-ih)/2",
         fullPath
-      ],
-      { timeout: 15e3 },
-      (err) => {
-        if (!err && import_fs4.default.existsSync(fullPath)) {
-          resolve({ imagePath: fullPath, duration, targetTime });
-        } else {
-          console.error("FFmpeg thumbnail generation error:", err);
-          resolve(null);
-        }
+      ];
+      if (await execFFmpeg(fallbackEarlierArgs)) {
+        resolve({ imagePath: fullPath, duration, targetTime: fallbackEarlier });
+        return;
       }
-    );
+    }
+    console.error("FFmpeg thumbnail generation failed after fallbacks for:", filePath, "at targetTime:", targetTime);
+    resolve(null);
   });
 }
 import_electron3.app.whenReady().then(() => {
@@ -1355,6 +1456,11 @@ import_electron3.app.whenReady().then(() => {
   registerMediaProtocol();
   initDatabase();
   createWindow();
+  setTimeout(() => {
+    cleanOrphanThumbnails().catch((err) => {
+      console.error("Failed to clean orphan thumbnails:", err);
+    });
+  }, 3e3);
   import_electron3.app.on("activate", () => {
     if (import_electron3.BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -1432,6 +1538,9 @@ import_electron3.ipcMain.handle("app:saveSummaryImage", async (_, base64Data) =>
 });
 import_electron3.ipcMain.handle("app:generateThumbnail", async (_, { filePath, targetTime }) => {
   return generateThumbnailWithFFmpeg(filePath, targetTime);
+});
+import_electron3.ipcMain.handle("app:cleanThumbnails", async () => {
+  return cleanOrphanThumbnails();
 });
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
