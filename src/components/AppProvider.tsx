@@ -347,7 +347,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       <DragDropWrapper onFileDrop={handleFileDrop}>
         <TitleBar />
         <Navbar onOpenSettings={() => setIsSettingsOpen(true)} />
-        <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+        <main className="px-6 py-8">{children}</main>
 
         <InitialSetupModal
           isOpen={isSettingsOpen}
