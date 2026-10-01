@@ -7,6 +7,7 @@ import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
 import { ConfirmModal } from './ConfirmModal';
+import { APP_VERSION } from '../lib/version';
 
 interface InitialSetupModalProps {
   isOpen: boolean;
@@ -235,13 +236,14 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
       <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-slate-700/60 pb-4">
-          <div className="p-3 rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
-            <Settings className="w-6 h-6" />
-          </div>
-          <div>
+        <div className="flex items-center justify-between border-b border-slate-700/60 pb-4">
+          <div className="flex items-center gap-2.5">
+            <Settings className="w-6 h-6 text-blue-400" />
             <h2 className="text-xl font-bold text-white">{t('settings_title')}</h2>
           </div>
+          <span className="text-xs font-mono text-slate-400 select-none">
+            v{APP_VERSION}
+          </span>
         </div>
 
         {/* Database File Section (Always at the top) */}
