@@ -9,7 +9,7 @@ export interface AppSettings {
   custom_field_3_display_in_list?: boolean;
   key_fields: string[]; // JSON array stored in DB
   field_order?: string[]; // Order of metadata fields
-  language?: 'auto' | 'ja' | 'en' | null; // Language setting
+  language?: 'auto' | 'ja' | 'en' | 'zh-CN' | 'zh-TW' | null; // Language setting
   database_name?: string;
 }
 

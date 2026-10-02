@@ -63,14 +63,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Detect OS Language
   useEffect(() => {
     if (typeof window !== 'undefined' && window.navigator) {
-      const navLang = window.navigator.language || '';
-      setDetectedLang(navLang.toLowerCase().startsWith('ja') ? 'ja' : 'en');
+      const navLang = (window.navigator.language || '').toLowerCase();
+      if (navLang.startsWith('ja')) {
+        setDetectedLang('ja');
+      } else if (navLang.startsWith('zh-tw') || navLang.startsWith('zh-hk') || navLang.startsWith('zh-mo') || navLang.includes('hant')) {
+        setDetectedLang('zh-TW');
+      } else if (navLang.startsWith('zh')) {
+        setDetectedLang('zh-CN');
+      } else {
+        setDetectedLang('en');
+      }
     }
   }, []);
 
   const currentLang: Language = React.useMemo(() => {
     if (settings?.language === 'ja') return 'ja';
     if (settings?.language === 'en') return 'en';
+    if (settings?.language === 'zh-CN') return 'zh-CN';
+    if (settings?.language === 'zh-TW') return 'zh-TW';
     return detectedLang;
   }, [settings?.language, detectedLang]);
 
