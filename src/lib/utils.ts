@@ -197,25 +197,65 @@ export function isMatchingGroupMovie(
 }
 
 /**
- * Get all movies belonging to the same group as targetMovie
+ * Separate file name into base name (without extension) and extension
+ */
+export function splitFileName(filename: string): { base: string; ext: string } {
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex <= 0) {
+    return { base: filename, ext: '' };
+  }
+  return {
+    base: filename.slice(0, dotIndex),
+    ext: filename.slice(dotIndex),
+  };
+}
+
+/**
+ * Compare two file names by base name first (without extension), then by extension
+ */
+export function compareFileNames(fileA: string, fileB: string): number {
+  const { base: baseA, ext: extA } = splitFileName(fileA);
+  const { base: baseB, ext: extB } = splitFileName(fileB);
+
+  const baseCompare = baseA.localeCompare(baseB, 'ja', { numeric: true });
+  if (baseCompare !== 0) return baseCompare;
+
+  return extA.localeCompare(extB, 'ja', { numeric: true });
+}
+
+/**
+ * Sort movies by file_name (natural alphanumeric sort comparing base name first, with title/id fallback)
+ */
+export function sortMoviesByFileName(movies: Movie[]): Movie[] {
+  return [...movies].sort((a, b) => {
+    const fileA = a.file_name || a.title || '';
+    const fileB = b.file_name || b.title || '';
+    const fileCompare = compareFileNames(fileA, fileB);
+    if (fileCompare !== 0) return fileCompare;
+    return a.id - b.id;
+  });
+}
+
+/**
+ * Get all movies belonging to the same group as targetMovie, sorted by file_name
  */
 export function getGroupMatches(
   targetMovie: Movie,
   allMovies: Movie[],
   keyFields: string[]
 ): Movie[] {
-  const parentId = targetMovie.parent_movie_id || (targetMovie.is_grouped ? targetMovie.id : null);
-
   const matches = allMovies.filter((m) => {
-    // 1. Check parent-child relationships
-    if (parentId && (m.id === parentId || m.parent_movie_id === parentId)) {
+    if (m.id === targetMovie.id) return true;
+
+    // 後方互換: 既存の親子関係があれば同一グループと判定
+    if (targetMovie.parent_movie_id && (m.id === targetMovie.parent_movie_id || m.parent_movie_id === targetMovie.parent_movie_id)) {
       return true;
     }
     if (m.parent_movie_id === targetMovie.id || targetMovie.parent_movie_id === m.id) {
       return true;
     }
 
-    // 2. Check matching attributes if both have grouping enabled
+    // 属性マッチ（両者ともグループ化有効時）
     if (targetMovie.is_grouped && m.is_grouped) {
       return isMatchingGroupMovie(targetMovie, m, keyFields);
     }
@@ -223,7 +263,28 @@ export function getGroupMatches(
     return false;
   });
 
-  return Array.from(new Map(matches.map((m) => [m.id, m])).values());
+  const uniqueMatches = Array.from(new Map(matches.map((m) => [m.id, m])).values());
+  return sortMoviesByFileName(uniqueMatches);
+}
+
+/**
+ * Group all movies into groups (each group sorted by file_name)
+ */
+export function groupAllMovies(movies: Movie[], keyFields: string[]): Movie[][] {
+  const visited = new Set<number>();
+  const groups: Movie[][] = [];
+
+  for (const movie of movies) {
+    if (visited.has(movie.id)) continue;
+
+    const group = getGroupMatches(movie, movies, keyFields);
+    for (const m of group) {
+      visited.add(m.id);
+    }
+    groups.push(group);
+  }
+
+  return groups;
 }
 
 /**
@@ -244,6 +305,37 @@ export function findInitialCastKana(
     }
   }
   return '';
+}
+
+const SLIDER_POS_KEY = 'movie_album_slider_positions';
+
+/**
+ * Get saved slider index for a movie group
+ */
+export function getSavedSliderIndex(groupId: number): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const raw = sessionStorage.getItem(SLIDER_POS_KEY);
+    if (!raw) return 0;
+    const map = JSON.parse(raw);
+    const val = map[groupId];
+    return typeof val === 'number' && !isNaN(val) ? val : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Save slider index for a movie group
+ */
+export function saveSliderIndex(groupId: number, index: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = sessionStorage.getItem(SLIDER_POS_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[groupId] = index;
+    sessionStorage.setItem(SLIDER_POS_KEY, JSON.stringify(map));
+  } catch {}
 }
 
 

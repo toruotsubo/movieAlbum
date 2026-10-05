@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
-import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2 } from 'lucide-react';
+import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -453,39 +453,35 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         </div>
 
         {/* Section 3: Language Selection */}
-        <div className="space-y-4">
+        <div className="space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
             {t('settings_section3')}
           </h3>
 
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { id: 'auto', label: t('settings_lang_auto') },
-              { id: 'ja', label: t('settings_lang_ja') },
-              { id: 'en', label: t('settings_lang_en') },
-            ].map((langOpt) => {
-              const isSelected = selectedLanguage === langOpt.id;
-              return (
-                <button
-                  key={langOpt.id}
-                  type="button"
-                  onClick={() => setSelectedLanguage(langOpt.id as LanguageSetting)}
-                  className={clsx(
-                    'flex items-center gap-2.5 px-4 py-3 rounded-xl border text-sm font-medium transition-all text-left',
-                    isSelected
-                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
-                      : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                  )}
-                >
-                  {isSelected ? (
-                    <Radio className="w-4 h-4 text-blue-400 shrink-0" />
-                  ) : (
-                    <Circle className="w-4 h-4 text-slate-600 shrink-0" />
-                  )}
-                  <span className="truncate">{langOpt.label}</span>
-                </button>
-              );
-            })}
+          <div className="relative max-w-xs">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+              <Globe className="w-4 h-4" />
+            </div>
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value as LanguageSetting)}
+              className="w-full appearance-none bg-slate-900/80 border border-slate-700/70 hover:border-slate-600 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
+            >
+              {[
+                { id: 'auto', label: t('settings_lang_auto') },
+                { id: 'ja', label: t('settings_lang_ja') },
+                { id: 'en', label: t('settings_lang_en') },
+                { id: 'zh-CN', label: t('settings_lang_zh_CN') },
+                { id: 'zh-TW', label: t('settings_lang_zh_TW') },
+              ].map((langOpt) => (
+                <option key={langOpt.id} value={langOpt.id} className="bg-slate-900 text-white">
+                  {langOpt.label}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+              <ChevronDown className="w-4 h-4" />
+            </div>
           </div>
         </div>
 

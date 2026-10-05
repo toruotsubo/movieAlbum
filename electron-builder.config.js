@@ -32,6 +32,8 @@ module.exports = {
     languages: [
       'ja-JP',
       'en-US',
+      'zh-CN',
+      'zh-TW',
     ],
   },
 };
