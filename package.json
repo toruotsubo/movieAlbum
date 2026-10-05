@@ -1,6 +1,6 @@
 {
   "name": "movie-album",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "movieAlbum Desktop App",
   "author": "Web Studio Tokotan",
   "main": "dist-electron/main.js",
