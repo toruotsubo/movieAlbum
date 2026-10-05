@@ -107,6 +107,8 @@ export const TRANSLATIONS = {
     movies_list_rating_gte3: '★3以上',
     movies_list_search_placeholder: '検索...',
     movies_list_search_clear: '検索クリア',
+    slider_prev: '前の動画',
+    slider_next: '次の動画',
 
     // Movie Detail Page
     detail_movie_not_found: '動画が見つかりませんでした',
@@ -305,6 +307,8 @@ export const TRANSLATIONS = {
     movies_list_rating_gte3: '★3 and above',
     movies_list_search_placeholder: 'Search...',
     movies_list_search_clear: 'Clear search',
+    slider_prev: 'Previous video',
+    slider_next: 'Next video',
 
     // Movie Detail Page
     detail_movie_not_found: 'Video not found',
@@ -490,6 +494,8 @@ export const TRANSLATIONS = {
     movies_list_rating_gte3: '★3以上',
     movies_list_search_placeholder: '搜索...',
     movies_list_search_clear: '清除搜索',
+    slider_prev: '上一个视频',
+    slider_next: '下一个视频',
     detail_movie_not_found: '未找到视频',
     detail_back_to_list: '返回视频列表',
     detail_no_summary_img: '无摘要图片',
@@ -664,6 +670,8 @@ export const TRANSLATIONS = {
     movies_list_rating_gte3: '★3以上',
     movies_list_search_placeholder: '搜尋...',
     movies_list_search_clear: '清除搜尋',
+    slider_prev: '上一個影片',
+    slider_next: '下一個影片',
     detail_movie_not_found: '找不到影片',
     detail_back_to_list: '返回影片清單',
     detail_no_summary_img: '無摘要圖片',
