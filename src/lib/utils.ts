@@ -197,13 +197,40 @@ export function isMatchingGroupMovie(
 }
 
 /**
- * Sort movies by file_name (natural alphanumeric sort with title/id fallback)
+ * Separate file name into base name (without extension) and extension
+ */
+export function splitFileName(filename: string): { base: string; ext: string } {
+  const dotIndex = filename.lastIndexOf('.');
+  if (dotIndex <= 0) {
+    return { base: filename, ext: '' };
+  }
+  return {
+    base: filename.slice(0, dotIndex),
+    ext: filename.slice(dotIndex),
+  };
+}
+
+/**
+ * Compare two file names by base name first (without extension), then by extension
+ */
+export function compareFileNames(fileA: string, fileB: string): number {
+  const { base: baseA, ext: extA } = splitFileName(fileA);
+  const { base: baseB, ext: extB } = splitFileName(fileB);
+
+  const baseCompare = baseA.localeCompare(baseB, 'ja', { numeric: true });
+  if (baseCompare !== 0) return baseCompare;
+
+  return extA.localeCompare(extB, 'ja', { numeric: true });
+}
+
+/**
+ * Sort movies by file_name (natural alphanumeric sort comparing base name first, with title/id fallback)
  */
 export function sortMoviesByFileName(movies: Movie[]): Movie[] {
   return [...movies].sort((a, b) => {
     const fileA = a.file_name || a.title || '';
     const fileB = b.file_name || b.title || '';
-    const fileCompare = fileA.localeCompare(fileB, 'ja', { numeric: true });
+    const fileCompare = compareFileNames(fileA, fileB);
     if (fileCompare !== 0) return fileCompare;
     return a.id - b.id;
   });

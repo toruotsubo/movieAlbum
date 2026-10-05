@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, getSplitValues, formatReleaseDate, getKeyFieldLabel, groupAllMovies } from '@/lib/utils';
+import { formatMediaUrl, getSplitValues, formatReleaseDate, getKeyFieldLabel, groupAllMovies, compareFileNames } from '@/lib/utils';
 import { MovieCardSlider } from '@/components/MovieCardSlider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
@@ -236,7 +236,7 @@ function MoviesContent() {
       const b = groupB[0];
       let result = 0;
       if (sortKey === 'title') {
-        result = (a.title || a.file_name || '').localeCompare(b.title || b.file_name || '');
+        result = compareFileNames(a.title || a.file_name || '', b.title || b.file_name || '');
       } else if (sortKey === 'genre') {
         result = (a.genre || '').localeCompare(b.genre || '');
       } else if (sortKey === 'key_field') {
