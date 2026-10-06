@@ -17,7 +17,6 @@ import {
   Tag,
   ChevronLeft,
   ChevronRight,
-  Layers,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -123,10 +122,9 @@ export function MovieCardSlider({
 
           {/* Group Count Badge */}
           <div
-            className="pointer-events-auto absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/50 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 flex items-center gap-1.5 select-none shadow-md"
+            className="pointer-events-auto absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/50 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 flex items-center select-none shadow-md"
             title={t('movies_list_group_badge', { count: totalCount })}
           >
-            <Layers className="w-3.5 h-3.5" />
             <span>
               {safeIndex + 1} / {totalCount}
             </span>

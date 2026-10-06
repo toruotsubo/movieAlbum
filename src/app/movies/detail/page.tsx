@@ -18,7 +18,6 @@ import {
   MessageSquare,
   FileText,
   Tags,
-  Layers,
   Clock,
   Monitor,
   Gauge,
@@ -216,10 +215,9 @@ function MovieDetailContent() {
 
                 {/* Group Count Badge */}
                 <div
-                  className="pointer-events-auto absolute top-3 right-3 px-3 py-1 rounded-full bg-slate-950/50 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 flex items-center gap-1.5 select-none shadow-md"
+                  className="pointer-events-auto absolute top-3 right-3 px-3 py-1 rounded-full bg-slate-950/50 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 flex items-center select-none shadow-md"
                   title={t('movies_list_group_badge', { count: totalCount })}
                 >
-                  <Layers className="w-3.5 h-3.5" />
                   <span>
                     {safeIndex + 1} / {totalCount}
                   </span>
