@@ -55,7 +55,9 @@ var api = {
   saveSummaryImage: (base64Data) => import_electron.ipcRenderer.invoke("app:saveSummaryImage", base64Data),
   generateThumbnail: (filePath, targetTime) => import_electron.ipcRenderer.invoke("app:generateThumbnail", { filePath, targetTime }),
   cleanThumbnails: () => import_electron.ipcRenderer.invoke("app:cleanThumbnails"),
-  resetData: () => import_electron.ipcRenderer.invoke("app:resetData")
+  resetData: () => import_electron.ipcRenderer.invoke("app:resetData"),
+  openExternal: (url) => import_electron.ipcRenderer.invoke("app:openExternal", url),
+  getFFmpegLicense: () => import_electron.ipcRenderer.invoke("app:getFFmpegLicense")
 };
 import_electron.contextBridge.exposeInMainWorld("api", api);
 // Annotate the CommonJS export names for ESM import in node:
