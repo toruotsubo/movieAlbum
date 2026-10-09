@@ -18,8 +18,16 @@ module.exports = {
   ],
   extraFiles: [
     {
+      from: 'LICENSE',
+      to: 'LICENSE.txt',
+    },
+    {
       from: 'licenses/LICENSE-FFMPEG.txt',
       to: 'LICENSE-FFMPEG.txt',
+    },
+    {
+      from: 'licenses/THIRD_PARTY_LICENSES.txt',
+      to: 'THIRD_PARTY_LICENSES.txt',
     },
   ],
   icon: 'build/icon.png',

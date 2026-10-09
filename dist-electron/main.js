@@ -1575,6 +1575,24 @@ import_electron3.ipcMain.handle("app:getFFmpegLicense", async () => {
     return "GNU General Public License v3.0\n\nPlease refer to https://www.gnu.org/licenses/gpl-3.0.html";
   }
 });
+import_electron3.ipcMain.handle("app:getThirdPartyLicenses", async () => {
+  try {
+    const candidatePaths = [
+      import_path4.default.join(process.resourcesPath, "../THIRD_PARTY_LICENSES.txt"),
+      import_path4.default.join(__dirname, "../licenses/THIRD_PARTY_LICENSES.txt"),
+      import_path4.default.join(process.cwd(), "licenses/THIRD_PARTY_LICENSES.txt")
+    ];
+    for (const p of candidatePaths) {
+      if (import_fs4.default.existsSync(p)) {
+        return import_fs4.default.readFileSync(p, "utf-8");
+      }
+    }
+    return "Third-Party Licenses file not found.";
+  } catch (err) {
+    console.error("Failed to read Third-Party licenses:", err);
+    return "Failed to load Third-Party licenses.";
+  }
+});
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   generateThumbnailWithFFmpeg

@@ -480,3 +480,25 @@ ipcMain.handle('app:getFFmpegLicense', async () => {
   }
 });
 
+// Read Third-Party licenses text
+ipcMain.handle('app:getThirdPartyLicenses', async () => {
+  try {
+    const candidatePaths = [
+      path.join(process.resourcesPath, '../THIRD_PARTY_LICENSES.txt'),
+      path.join(__dirname, '../licenses/THIRD_PARTY_LICENSES.txt'),
+      path.join(process.cwd(), 'licenses/THIRD_PARTY_LICENSES.txt'),
+    ];
+
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        return fs.readFileSync(p, 'utf-8');
+      }
+    }
+    return 'Third-Party Licenses file not found.';
+  } catch (err) {
+    console.error('Failed to read Third-Party licenses:', err);
+    return 'Failed to load Third-Party licenses.';
+  }
+});
+
+

@@ -79,6 +79,12 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [isLicenseCopied, setIsLicenseCopied] = useState(false);
   const [isLoadingLicense, setIsLoadingLicense] = useState(false);
 
+  // Third-party licenses state
+  const [showThirdPartyLicenses, setShowThirdPartyLicenses] = useState(false);
+  const [thirdPartyLicensesText, setThirdPartyLicensesText] = useState<string>('');
+  const [isThirdPartyCopied, setIsThirdPartyCopied] = useState(false);
+  const [isLoadingThirdParty, setIsLoadingThirdParty] = useState(false);
+
   const handleOpenExternal = (url: string) => {
     if (window.api?.openExternal) {
       window.api.openExternal(url);
@@ -115,6 +121,37 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       navigator.clipboard.writeText(licenseText);
       setIsLicenseCopied(true);
       setTimeout(() => setIsLicenseCopied(false), 2000);
+    }
+  };
+
+  const handleToggleThirdParty = async () => {
+    if (!showThirdPartyLicenses) {
+      if (!thirdPartyLicensesText) {
+        setIsLoadingThirdParty(true);
+        try {
+          if (window.api?.getThirdPartyLicenses) {
+            const txt = await window.api.getThirdPartyLicenses();
+            setThirdPartyLicensesText(txt);
+          } else {
+            setThirdPartyLicensesText('Third-Party Licenses: Electron, Next.js, React, Tailwind CSS, Lucide React (MIT/Apache-2.0)');
+          }
+        } catch (err) {
+          console.error('Failed to load third party licenses:', err);
+        } finally {
+          setIsLoadingThirdParty(false);
+        }
+      }
+      setShowThirdPartyLicenses(true);
+    } else {
+      setShowThirdPartyLicenses(false);
+    }
+  };
+
+  const handleCopyThirdParty = () => {
+    if (thirdPartyLicensesText) {
+      navigator.clipboard.writeText(thirdPartyLicensesText);
+      setIsThirdPartyCopied(true);
+      setTimeout(() => setIsThirdPartyCopied(false), 2000);
     }
   };
 
@@ -548,6 +585,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                   {t('settings_ffmpeg_source_desc')}
                 </p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  {t('settings_ffmpeg_source_request')}
+                </p>
               </div>
             </div>
 
@@ -607,6 +647,61 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 ) : (
                   <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
                     {licenseText}
+                  </pre>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Third-Party OSS Box */}
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="font-semibold text-white text-sm">{t('settings_third_party_title')}</span>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  {t('settings_third_party_desc')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <button
+                type="button"
+                onClick={handleToggleThirdParty}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-400" />
+                <span>{showThirdPartyLicenses ? t('settings_third_party_hide_license') : t('settings_third_party_view_license')}</span>
+              </button>
+            </div>
+
+            {showThirdPartyLicenses && (
+              <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono">Third-Party Licenses</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyThirdParty}
+                    className="flex items-center gap-1 text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    {isThirdPartyCopied ? (
+                      <>
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">{t('settings_ffmpeg_copied')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>{t('settings_ffmpeg_copy')}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {isLoadingThirdParty ? (
+                  <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
+                ) : (
+                  <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
+                    {thirdPartyLicensesText}
                   </pre>
                 )}
               </div>
