@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
-import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Scale } from 'lucide-react';
+import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -282,10 +282,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-700/60 pb-4">
-          <div className="flex items-center gap-2.5">
-            <Settings className="w-6 h-6 text-blue-400" />
-            <h2 className="text-xl font-bold text-white">{t('settings_title')}</h2>
-          </div>
+          <h2 className="text-xl font-bold text-white">{t('settings_title')}</h2>
           <span className="text-xs font-mono text-slate-400 select-none">
             v{APP_VERSION}
           </span>
@@ -532,9 +529,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
         {/* Section 4: Open Source Licenses */}
         <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400 flex items-center gap-2">
-            <Scale className="w-4 h-4 text-blue-400" />
-            <span>{t('settings_section4')}</span>
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
+            {t('settings_section4')}
           </h3>
 
           <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
@@ -542,7 +538,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-white text-sm">{t('settings_ffmpeg_title')}</span>
-                  <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <span className="text-xs font-medium text-blue-400">
                     {t('settings_ffmpeg_license_badge')}
                   </span>
                 </div>
@@ -578,7 +574,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 onClick={handleToggleLicense}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
               >
-                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <FileText className="w-3.5 h-3.5 text-blue-400" />
                 <span>{showLicenseText ? t('settings_ffmpeg_hide_license') : t('settings_ffmpeg_view_license')}</span>
               </button>
             </div>
