@@ -71,7 +71,7 @@ export function formatReleaseDate(year?: number | null, dateStr?: string | null,
     if (match) {
       const month = match[1].padStart(2, '0');
       const day = match[2].padStart(2, '0');
-      datePart = isEn ? `${month}/${day}` : `${month}月${day}日`;
+      datePart = isEn ? `${month}-${day}` : `${month}月${day}日`;
     } else {
       datePart = trimmed;
     }
