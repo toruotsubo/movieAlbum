@@ -1542,6 +1542,39 @@ import_electron3.ipcMain.handle("app:generateThumbnail", async (_, { filePath, t
 import_electron3.ipcMain.handle("app:cleanThumbnails", async () => {
   return cleanOrphanThumbnails();
 });
+import_electron3.ipcMain.handle("app:openExternal", async (_, targetUrl) => {
+  try {
+    if (targetUrl && (targetUrl.startsWith("https://") || targetUrl.startsWith("http://"))) {
+      await import_electron3.shell.openExternal(targetUrl);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error("Failed to open external URL:", err);
+    return false;
+  }
+});
+import_electron3.ipcMain.handle("app:getFFmpegLicense", async () => {
+  try {
+    const candidatePaths = [
+      import_path4.default.join(process.resourcesPath, "../LICENSE-FFMPEG.txt"),
+      import_path4.default.join(process.resourcesPath, "app.asar.unpacked", "node_modules", "ffmpeg-static", "ffmpeg.exe.LICENSE"),
+      import_path4.default.join(__dirname, "../licenses/LICENSE-FFMPEG.txt"),
+      import_path4.default.join(__dirname, "../node_modules/ffmpeg-static/ffmpeg.exe.LICENSE"),
+      import_path4.default.join(process.cwd(), "licenses/LICENSE-FFMPEG.txt"),
+      import_path4.default.join(process.cwd(), "node_modules/ffmpeg-static/ffmpeg.exe.LICENSE")
+    ];
+    for (const p of candidatePaths) {
+      if (import_fs4.default.existsSync(p)) {
+        return import_fs4.default.readFileSync(p, "utf-8");
+      }
+    }
+    return "GNU General Public License v3.0\n\nPlease refer to https://www.gnu.org/licenses/gpl-3.0.html for full license details.";
+  } catch (err) {
+    console.error("Failed to read FFmpeg license:", err);
+    return "GNU General Public License v3.0\n\nPlease refer to https://www.gnu.org/licenses/gpl-3.0.html";
+  }
+});
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   generateThumbnailWithFFmpeg

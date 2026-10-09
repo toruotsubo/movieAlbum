@@ -16,6 +16,12 @@ module.exports = {
   asarUnpack: [
     '**/node_modules/ffmpeg-static/**/*',
   ],
+  extraFiles: [
+    {
+      from: 'licenses/LICENSE-FFMPEG.txt',
+      to: 'LICENSE-FFMPEG.txt',
+    },
+  ],
   icon: 'build/icon.png',
   win: {
     icon: 'build/icon.ico',

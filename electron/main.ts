@@ -441,3 +441,42 @@ ipcMain.handle('app:generateThumbnail', async (_, { filePath, targetTime }: { fi
 ipcMain.handle('app:cleanThumbnails', async () => {
   return cleanOrphanThumbnails();
 });
+
+// Open external URL in default browser
+ipcMain.handle('app:openExternal', async (_, targetUrl: string) => {
+  try {
+    if (targetUrl && (targetUrl.startsWith('https://') || targetUrl.startsWith('http://'))) {
+      await shell.openExternal(targetUrl);
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error('Failed to open external URL:', err);
+    return false;
+  }
+});
+
+// Read FFmpeg license text
+ipcMain.handle('app:getFFmpegLicense', async () => {
+  try {
+    const candidatePaths = [
+      path.join(process.resourcesPath, '../LICENSE-FFMPEG.txt'),
+      path.join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'ffmpeg-static', 'ffmpeg.exe.LICENSE'),
+      path.join(__dirname, '../licenses/LICENSE-FFMPEG.txt'),
+      path.join(__dirname, '../node_modules/ffmpeg-static/ffmpeg.exe.LICENSE'),
+      path.join(process.cwd(), 'licenses/LICENSE-FFMPEG.txt'),
+      path.join(process.cwd(), 'node_modules/ffmpeg-static/ffmpeg.exe.LICENSE'),
+    ];
+
+    for (const p of candidatePaths) {
+      if (fs.existsSync(p)) {
+        return fs.readFileSync(p, 'utf-8');
+      }
+    }
+    return 'GNU General Public License v3.0\n\nPlease refer to https://www.gnu.org/licenses/gpl-3.0.html for full license details.';
+  } catch (err) {
+    console.error('Failed to read FFmpeg license:', err);
+    return 'GNU General Public License v3.0\n\nPlease refer to https://www.gnu.org/licenses/gpl-3.0.html';
+  }
+});
+
