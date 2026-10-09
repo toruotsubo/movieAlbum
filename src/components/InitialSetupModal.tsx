@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
-import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown } from 'lucide-react';
+import { Settings, Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Scale } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -72,6 +72,51 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [canDragIndex, setCanDragIndex] = useState<number | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDeleteDbConfirm, setShowDeleteDbConfirm] = useState(false);
+
+  // License state
+  const [showLicenseText, setShowLicenseText] = useState(false);
+  const [licenseText, setLicenseText] = useState<string>('');
+  const [isLicenseCopied, setIsLicenseCopied] = useState(false);
+  const [isLoadingLicense, setIsLoadingLicense] = useState(false);
+
+  const handleOpenExternal = (url: string) => {
+    if (window.api?.openExternal) {
+      window.api.openExternal(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleToggleLicense = async () => {
+    if (!showLicenseText) {
+      if (!licenseText) {
+        setIsLoadingLicense(true);
+        try {
+          if (window.api?.getFFmpegLicense) {
+            const txt = await window.api.getFFmpegLicense();
+            setLicenseText(txt);
+          } else {
+            setLicenseText('GNU General Public License v3.0\nhttps://www.gnu.org/licenses/gpl-3.0.html');
+          }
+        } catch (err) {
+          console.error('Failed to load license text:', err);
+        } finally {
+          setIsLoadingLicense(false);
+        }
+      }
+      setShowLicenseText(true);
+    } else {
+      setShowLicenseText(false);
+    }
+  };
+
+  const handleCopyLicense = () => {
+    if (licenseText) {
+      navigator.clipboard.writeText(licenseText);
+      setIsLicenseCopied(true);
+      setTimeout(() => setIsLicenseCopied(false), 2000);
+    }
+  };
 
   const isLoadedRef = React.useRef(false);
   const loadedDbIdRef = React.useRef<string | null>(null);
@@ -482,6 +527,94 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
               <ChevronDown className="w-4 h-4" />
             </div>
+          </div>
+        </div>
+
+        {/* Section 4: Open Source Licenses */}
+        <div className="space-y-3 pt-2">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400 flex items-center gap-2">
+            <Scale className="w-4 h-4 text-blue-400" />
+            <span>{t('settings_section4')}</span>
+          </h3>
+
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-white text-sm">{t('settings_ffmpeg_title')}</span>
+                  <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                    {t('settings_ffmpeg_license_badge')}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  {t('settings_ffmpeg_desc')}
+                </p>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  {t('settings_ffmpeg_source_desc')}
+                </p>
+              </div>
+            </div>
+
+            {/* External Links */}
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <button
+                type="button"
+                onClick={() => handleOpenExternal('https://ffmpeg.org')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                <span>{t('settings_ffmpeg_official_site')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenExternal('https://www.gyan.dev/ffmpeg/builds/')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                <span>{t('settings_ffmpeg_build_site')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleLicense}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{showLicenseText ? t('settings_ffmpeg_hide_license') : t('settings_ffmpeg_view_license')}</span>
+              </button>
+            </div>
+
+            {/* License Text Area */}
+            {showLicenseText && (
+              <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono">GNU General Public License v3.0</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyLicense}
+                    className="flex items-center gap-1 text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    {isLicenseCopied ? (
+                      <>
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">{t('settings_ffmpeg_copied')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>{t('settings_ffmpeg_copy')}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {isLoadingLicense ? (
+                  <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
+                ) : (
+                  <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
+                    {licenseText}
+                  </pre>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -69,6 +69,8 @@ export const api = {
     ipcRenderer.invoke('app:generateThumbnail', { filePath, targetTime }),
   cleanThumbnails: (): Promise<{ deletedCount: number }> => ipcRenderer.invoke('app:cleanThumbnails'),
   resetData: (): Promise<AppSettings> => ipcRenderer.invoke('app:resetData'),
+  openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('app:openExternal', url),
+  getFFmpegLicense: (): Promise<string> => ipcRenderer.invoke('app:getFFmpegLicense'),
 };
 
 contextBridge.exposeInMainWorld('api', api);
