@@ -62,9 +62,16 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
     }
   };
 
-  const getKeyFieldsLabel = () => {
+  const getGroupingDesc = () => {
     const keyFields = settings?.key_fields || ['genre'];
-    return keyFields.map((kf) => getKeyFieldLabel(kf, settings, t)).join(' / ');
+    const baseGroupFields = new Set(['title', 'genre', 'release_year', 'release_date']);
+    const extraKeyFields = keyFields.filter((kf) => !baseGroupFields.has(kf));
+
+    if (extraKeyFields.length === 0) {
+      return t('form_grouping_desc_base');
+    }
+    const keyFieldsLabel = extraKeyFields.map((kf) => getKeyFieldLabel(kf, settings, t)).join(' / ');
+    return t('form_grouping_desc', { keyFields: keyFieldsLabel });
   };
 
   const order = settings?.field_order || DEFAULT_FIELD_ORDER;
@@ -228,7 +235,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
         <div className="space-y-0.5">
           <span className="text-sm font-semibold text-slate-200 block">{t('form_grouping_label')}</span>
           <span className="text-xs text-slate-400 block">
-            {t('form_grouping_desc', { keyFields: getKeyFieldsLabel() })}
+            {getGroupingDesc()}
           </span>
         </div>
         <button
