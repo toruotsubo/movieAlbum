@@ -57,7 +57,8 @@ var api = {
   cleanThumbnails: () => import_electron.ipcRenderer.invoke("app:cleanThumbnails"),
   resetData: () => import_electron.ipcRenderer.invoke("app:resetData"),
   openExternal: (url) => import_electron.ipcRenderer.invoke("app:openExternal", url),
-  getFFmpegLicense: () => import_electron.ipcRenderer.invoke("app:getFFmpegLicense")
+  getFFmpegLicense: () => import_electron.ipcRenderer.invoke("app:getFFmpegLicense"),
+  getThirdPartyLicenses: () => import_electron.ipcRenderer.invoke("app:getThirdPartyLicenses")
 };
 import_electron.contextBridge.exposeInMainWorld("api", api);
 // Annotate the CommonJS export names for ESM import in node:

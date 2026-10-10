@@ -142,7 +142,8 @@ movieManager/
 
 ## 📝 更新履歴
 ### v1.2.2 (2026-10-10)
-- FFmpegのライセンス表示を追加。
+- 動画詳細画面のレイアウトを調整。
+- FFmpeg等のサードパーティソフトウェアのライセンス表示を追加。
 
 ### v1.2.1 (2026-10-09)
 - 軽微なテキスト修正。
@@ -167,5 +168,16 @@ movieManager/
 
 ## 📄 ライセンス
 
-[MIT License](LICENSE)
+### 本アプリケーション本体
+本アプリケーションのソースコードは [MIT License](LICENSE) のもとで公開・配布されています。
+
+### 同梱ソフトウェア (FFmpeg)
+本アプリケーションは、動画のサムネイル生成およびメタデータ解析のために [FFmpeg](https://ffmpeg.org/)（[gyan.dev ビルド](https://www.gyan.dev/ffmpeg/builds/)）を同梱・利用しています。
+- ライセンス: [GNU General Public License v3.0 (GPLv3)](licenses/LICENSE-FFMPEG.txt)
+- FFmpeg はフリーソフトウェアです。ソースコードおよびビルド情報は上記公式サイトより入手可能です。
+- 同梱バイナリに対応するソースコードの提供を希望される場合は、本リポジトリの Issue または開発者までお問い合わせください。
+
+### サードパーティライブラリ
+本アプリケーションが使用しているサードパーティ製オープンソースライブラリ（Electron, Next.js, React, Tailwind CSS, Lucide React等）の著作権表示および許諾条件については、[THIRD_PARTY_LICENSES.txt](licenses/THIRD_PARTY_LICENSES.txt) をご参照ください。
+
 

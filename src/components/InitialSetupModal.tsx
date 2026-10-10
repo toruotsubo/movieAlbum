@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
-import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight } from 'lucide-react';
+import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Settings, Scale } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -54,6 +54,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [custom3DisplayInList, setCustom3DisplayInList] = useState(true);
   const [selectedKeyField, setSelectedKeyField] = useState<string>('genre');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageSetting>('auto');
+  const [activeTab, setActiveTab] = useState<'settings' | 'licenses'>('settings');
 
   // 'title' と 'rating' 以外の項目の並び順ID配列
   const [reorderableFieldIds, setReorderableFieldIds] = useState<string[]>([
@@ -78,6 +79,12 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [licenseText, setLicenseText] = useState<string>('');
   const [isLicenseCopied, setIsLicenseCopied] = useState(false);
   const [isLoadingLicense, setIsLoadingLicense] = useState(false);
+
+  // Third-party licenses state
+  const [showThirdPartyLicenses, setShowThirdPartyLicenses] = useState(false);
+  const [thirdPartyLicensesText, setThirdPartyLicensesText] = useState<string>('');
+  const [isThirdPartyCopied, setIsThirdPartyCopied] = useState(false);
+  const [isLoadingThirdParty, setIsLoadingThirdParty] = useState(false);
 
   const handleOpenExternal = (url: string) => {
     if (window.api?.openExternal) {
@@ -118,12 +125,44 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   };
 
+  const handleToggleThirdParty = async () => {
+    if (!showThirdPartyLicenses) {
+      if (!thirdPartyLicensesText) {
+        setIsLoadingThirdParty(true);
+        try {
+          if (window.api?.getThirdPartyLicenses) {
+            const txt = await window.api.getThirdPartyLicenses();
+            setThirdPartyLicensesText(txt);
+          } else {
+            setThirdPartyLicensesText('Third-Party Licenses: Electron, Next.js, React, Tailwind CSS, Lucide React (MIT/Apache-2.0)');
+          }
+        } catch (err) {
+          console.error('Failed to load third party licenses:', err);
+        } finally {
+          setIsLoadingThirdParty(false);
+        }
+      }
+      setShowThirdPartyLicenses(true);
+    } else {
+      setShowThirdPartyLicenses(false);
+    }
+  };
+
+  const handleCopyThirdParty = () => {
+    if (thirdPartyLicensesText) {
+      navigator.clipboard.writeText(thirdPartyLicensesText);
+      setIsThirdPartyCopied(true);
+      setTimeout(() => setIsThirdPartyCopied(false), 2000);
+    }
+  };
+
   const isLoadedRef = React.useRef(false);
   const loadedDbIdRef = React.useRef<string | null>(null);
 
   // Sync settings when modal opens or current DB switches
   useEffect(() => {
     if (!isOpen) {
+      setActiveTab('settings');
       isLoadedRef.current = false;
       loadedDbIdRef.current = null;
       return;
@@ -280,15 +319,44 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
       <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-700/60 pb-4">
-          <h2 className="text-xl font-bold text-white">{t('settings_title')}</h2>
-          <span className="text-xs font-mono text-slate-400 select-none">
+        {/* Tab Navigation & Version */}
+        <div className="flex items-center justify-between border-b border-slate-700/60">
+          <div className="flex items-center gap-2 -mb-px">
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={clsx(
+                'px-4 py-2.5 text-sm font-medium border-b-2 transition-all flex items-center gap-2 cursor-pointer',
+                activeTab === 'settings'
+                  ? 'border-blue-500 text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              )}
+            >
+              <Settings className="w-4 h-4" />
+              <span>{t('settings_tab_settings')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('licenses')}
+              className={clsx(
+                'px-4 py-2.5 text-sm font-medium border-b-2 transition-all flex items-center gap-2 cursor-pointer',
+                activeTab === 'licenses'
+                  ? 'border-blue-500 text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              )}
+            >
+              <Scale className="w-4 h-4" />
+              <span>{t('settings_tab_licenses')}</span>
+            </button>
+          </div>
+          <span className="text-xs font-mono text-slate-400 select-none pr-2">
             v{APP_VERSION}
           </span>
         </div>
 
-        {/* Database File Section (Always at the top) */}
+        {activeTab === 'settings' ? (
+          <>
+            {/* Database File Section (Always at the top) */}
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase tracking-wider text-blue-400 block">
             {t('settings_db_name')}
@@ -526,14 +594,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Section 4: Open Source Licenses */}
-        <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
-            {t('settings_section4')}
-          </h3>
-
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
+      </>
+    ) : (
+      /* Section: Open Source Licenses */
+      <div className="space-y-4">
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -547,6 +612,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 </p>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
                   {t('settings_ffmpeg_source_desc')}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                  {t('settings_ffmpeg_source_request')}
                 </p>
               </div>
             </div>
@@ -612,42 +680,102 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               </div>
             )}
           </div>
+
+          {/* Third-Party OSS Box */}
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="font-semibold text-white text-sm">{t('settings_third_party_title')}</span>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  {t('settings_third_party_desc')}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap pt-1">
+              <button
+                type="button"
+                onClick={handleToggleThirdParty}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-400" />
+                <span>{showThirdPartyLicenses ? t('settings_third_party_hide_license') : t('settings_third_party_view_license')}</span>
+              </button>
+            </div>
+
+            {showThirdPartyLicenses && (
+              <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span className="font-mono">Third-Party Licenses</span>
+                  <button
+                    type="button"
+                    onClick={handleCopyThirdParty}
+                    className="flex items-center gap-1 text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    {isThirdPartyCopied ? (
+                      <>
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">{t('settings_ffmpeg_copied')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>{t('settings_ffmpeg_copy')}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {isLoadingThirdParty ? (
+                  <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
+                ) : (
+                  <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
+                    {thirdPartyLicensesText}
+                  </pre>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+      )}
 
         {/* Footer actions */}
         <div className="pt-4 border-t border-slate-700/60 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {!hasMultipleDbs ? (
-              <button
-                type="button"
-                onClick={handleResetData}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
-                title={t('settings_reset_data_tooltip')}
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>{t('resetData')}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowDeleteDbConfirm(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
-                title={t('settings_delete_db')}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>{t('settings_delete_db')}</span>
-              </button>
-            )}
+            {activeTab === 'settings' && (
+              <>
+                {!hasMultipleDbs ? (
+                  <button
+                    type="button"
+                    onClick={handleResetData}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    title={t('settings_reset_data_tooltip')}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>{t('resetData')}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteDbConfirm(true)}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    title={t('settings_delete_db')}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>{t('settings_delete_db')}</span>
+                  </button>
+                )}
 
-            <button
-              type="button"
-              onClick={handleAddDatabase}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
-              title={t('settings_add_db')}
-            >
-              <Plus className="w-4 h-4" />
-              <span>{t('settings_add_db')}</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={handleAddDatabase}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
+                  title={t('settings_add_db')}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t('settings_add_db')}</span>
+                </button>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -657,7 +785,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 onClick={onClose}
                 className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
               >
-                {t('cancel')}
+                {activeTab === 'licenses' ? t('close') : t('cancel')}
               </button>
             )}
             <button

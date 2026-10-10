@@ -71,6 +71,7 @@ export const api = {
   resetData: (): Promise<AppSettings> => ipcRenderer.invoke('app:resetData'),
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('app:openExternal', url),
   getFFmpegLicense: (): Promise<string> => ipcRenderer.invoke('app:getFFmpegLicense'),
+  getThirdPartyLicenses: (): Promise<string> => ipcRenderer.invoke('app:getThirdPartyLicenses'),
 };
 
 contextBridge.exposeInMainWorld('api', api);
