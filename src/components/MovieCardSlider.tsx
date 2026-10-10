@@ -19,6 +19,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { SlideItem } from './SlideItem';
 
 interface MovieCardSliderProps {
   movies: Movie[]; // グループの全動画（初期表示の代表動画がインデックス0）
@@ -155,25 +156,41 @@ export function MovieCardSlider({
       )}
 
       {/* Slides Track Viewport */}
-      <div className="w-full overflow-hidden flex-1 flex flex-col">
+      <div
+        className="w-full overflow-hidden flex-1 flex flex-col"
+        onScroll={(e) => {
+          e.currentTarget.scrollLeft = 0;
+        }}
+      >
         <div
           className="flex w-full h-full transition-transform duration-300 ease-out"
           style={{ transform: `translateX(-${safeIndex * 100}%)` }}
         >
-          {movies.map((movie) => {
+          {movies.map((movie, index) => {
             const imageSrc = formatMediaUrl(movie.summary_image_path);
             const displayTags = movie.tags ? getSplitValues(movie.tags) : [];
+            const isCurrent = index === safeIndex;
 
             return (
-              <div
+              <SlideItem
                 key={movie.id}
+                isCurrent={isCurrent}
                 className="w-full shrink-0 flex flex-col justify-between"
               >
                 {/* Summary Image (720x405 Aspect Ratio) */}
                 <div
+                  role="button"
+                  tabIndex={isCurrent ? 0 : -1}
                   onClick={() => openMoviePlayer(movie.file_path)}
-                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      openMoviePlayer(movie.file_path);
+                    }
+                  }}
+                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
                   title={t('movies_list_play_tooltip')}
+                  aria-label={t('movies_list_play_tooltip')}
                 >
                   {imageSrc ? (
                     <img
@@ -182,7 +199,7 @@ export function MovieCardSlider({
                       draggable={false}
                       loading="lazy"
                       decoding="async"
-                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300 pointer-events-none"
+                      className="w-full h-full object-cover group-hover/img:scale-105 group-focus-visible/img:scale-105 transition-transform duration-300 pointer-events-none"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
@@ -192,8 +209,8 @@ export function MovieCardSlider({
                   )}
 
                   {/* Play Button Overlay */}
-                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="p-3 rounded-full bg-blue-600/90 text-white shadow-lg backdrop-blur-sm transform group-hover/img:scale-110 transition-transform">
+                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover/img:opacity-100 group-focus-visible/img:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="p-3 rounded-full bg-blue-600/90 text-white shadow-lg backdrop-blur-sm transform group-hover/img:scale-110 group-focus-visible/img:scale-110 transition-transform">
                       <Play className="w-6 h-6 fill-current" />
                     </div>
                   </div>
@@ -421,7 +438,7 @@ export function MovieCardSlider({
                     </div>
                   </div>
                 </div>
-              </div>
+              </SlideItem>
             );
           })}
         </div>

@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowUpDown, Film, Star, Edit, Tag, X, Search } from 'lucide-react';
 import { clsx } from 'clsx';
 import { KeyItemGroup } from '@/lib/types';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 
 export default function KeyItemsPage() {
   const { keyGroups, settings, updateKeyItemRating, openEditKeyItemModal, loading, t, databaseState } = useApp();
@@ -19,6 +20,8 @@ export default function KeyItemsPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isTextListModalOpen, setIsTextListModalOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  const textListModalRef = useFocusTrap<HTMLDivElement>(isTextListModalOpen);
 
   // Restore filter/sort state from sessionStorage on mount
   useEffect(() => {
@@ -287,15 +290,23 @@ export default function KeyItemsPage() {
               >
                 {/* Summary Image (720x405 Aspect Ratio) */}
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleRowClick(group)}
-                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleRowClick(group);
+                    }
+                  }}
+                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
                 >
                   {imageSrc ? (
                     <img
                       src={imageSrc}
                       alt="Group Summary"
                       draggable={false}
-                      className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-300 pointer-events-none"
+                      className="w-full h-full object-cover group-hover/img:scale-105 group-focus-visible/img:scale-105 transition-transform duration-300 pointer-events-none"
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/80 gap-1.5 select-none">
@@ -385,7 +396,7 @@ export default function KeyItemsPage() {
       {/* Text List Modal */}
       {isTextListModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl">
+          <div ref={textListModalRef} className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
               <h3 className="text-base font-semibold text-slate-100 select-none">{t('key_list_text_display')}</h3>
