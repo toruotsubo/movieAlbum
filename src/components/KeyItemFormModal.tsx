@@ -6,6 +6,7 @@ import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
 import { getKeyFieldLabel } from '@/lib/utils';
 import { X, Save } from 'lucide-react';
+import { useFocusTrap } from '@/lib/useFocusTrap';
 
 interface KeyItemFormModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
   onClose,
 }) => {
   const { settings, showKana, t } = useApp();
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen && !!group);
   const [castKana, setCastKana] = useState('');
   const [tags, setTags] = useState('');
   const [rating, setRating] = useState<number>(3);
@@ -70,7 +72,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="glass-card w-full max-w-lg rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+      <div ref={modalRef} className="glass-card w-full max-w-lg rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/60">
           <div>

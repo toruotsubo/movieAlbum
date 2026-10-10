@@ -8,6 +8,7 @@ import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
 import { ConfirmModal } from './ConfirmModal';
 import { APP_VERSION } from '../lib/version';
+import { useFocusTrap } from '../lib/useFocusTrap';
 
 interface InitialSetupModalProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   onClose,
 }) => {
   const { t } = useApp();
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   const [databaseName, setDatabaseName] = useState('設定ファイル_00');
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
@@ -318,7 +320,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
+      <div ref={modalRef} className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Tab Navigation & Version */}
         <div className="flex items-center justify-between border-b border-slate-700/60">
           <div className="flex items-center gap-2 -mb-px">

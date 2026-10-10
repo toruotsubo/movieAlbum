@@ -480,7 +480,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                 }
                 setIsPlayingVideo(true);
               }}
-              className="w-full h-full relative flex items-center justify-center group focus:outline-none cursor-pointer"
+              className="w-full h-full relative flex items-center justify-center group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset cursor-pointer"
             >
               {isAutoGeneratingSummary ? (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900/90 text-slate-300 gap-3">
@@ -491,7 +491,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                 <img
                   src={imageSrc}
                   alt="Summary Preview"
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 group-focus-visible:scale-105"
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500">
@@ -501,14 +501,14 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
               )}
 
               {!isAutoGeneratingSummary && (
-                <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity flex items-center justify-center p-4">
                   {isUnsupportedPlayback ? (
-                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm">
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm transform group-hover:scale-105 group-focus-visible:scale-105 transition-transform">
                       <Camera className="w-5 h-5" />
                       <span>{t('form_capture_unsupported_btn')}</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm">
+                    <div className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-blue-600/90 text-white font-medium shadow-lg backdrop-blur-sm transform group-hover:scale-105 group-focus-visible:scale-105 transition-transform">
                       <Play className="w-5 h-5 fill-current" />
                       <span>{t('form_play_capture_btn')}</span>
                     </div>

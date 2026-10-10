@@ -4,6 +4,7 @@ import React from 'react';
 import { AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 import clsx from 'clsx';
 import { useApp } from './AppProvider';
+import { useFocusTrap } from '../lib/useFocusTrap';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onClose,
 }) => {
   const { t } = useApp();
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   const effectiveCancelText = cancelText || t('cancel');
   if (!isOpen) return null;
 
@@ -65,7 +67,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div className="glass-card w-full max-w-md rounded-2xl border border-slate-700/60 shadow-2xl p-6 space-y-5 text-slate-100 relative select-none">
+      <div ref={modalRef} className="glass-card w-full max-w-md rounded-2xl border border-slate-700/60 shadow-2xl p-6 space-y-5 text-slate-100 relative select-none">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"

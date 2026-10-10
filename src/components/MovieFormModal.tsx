@@ -8,6 +8,7 @@ import { useApp } from './AppProvider';
 import { ConfirmModal } from './ConfirmModal';
 import { VideoThumbnailPlayer, VideoThumbnailPlayerHandle } from './movie-form/VideoThumbnailPlayer';
 import { MovieMetadataFields, MovieFormData } from './movie-form/MovieMetadataFields';
+import { useFocusTrap } from '../lib/useFocusTrap';
 
 interface MovieFormModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
 }) => {
   const { showKana, t } = useApp();
   const playerRef = useRef<VideoThumbnailPlayerHandle>(null);
+  const modalRef = useFocusTrap<HTMLDivElement>(isOpen && !!movie);
 
   // Form State
   const [formData, setFormData] = useState<MovieFormData>({
@@ -213,7 +215,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div className="glass-card w-full max-w-4xl rounded-2xl border border-slate-700/60 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div ref={modalRef} className="glass-card w-full max-w-4xl rounded-2xl border border-slate-700/60 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700/60 bg-slate-900/60">
           <h2 className="text-lg font-bold text-white">

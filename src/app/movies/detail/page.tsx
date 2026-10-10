@@ -26,6 +26,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { SlideItem } from '@/components/SlideItem';
 
 function MovieDetailContent() {
   const searchParams = useSearchParams();
@@ -174,7 +175,12 @@ function MovieDetailContent() {
 
       {/* Main Slider Card */}
       <div className="glass-card rounded-2xl p-6 border border-slate-800 relative select-none">
-        <div className="w-full overflow-hidden relative">
+        <div
+          className="w-full overflow-hidden relative"
+          onScroll={(e) => {
+            e.currentTarget.scrollLeft = 0;
+          }}
+        >
           {/* Controls Overlay (Aspect 16:9, matching the thumbnail hero card) */}
           {totalCount > 1 && (
             <div className="absolute top-0 left-0 right-0 pointer-events-none z-20 min-[1600px]:right-auto min-[1600px]:w-[calc(50%-1rem)]">
@@ -253,18 +259,32 @@ function MovieDetailContent() {
             className="flex w-full transition-transform duration-300 ease-out items-start"
             style={{ transform: `translateX(-${safeIndex * 100}%)` }}
           >
-            {groupMovies.map((item) => {
+            {groupMovies.map((item, index) => {
               const itemImageSrc = formatMediaUrl(item.summary_image_path);
+              const isCurrent = index === safeIndex;
 
               return (
-                <div key={item.id} className="w-full shrink-0 grid grid-cols-1 min-[1600px]:grid-cols-2 gap-6 min-[1600px]:gap-8 items-start">
+              <SlideItem
+                key={item.id}
+                isCurrent={isCurrent}
+                className="w-full shrink-0 grid grid-cols-1 min-[1600px]:grid-cols-2 gap-6 min-[1600px]:gap-8 items-start"
+              >
                   {/* Column 1: Video Hero, Technical Specs, File Path */}
                   <div className="space-y-6">
                     {/* Summary Image Hero Card (720px × 405px Aspect Ratio) */}
                     <div
+                      role="button"
+                      tabIndex={isCurrent ? 0 : -1}
                       onClick={() => openMoviePlayer(item.file_path)}
-                      className="relative aspect-video w-full max-w-[720px] mx-auto min-[1600px]:max-w-none rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group shadow-2xl select-none"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          openMoviePlayer(item.file_path);
+                        }
+                      }}
+                      className="relative aspect-video w-full max-w-[720px] mx-auto min-[1600px]:max-w-none rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group shadow-2xl select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
                       title={t('movies_list_play_tooltip')}
+                      aria-label={t('movies_list_play_tooltip')}
                     >
                       {itemImageSrc ? (
                         <img
@@ -273,7 +293,7 @@ function MovieDetailContent() {
                           draggable={false}
                           loading="lazy"
                           decoding="async"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
+                          className="w-full h-full object-cover group-hover:scale-105 group-focus-visible:scale-105 transition-transform duration-300 pointer-events-none"
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
@@ -283,8 +303,8 @@ function MovieDetailContent() {
                       )}
 
                       {/* Play Overlay */}
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center select-none">
-                        <div className="p-3 rounded-full bg-blue-600/90 text-white shadow-lg backdrop-blur-sm transform group-hover:scale-110 transition-transform">
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 transition-opacity flex items-center justify-center select-none">
+                        <div className="p-3 rounded-full bg-blue-600/90 text-white shadow-lg backdrop-blur-sm transform group-hover:scale-110 group-focus-visible:scale-110 transition-transform">
                           <Play className="w-6 h-6 fill-current" />
                         </div>
                       </div>
@@ -455,7 +475,7 @@ function MovieDetailContent() {
                       )}
                     </div>
                   </div>
-                </div>
+                </SlideItem>
               );
             })}
           </div>
