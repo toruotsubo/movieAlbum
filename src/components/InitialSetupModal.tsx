@@ -779,23 +779,35 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
-            {onClose && (
+            {activeTab === 'licenses' ? (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={onClose || (() => setActiveTab('settings'))}
                 className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
               >
-                {activeTab === 'licenses' ? t('close') : t('cancel')}
+                {t('close')}
               </button>
+            ) : (
+              <>
+                {onClose && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+                  >
+                    {t('cancel')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm shadow-lg shadow-blue-500/25 transition-all"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{t('saveSettings')}</span>
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              onClick={handleSave}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-medium text-sm shadow-lg shadow-blue-500/25 transition-all"
-            >
-              <Check className="w-4 h-4" />
-              <span>{t('saveSettings')}</span>
-            </button>
           </div>
         </div>
       </div>
