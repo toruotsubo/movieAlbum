@@ -142,7 +142,7 @@ function MovieDetailContent() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-4xl min-[1600px]:max-w-none mx-auto">
       {/* Back Button & Title Header */}
       <div className="flex items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div className="min-w-0 flex-1">
@@ -175,10 +175,10 @@ function MovieDetailContent() {
       {/* Main Slider Card */}
       <div className="glass-card rounded-2xl p-6 border border-slate-800 relative select-none">
         <div className="w-full overflow-hidden relative">
-          {/* Controls Overlay (Aspect 16:9, perfectly matching the 720px thumbnail hero card) */}
+          {/* Controls Overlay (Aspect 16:9, matching the thumbnail hero card) */}
           {totalCount > 1 && (
-            <div className="absolute top-0 left-0 right-0 pointer-events-none z-20">
-              <div className="relative aspect-video w-full max-w-[720px] mx-auto pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 pointer-events-none z-20 min-[1600px]:right-auto min-[1600px]:w-[calc(50%-1rem)]">
+              <div className="relative aspect-video w-full max-w-[720px] mx-auto min-[1600px]:max-w-none pointer-events-none">
                 {/* Previous Slide Button */}
                 <button
                   type="button"
@@ -257,196 +257,202 @@ function MovieDetailContent() {
               const itemImageSrc = formatMediaUrl(item.summary_image_path);
 
               return (
-                <div key={item.id} className="w-full shrink-0 space-y-6">
-                  {/* Summary Image Hero Card (720px × 405px Aspect Ratio) */}
-                  <div
-                    onClick={() => openMoviePlayer(item.file_path)}
-                    className="relative aspect-video w-full max-w-[720px] mx-auto rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group shadow-2xl select-none"
-                    title={t('movies_list_play_tooltip')}
-                  >
-                    {itemImageSrc ? (
-                      <img
-                        src={itemImageSrc}
-                        alt={item.title || 'Summary'}
-                        draggable={false}
-                        loading="lazy"
-                        decoding="async"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
-                        <Film className="w-12 h-12 mb-2 opacity-40" />
-                        <span className="text-sm">{t('detail_no_summary_img')}</span>
-                      </div>
-                    )}
+                <div key={item.id} className="w-full shrink-0 grid grid-cols-1 min-[1600px]:grid-cols-2 gap-6 min-[1600px]:gap-8 items-start">
+                  {/* Column 1: Video Hero, Technical Specs, File Path */}
+                  <div className="space-y-6">
+                    {/* Summary Image Hero Card (720px × 405px Aspect Ratio) */}
+                    <div
+                      onClick={() => openMoviePlayer(item.file_path)}
+                      className="relative aspect-video w-full max-w-[720px] mx-auto min-[1600px]:max-w-none rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 cursor-pointer group shadow-2xl select-none"
+                      title={t('movies_list_play_tooltip')}
+                    >
+                      {itemImageSrc ? (
+                        <img
+                          src={itemImageSrc}
+                          alt={item.title || 'Summary'}
+                          draggable={false}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 pointer-events-none"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
+                          <Film className="w-12 h-12 mb-2 opacity-40" />
+                          <span className="text-sm">{t('detail_no_summary_img')}</span>
+                        </div>
+                      )}
 
-                    {/* Play Overlay */}
-                    <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center select-none">
-                      <div className="p-3 rounded-full bg-blue-600/90 text-white shadow-lg backdrop-blur-sm transform group-hover:scale-110 transition-transform">
-                        <Play className="w-6 h-6 fill-current" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Technical Properties Bar (動画の長さ, 画面サイズ, フレームレート, ファイルサイズ) */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 shadow-inner select-none">
-                    <div className="flex items-center gap-2.5">
-                      <Clock className="w-4 h-4 text-slate-500 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-[11px] text-slate-400 block font-medium">{t('field_duration')}</span>
-                        <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
-                          {formatDuration(item.duration)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5">
-                      <Monitor className="w-4 h-4 text-slate-500 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-[11px] text-slate-400 block font-medium">{t('field_resolution')}</span>
-                        <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
-                          {formatResolution(item.width, item.height)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5">
-                      <Gauge className="w-4 h-4 text-slate-500 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-[11px] text-slate-400 block font-medium">{t('field_frame_rate')}</span>
-                        <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
-                          {formatFrameRate(item.frame_rate)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2.5">
-                      <HardDrive className="w-4 h-4 text-slate-500 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-[11px] text-slate-400 block font-medium">{t('field_file_size')}</span>
-                        <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
-                          {formatFileSize(item.file_size)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Rating Header */}
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800 select-none">
-                    <span className="text-sm font-semibold text-slate-200">{t('field_rating')}</span>
-                    <RatingStars
-                      rating={item.rating}
-                      onChange={(newRating) => updateMovieRating(item.id, newRating)}
-                      size="lg"
-                    />
-                  </div>
-
-                  {/* Metadata Details Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                    {(() => {
-                      const order = settings?.field_order || DEFAULT_FIELD_ORDER;
-                      let releaseDateRendered = false;
-
-                      return order.map((fieldId) => {
-                        if (fieldId === 'title' || fieldId === 'rating') return null;
-
-                        if (fieldId === 'genre') {
-                          return (
-                            <div key="genre" className="space-y-1">
-                              <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
-                                <Shapes className="w-3.5 h-3.5" /> {t('field_genre')}
-                              </span>
-                              <p className="text-sm font-medium text-slate-200">{item.genre || '-'}</p>
-                            </div>
-                          );
-                        }
-
-                        if (fieldId === 'cast') {
-                          return (
-                            <div key="cast" className="space-y-1">
-                              <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
-                                <User className="w-3.5 h-3.5" /> {t('field_cast')}
-                              </span>
-                              <p className="text-sm font-medium text-slate-200">
-                                {item.cast || '-'}
-                                {showKana && item.cast_kana ? (
-                                  <span className="text-xs text-slate-400 font-normal ml-2">({item.cast_kana})</span>
-                                ) : null}
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        if (fieldId === 'release_year' || fieldId === 'release_date') {
-                          if (releaseDateRendered) return null;
-                          releaseDateRendered = true;
-                          return (
-                            <div key="release" className="space-y-1">
-                              <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
-                                <Calendar className="w-3.5 h-3.5" /> {t('field_release_full')}
-                              </span>
-                              <p className="text-sm font-medium text-slate-200">
-                                {formatReleaseDate(item.release_year, item.release_date, language)}
-                              </p>
-                            </div>
-                          );
-                        }
-
-                        if (fieldId.startsWith('custom_field_')) {
-                          const num = fieldId.replace('custom_field_', '');
-                          const customName = (settings as any)?.[`custom_field_${num}_name`];
-                          if (!customName) return null;
-                          const val = (item as any)[fieldId];
-
-                          return (
-                            <div key={fieldId} className="space-y-1">
-                              <span className="text-xs text-slate-500 font-medium select-none">{customName}</span>
-                              <p className="text-sm font-medium text-slate-200">{val || '-'}</p>
-                            </div>
-                          );
-                        }
-
-                        return null;
-                      });
-                    })()}
-
-                    {/* Comment */}
-                    <div className="md:col-span-2 space-y-1">
-                      <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
-                        <MessageSquare className="w-3.5 h-3.5" /> {t('field_comment')}
-                      </span>
-                      <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 min-h-[80px]">
-                        <p className="text-sm text-slate-300 whitespace-pre-wrap">{item.comment || '-'}</p>
-                      </div>
-                    </div>
-
-                    {/* Tags */}
-                    {item.tags && (
-                      <div className="md:col-span-2 space-y-1.5">
-                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
-                          <Tags className="w-3.5 h-3.5" /> {t('field_tags')}
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {getSplitValues(item.tags).map((tag, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-300 border border-blue-500/30 text-xs font-medium"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                      {/* Play Overlay */}
+                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center select-none">
+                        <div className="p-3 rounded-full bg-blue-600/90 text-white shadow-lg backdrop-blur-sm transform group-hover:scale-110 transition-transform">
+                          <Play className="w-6 h-6 fill-current" />
                         </div>
                       </div>
-                    )}
+                    </div>
+
+                    {/* Technical Properties Bar (動画の長さ, 画面サイズ, フレームレート, ファイルサイズ) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-900/80 border border-slate-800/80 shadow-inner select-none">
+                      <div className="flex items-center gap-2.5">
+                        <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-[11px] text-slate-400 block font-medium">{t('field_duration')}</span>
+                          <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
+                            {formatDuration(item.duration)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        <Monitor className="w-4 h-4 text-slate-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-[11px] text-slate-400 block font-medium">{t('field_resolution')}</span>
+                          <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
+                            {formatResolution(item.width, item.height)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        <Gauge className="w-4 h-4 text-slate-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-[11px] text-slate-400 block font-medium">{t('field_frame_rate')}</span>
+                          <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
+                            {formatFrameRate(item.frame_rate)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2.5">
+                        <HardDrive className="w-4 h-4 text-slate-500 shrink-0" />
+                        <div className="min-w-0">
+                          <span className="text-[11px] text-slate-400 block font-medium">{t('field_file_size')}</span>
+                          <span className="text-sm font-semibold text-slate-200 font-mono truncate block">
+                            {formatFileSize(item.file_size)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* File Path */}
-                    <div className="md:col-span-2 space-y-1">
+                    <div className="space-y-1 select-none">
                       <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
                         <FileText className="w-3.5 h-3.5" /> {t('field_file_path')}
                       </span>
-                      <p className="text-sm font-mono bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-slate-300 break-all">
+                      <p className="text-sm font-mono bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-slate-300 break-all select-text">
                         {item.file_path}
                       </p>
+                    </div>
+                  </div>
+
+                  {/* Column 2: Rating Header, Metadata Details, Comment, Tags */}
+                  <div className="space-y-6">
+                    {/* Rating Header */}
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 border border-slate-800 select-none">
+                      <span className="text-sm font-semibold text-slate-200">{t('field_rating')}</span>
+                      <RatingStars
+                        rating={item.rating}
+                        onChange={(newRating) => updateMovieRating(item.id, newRating)}
+                        size="lg"
+                      />
+                    </div>
+
+                    {/* Metadata Details Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-1">
+                      {(() => {
+                        const order = settings?.field_order || DEFAULT_FIELD_ORDER;
+                        let releaseDateRendered = false;
+
+                        return order.map((fieldId) => {
+                          if (fieldId === 'title' || fieldId === 'rating') return null;
+
+                          if (fieldId === 'genre') {
+                            return (
+                              <div key="genre" className="space-y-1">
+                                <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
+                                  <Shapes className="w-3.5 h-3.5" /> {t('field_genre')}
+                                </span>
+                                <p className="text-sm font-medium text-slate-200">{item.genre || '-'}</p>
+                              </div>
+                            );
+                          }
+
+                          if (fieldId === 'cast') {
+                            return (
+                              <div key="cast" className="space-y-1">
+                                <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
+                                  <User className="w-3.5 h-3.5" /> {t('field_cast')}
+                                </span>
+                                <p className="text-sm font-medium text-slate-200">
+                                  {item.cast || '-'}
+                                  {showKana && item.cast_kana ? (
+                                    <span className="text-xs text-slate-400 font-normal ml-2">({item.cast_kana})</span>
+                                  ) : null}
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          if (fieldId === 'release_year' || fieldId === 'release_date') {
+                            if (releaseDateRendered) return null;
+                            releaseDateRendered = true;
+                            return (
+                              <div key="release" className="space-y-1">
+                                <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
+                                  <Calendar className="w-3.5 h-3.5" /> {t('field_release_full')}
+                                </span>
+                                <p className="text-sm font-medium text-slate-200">
+                                  {formatReleaseDate(item.release_year, item.release_date, language)}
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          if (fieldId.startsWith('custom_field_')) {
+                            const num = fieldId.replace('custom_field_', '');
+                            const customName = (settings as any)?.[`custom_field_${num}_name`];
+                            if (!customName) return null;
+                            const val = (item as any)[fieldId];
+
+                            return (
+                              <div key={fieldId} className="space-y-1">
+                                <span className="text-xs text-slate-500 font-medium select-none">{customName}</span>
+                                <p className="text-sm font-medium text-slate-200">{val || '-'}</p>
+                              </div>
+                            );
+                          }
+
+                          return null;
+                        });
+                      })()}
+
+                      {/* Comment */}
+                      <div className="sm:col-span-2 space-y-1">
+                        <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
+                          <MessageSquare className="w-3.5 h-3.5" /> {t('field_comment')}
+                        </span>
+                        <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 min-h-[80px]">
+                          <p className="text-sm text-slate-300 whitespace-pre-wrap">{item.comment || '-'}</p>
+                        </div>
+                      </div>
+
+                      {/* Tags */}
+                      {item.tags && (
+                        <div className="sm:col-span-2 space-y-1.5">
+                          <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
+                            <Tags className="w-3.5 h-3.5" /> {t('field_tags')}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {getSplitValues(item.tags).map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-300 border border-blue-500/30 text-xs font-medium"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
