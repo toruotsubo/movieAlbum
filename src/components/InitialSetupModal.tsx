@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
-import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight } from 'lucide-react';
+import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Settings, Scale } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -54,6 +54,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [custom3DisplayInList, setCustom3DisplayInList] = useState(true);
   const [selectedKeyField, setSelectedKeyField] = useState<string>('genre');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageSetting>('auto');
+  const [activeTab, setActiveTab] = useState<'settings' | 'licenses'>('settings');
 
   // 'title' と 'rating' 以外の項目の並び順ID配列
   const [reorderableFieldIds, setReorderableFieldIds] = useState<string[]>([
@@ -161,6 +162,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   // Sync settings when modal opens or current DB switches
   useEffect(() => {
     if (!isOpen) {
+      setActiveTab('settings');
       isLoadedRef.current = false;
       loadedDbIdRef.current = null;
       return;
@@ -317,15 +319,44 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
       <div className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-700/60 pb-4">
-          <h2 className="text-xl font-bold text-white">{t('settings_title')}</h2>
-          <span className="text-xs font-mono text-slate-400 select-none">
+        {/* Tab Navigation & Version */}
+        <div className="flex items-center justify-between border-b border-slate-700/60">
+          <div className="flex items-center gap-2 -mb-px">
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={clsx(
+                'px-4 py-2.5 text-sm font-medium border-b-2 transition-all flex items-center gap-2 cursor-pointer',
+                activeTab === 'settings'
+                  ? 'border-blue-500 text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              )}
+            >
+              <Settings className="w-4 h-4" />
+              <span>{t('settings_tab_settings')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('licenses')}
+              className={clsx(
+                'px-4 py-2.5 text-sm font-medium border-b-2 transition-all flex items-center gap-2 cursor-pointer',
+                activeTab === 'licenses'
+                  ? 'border-blue-500 text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+              )}
+            >
+              <Scale className="w-4 h-4" />
+              <span>{t('settings_tab_licenses')}</span>
+            </button>
+          </div>
+          <span className="text-xs font-mono text-slate-400 select-none pr-2">
             v{APP_VERSION}
           </span>
         </div>
 
-        {/* Database File Section (Always at the top) */}
+        {activeTab === 'settings' ? (
+          <>
+            {/* Database File Section (Always at the top) */}
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase tracking-wider text-blue-400 block">
             {t('settings_db_name')}
@@ -563,14 +594,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Section 4: Open Source Licenses */}
-        <div className="space-y-3 pt-2">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
-            {t('settings_section4')}
-          </h3>
-
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
+      </>
+    ) : (
+      /* Section: Open Source Licenses */
+      <div className="space-y-4">
+        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -708,41 +736,46 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             )}
           </div>
         </div>
+      )}
 
         {/* Footer actions */}
         <div className="pt-4 border-t border-slate-700/60 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            {!hasMultipleDbs ? (
-              <button
-                type="button"
-                onClick={handleResetData}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
-                title={t('settings_reset_data_tooltip')}
-              >
-                <RotateCcw className="w-4 h-4" />
-                <span>{t('resetData')}</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowDeleteDbConfirm(true)}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
-                title={t('settings_delete_db')}
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>{t('settings_delete_db')}</span>
-              </button>
-            )}
+            {activeTab === 'settings' && (
+              <>
+                {!hasMultipleDbs ? (
+                  <button
+                    type="button"
+                    onClick={handleResetData}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    title={t('settings_reset_data_tooltip')}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    <span>{t('resetData')}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteDbConfirm(true)}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    title={t('settings_delete_db')}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>{t('settings_delete_db')}</span>
+                  </button>
+                )}
 
-            <button
-              type="button"
-              onClick={handleAddDatabase}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
-              title={t('settings_add_db')}
-            >
-              <Plus className="w-4 h-4" />
-              <span>{t('settings_add_db')}</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={handleAddDatabase}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
+                  title={t('settings_add_db')}
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t('settings_add_db')}</span>
+                </button>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -752,7 +785,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 onClick={onClose}
                 className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
               >
-                {t('cancel')}
+                {activeTab === 'licenses' ? t('close') : t('cancel')}
               </button>
             )}
             <button
