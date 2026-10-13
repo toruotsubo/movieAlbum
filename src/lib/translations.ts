@@ -22,6 +22,7 @@ export const TRANSLATIONS = {
     resetData: 'データ初期化',
     on: 'ON',
     off: 'OFF',
+    add: '追加',
 
     // Fields
     field_title: 'タイトル',
@@ -106,7 +107,7 @@ export const TRANSLATIONS = {
     key_modal_cast_kana_placeholder: '例: たろう, はなこ, ぽち, ほっかいどう (カンマ区切り)',
     key_modal_rating_label: '評価',
     key_modal_tags_label: 'タグ',
-    key_modal_tags_placeholder: '例: お気に入り, 名作 (カンマ区切り)',
+    key_modal_tags_placeholder: 'タグを入力...',
     key_modal_cast_kana_note: '※{title}のすべての動画データに反映されます。',
 
     // Movies List Page
@@ -192,7 +193,7 @@ export const TRANSLATIONS = {
     form_release_date_label: '月日',
     form_release_date_placeholder: '例: 09-15,0915',
     form_comment_placeholder: '動画に関するメモやコメント',
-    form_tags_placeholder: '例: お気に入り, 名作 (カンマ区切り)',
+    form_tags_placeholder: 'タグを入力...',
 
     // Drag & Drop Wrapper
     drag_drop_overlay_title: '動画ファイルをドロップ',
@@ -242,6 +243,7 @@ export const TRANSLATIONS = {
     resetData: 'Reset Data',
     on: 'ON',
     off: 'OFF',
+    add: 'Add',
 
     // Fields
     field_title: 'Title',
@@ -326,7 +328,7 @@ export const TRANSLATIONS = {
     key_modal_cast_kana_placeholder: 'e.g., John, Mary, Buddy, London (comma separated)',
     key_modal_rating_label: 'Rating',
     key_modal_tags_label: 'Tags',
-    key_modal_tags_placeholder: 'e.g., Favorite, Masterpiece (comma separated)',
+    key_modal_tags_placeholder: 'Enter tag...',
     key_modal_cast_kana_note: '* Will be applied to all video data for {title}.',
 
     // Movies List Page
@@ -412,7 +414,7 @@ export const TRANSLATIONS = {
     form_release_date_label: 'Date (MM-DD,MMDD)',
     form_release_date_placeholder: 'e.g., 09-15,0915',
     form_comment_placeholder: 'Notes or comments about the video',
-    form_tags_placeholder: 'e.g., Favorite, Masterpiece (comma separated)',
+    form_tags_placeholder: 'Enter tag...',
 
     // Drag & Drop Wrapper
     drag_drop_overlay_title: 'Drop video files',
@@ -461,6 +463,7 @@ export const TRANSLATIONS = {
     resetData: '数据初始化',
     on: 'ON',
     off: 'OFF',
+    add: '添加',
     field_title: '标题',
     field_genre: '类别',
     field_cast: '姓名',
@@ -535,7 +538,7 @@ export const TRANSLATIONS = {
     key_modal_cast_kana_placeholder: '例: 张三, 李四 (逗号分隔)',
     key_modal_rating_label: '评分',
     key_modal_tags_label: '标签',
-    key_modal_tags_placeholder: '例: 收藏, 佳作 (逗号分隔)',
+    key_modal_tags_placeholder: '输入标签...',
     key_modal_cast_kana_note: '※将应用至 {title} 的所有视频数据。',
     movies_list_title: '视频列表',
     movies_list_filtered_title: '{value} 视频列表',
@@ -615,7 +618,7 @@ export const TRANSLATIONS = {
     form_release_date_label: '月日',
     form_release_date_placeholder: '例: 09-15,0915',
     form_comment_placeholder: '关于视频的备忘录或评论',
-    form_tags_placeholder: '例: 收藏, 佳作 (逗号分隔)',
+    form_tags_placeholder: '输入标签...',
     drag_drop_overlay_title: '拖拽视频文件',
     drag_drop_overlay_desc: '将自动打开项目输入表单',
     drag_drop_invalid_title: '不支持的文件',
@@ -657,6 +660,7 @@ export const TRANSLATIONS = {
     resetData: '資料初始化',
     on: 'ON',
     off: 'OFF',
+    add: '新增',
     field_title: '標題',
     field_genre: '類別',
     field_cast: '姓名',
@@ -731,7 +735,7 @@ export const TRANSLATIONS = {
     key_modal_cast_kana_placeholder: '例: 張三, 李四 (逗號分隔)',
     key_modal_rating_label: '評分',
     key_modal_tags_label: '標籤',
-    key_modal_tags_placeholder: '例: 收藏, 佳作 (逗號分隔)',
+    key_modal_tags_placeholder: '輸入標籤...',
     key_modal_cast_kana_note: '※將套用至 {title} 的所有影片資料。',
     movies_list_title: '影片清單',
     movies_list_filtered_title: '{value} 影片清單',
@@ -811,7 +815,7 @@ export const TRANSLATIONS = {
     form_release_date_label: '月日',
     form_release_date_placeholder: '例: 09-15,0915',
     form_comment_placeholder: '關於影片的備忘錄或評論',
-    form_tags_placeholder: '例: 收藏, 佳作 (逗號分隔)',
+    form_tags_placeholder: '輸入標籤...',
     drag_drop_overlay_title: '拖曳影片檔案',
     drag_drop_overlay_desc: '將自動開啟項目輸入表單',
     drag_drop_invalid_title: '不支援的檔案',

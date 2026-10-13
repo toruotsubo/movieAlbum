@@ -5,6 +5,7 @@ import { AppSettings, DEFAULT_FIELD_ORDER } from '../../lib/types';
 import { RatingStars } from '../RatingStars';
 import { useApp } from '../AppProvider';
 import { getKeyFieldLabel, split8DigitYear } from '../../lib/utils';
+import { TagInput } from '../TagInput';
 
 export interface MovieFormData {
   title: string;
@@ -221,12 +222,10 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
       {/* Tags */}
       <div className="md:col-span-2">
         <label className="text-xs text-slate-400 mb-1 block">{t('field_tags')}</label>
-        <input
-          type="text"
+        <TagInput
           value={formData.tags}
-          onChange={(e) => onFieldChange('tags', e.target.value)}
+          onChange={(newTags) => onFieldChange('tags', newTags)}
           placeholder={t('form_tags_placeholder')}
-          className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
         />
       </div>
 
