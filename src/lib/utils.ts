@@ -307,6 +307,80 @@ export function findInitialCastKana(
   return '';
 }
 
+/**
+ * Find furigana for cast name(s) from existing movies.
+ * Searches existing movie data for matching cast names and returns their kana.
+ * Supports comma-separated multiple cast names.
+ */
+export function findKanaForCast(
+  inputCast: string,
+  movies: Movie[],
+  currentCastKana?: string
+): string | null {
+  if (!inputCast || !movies || movies.length === 0) {
+    return null;
+  }
+
+  const castNames = inputCast.split(/[,|、|，]/).map((s) => s.trim());
+  if (castNames.every((n) => n === '')) {
+    return null;
+  }
+
+  const existingKanas = currentCastKana
+    ? currentCastKana.split(/[,|、|，]/).map((s) => s.trim())
+    : [];
+
+  let foundAny = false;
+  const resultKanas: string[] = [];
+
+  for (let i = 0; i < castNames.length; i++) {
+    const name = castNames[i];
+    if (!name) {
+      if (i < existingKanas.length && existingKanas[i]) {
+        resultKanas.push(existingKanas[i]);
+      } else {
+        resultKanas.push('');
+      }
+      continue;
+    }
+
+    let matchedKana: string | null = null;
+    for (const m of movies) {
+      if (m.cast && m.cast_kana) {
+        const kana = getKanaForCast(m.cast, m.cast_kana, name);
+        if (kana) {
+          matchedKana = kana;
+          foundAny = true;
+          break;
+        }
+      }
+    }
+
+    if (matchedKana) {
+      resultKanas.push(matchedKana);
+    } else if (i < existingKanas.length && existingKanas[i]) {
+      resultKanas.push(existingKanas[i]);
+    } else {
+      resultKanas.push('');
+    }
+  }
+
+  if (!foundAny) {
+    return null;
+  }
+
+  // Remove trailing empty elements
+  while (resultKanas.length > 0 && !resultKanas[resultKanas.length - 1]) {
+    resultKanas.pop();
+  }
+
+  if (resultKanas.length === 0) {
+    return null;
+  }
+
+  return resultKanas.join(', ');
+}
+
 const SLIDER_POS_KEY = 'movie_album_slider_positions';
 
 /**

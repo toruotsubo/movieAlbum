@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Movie, AppSettings } from '../lib/types';
-import { split8DigitYear } from '../lib/utils';
+import { split8DigitYear, findKanaForCast } from '../lib/utils';
 import { Save, X, Trash2 } from 'lucide-react';
 import { useApp } from './AppProvider';
 import { ConfirmModal } from './ConfirmModal';
@@ -27,7 +27,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
   onDelete,
   onClose,
 }) => {
-  const { showKana, t } = useApp();
+  const { showKana, t, movies } = useApp();
   const playerRef = useRef<VideoThumbnailPlayerHandle>(null);
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen && !!movie);
 
@@ -126,7 +126,16 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
   }, [isOpen, movie]);
 
   const handleFieldChange = <K extends keyof MovieFormData>(field: K, value: MovieFormData[K]) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'cast' && showKana && typeof value === 'string') {
+        const autoKana = findKanaForCast(value, movies, prev.castKana);
+        if (autoKana) {
+          next.castKana = autoKana;
+        }
+      }
+      return next;
+    });
   };
 
   const handleToggleGrouping = () => {

@@ -7,6 +7,7 @@ import { RatingStars } from '@/components/RatingStars';
 import { getKeyFieldLabel } from '@/lib/utils';
 import { X, Save } from 'lucide-react';
 import { useFocusTrap } from '@/lib/useFocusTrap';
+import { TagInput } from '@/components/TagInput';
 
 interface KeyItemFormModalProps {
   isOpen: boolean;
@@ -129,12 +130,10 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
             <label className="text-xs font-semibold text-slate-300 block select-none">
               {t('key_modal_tags_label')} ({keyLabel})
             </label>
-            <input
-              type="text"
+            <TagInput
               value={tags}
-              onChange={(e) => setTags(e.target.value)}
+              onChange={setTags}
               placeholder={t('key_modal_tags_placeholder')}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
             />
           </div>
 
