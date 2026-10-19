@@ -354,7 +354,7 @@ function isMatchingGroupAttributes(movieA: Movie, movieB: Movie, keyFields: stri
 /**
  * Synchronize grouping relationships for a movie
  */
-function syncGroupingForMovie(movie: Movie): void {
+function syncGroupingForMovie(movie: Movie, oldMovie?: Movie): void {
   if (!jsonDb) return;
   const keyFields = jsonDb.settings.key_fields || ['genre'];
 
@@ -362,17 +362,48 @@ function syncGroupingForMovie(movie: Movie): void {
     for (const m of jsonDb.movies) {
       if (m.id === movie.id) continue;
       if (isMatchingGroupAttributes(movie, m, keyFields)) {
+        m.is_grouped = true;
         m.parent_movie_id = movie.id;
         m.updated_at = new Date().toISOString();
       }
     }
+    movie.parent_movie_id = null;
   } else {
-    for (const m of jsonDb.movies) {
-      if (m.parent_movie_id === movie.id) {
-        m.parent_movie_id = null;
-        m.updated_at = new Date().toISOString();
+    const wasGrouped = Boolean(
+      oldMovie?.is_grouped ||
+      oldMovie?.parent_movie_id ||
+      movie.parent_movie_id ||
+      (oldMovie && jsonDb.movies.some((m) => m.parent_movie_id === oldMovie.id)) ||
+      jsonDb.movies.some((m) => m.parent_movie_id === movie.id)
+    );
+
+    if (wasGrouped) {
+      const targetOld = oldMovie || movie;
+      for (const m of jsonDb.movies) {
+        if (m.id === movie.id) continue;
+
+        // 1. 旧親子関係で紐づいていた動画
+        const isChildOfThis = m.parent_movie_id === targetOld.id || m.parent_movie_id === movie.id;
+        const isParentOrSibling = Boolean(
+          targetOld.parent_movie_id &&
+          (m.id === targetOld.parent_movie_id || m.parent_movie_id === targetOld.parent_movie_id)
+        );
+
+        // 2. 属性が一致し、グループ化されていた動画
+        const isMatchingAndGrouped =
+          (m.is_grouped || m.parent_movie_id !== null) &&
+          isMatchingGroupAttributes(targetOld, m, keyFields);
+
+        if (isChildOfThis || isParentOrSibling || isMatchingAndGrouped) {
+          m.is_grouped = false;
+          m.parent_movie_id = null;
+          m.updated_at = new Date().toISOString();
+        }
       }
     }
+
+    movie.is_grouped = false;
+    movie.parent_movie_id = null;
   }
 }
 
@@ -442,7 +473,9 @@ export function saveAppSettings(input: SaveSettingsInput): AppSettings {
 
   if (keyFieldsChanged) {
     for (const m of jsonDb!.movies) {
-      syncGroupingForMovie(m);
+      if (m.is_grouped) {
+        syncGroupingForMovie(m);
+      }
     }
   }
 
@@ -516,6 +549,7 @@ export function updateMovie(movie: UpdateMovieInput): Movie {
   const index = jsonDb!.movies.findIndex((m) => m.id === movie.id);
   if (index === -1) throw new Error(`Movie with id ${movie.id} not found.`);
 
+  const oldMovie = { ...jsonDb!.movies[index] };
   const updatedMovie: Movie = {
     ...jsonDb!.movies[index],
     ...movie,
@@ -523,7 +557,7 @@ export function updateMovie(movie: UpdateMovieInput): Movie {
   };
 
   jsonDb!.movies[index] = updatedMovie;
-  syncGroupingForMovie(updatedMovie);
+  syncGroupingForMovie(updatedMovie, oldMovie);
   saveDatabase();
   return updatedMovie;
 }
