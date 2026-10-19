@@ -592,12 +592,12 @@ export function updateMovieRating(id: number, rating: number): Movie {
 }
 
 // === Key Items Helpers ===
-export function getKeyItemGroups(): KeyItemGroup[] {
+export function getKeyItemGroups(field?: string): KeyItemGroup[] {
   const settings = getAppSettings();
-  const keyFields = settings.key_fields;
+  const keyFields = field ? [field] : settings.key_fields;
   const movies = getAllMovies();
 
-  if (keyFields.length === 0) return [];
+  if (!keyFields || keyFields.length === 0) return [];
 
   const groupsMap = new Map<string, { keyValues: Record<string, string>; movies: Movie[] }>();
 
@@ -674,22 +674,24 @@ export function updateKeyItemDetails(input: UpdateKeyItemInput): void {
   }
 
   if (cast_kana !== undefined) {
-    const settings = getAppSettings();
-    const keyFields = settings.key_fields;
     const movies = jsonDb!.movies;
 
     let targetCastVal: string | null = null;
+    let matchFields: string[] = ['cast'];
     try {
       const parsedKeyValues = JSON.parse(key_signature);
-      if (parsedKeyValues && typeof parsedKeyValues === 'object' && parsedKeyValues.cast) {
-        targetCastVal = parsedKeyValues.cast;
+      if (parsedKeyValues && typeof parsedKeyValues === 'object') {
+        matchFields = Object.keys(parsedKeyValues);
+        if (parsedKeyValues.cast) {
+          targetCastVal = parsedKeyValues.cast;
+        }
       }
     } catch (e) {
       console.error('Failed to parse key_signature in updateKeyItemDetails:', e);
     }
 
     for (const movie of movies) {
-      const combinations = buildKeyCombinations(movie, keyFields);
+      const combinations = buildKeyCombinations(movie, matchFields);
       const isMatch = combinations.some((comb) => JSON.stringify(comb) === key_signature);
       if (isMatch) {
         if (targetCastVal && movie.cast) {

@@ -1,18 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
 import { formatMediaUrl, getKeyFieldLabel } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUpDown, Film, Star, Edit, Tag, X, Search } from 'lucide-react';
 import { clsx } from 'clsx';
 import { KeyItemGroup } from '@/lib/types';
 import { useFocusTrap } from '@/lib/useFocusTrap';
 
-export default function KeyItemsPage() {
-  const { keyGroups, settings, updateKeyItemRating, openEditKeyItemModal, loading, t, databaseState } = useApp();
+function KeyItemsContent() {
+  const { settings, updateKeyItemRating, openEditKeyItemModal, loading: appLoading, t, databaseState, movies } = useApp();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const keyFields = settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields : ['genre'];
+  const currentFieldParam = searchParams.get('field');
+  const activeKeyField = currentFieldParam && keyFields.includes(currentFieldParam) ? currentFieldParam : keyFields[0] || 'genre';
+  const keyLabel = getKeyFieldLabel(activeKeyField, settings, t);
+
+  const [keyGroups, setKeyGroups] = useState<KeyItemGroup[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(true);
 
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [ratingFilter, setRatingFilter] = useState<string | number>('all');
@@ -23,30 +32,62 @@ export default function KeyItemsPage() {
 
   const textListModalRef = useFocusTrap<HTMLDivElement>(isTextListModalOpen);
 
+  // Load key item groups for the active key field
+  useEffect(() => {
+    let isMounted = true;
+    const fetchGroups = async () => {
+      setGroupsLoading(true);
+      try {
+        if (typeof window !== 'undefined' && window.api?.getKeyItemGroups) {
+          const data = await window.api.getKeyItemGroups(activeKeyField);
+          if (isMounted) {
+            setKeyGroups(data);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load key item groups:', err);
+      } finally {
+        if (isMounted) {
+          setGroupsLoading(false);
+        }
+      }
+    };
+    fetchGroups();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeKeyField, movies, databaseState.activeId]);
+
   // Restore filter/sort state from sessionStorage on mount
   useEffect(() => {
     try {
-      const savedStateStr = sessionStorage.getItem('movie_manager_key_items_page_state');
+      const storageKey = `movie_manager_key_items_page_state_${activeKeyField}`;
+      const savedStateStr = sessionStorage.getItem(storageKey);
       if (savedStateStr) {
         const savedState = JSON.parse(savedStateStr);
-        // Only restore if the saved state belongs to the current database
         if (!savedState.dbId || !databaseState.activeId || savedState.dbId === databaseState.activeId) {
           if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
           if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
           if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
           if (savedState.searchQuery !== undefined) setSearchQuery(savedState.searchQuery);
         }
+      } else {
+        setTagFilter('all');
+        setRatingFilter('all');
+        setSearchQuery('');
+        setSortOrder('asc');
       }
     } catch (e) {
       console.error('Failed to load filter state from sessionStorage:', e);
     }
     setIsInitialized(true);
-  }, [databaseState.activeId]);
+  }, [databaseState.activeId, activeKeyField]);
 
   // Save filter/sort state to sessionStorage when changed
   useEffect(() => {
     if (!isInitialized) return;
     try {
+      const storageKey = `movie_manager_key_items_page_state_${activeKeyField}`;
       const stateToSave = {
         dbId: databaseState.activeId,
         sortOrder,
@@ -54,25 +95,11 @@ export default function KeyItemsPage() {
         tagFilter,
         searchQuery,
       };
-      sessionStorage.setItem('movie_manager_key_items_page_state', JSON.stringify(stateToSave));
+      sessionStorage.setItem(storageKey, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Failed to save filter state to sessionStorage:', e);
     }
-  }, [sortOrder, ratingFilter, tagFilter, searchQuery, isInitialized, databaseState.activeId]);
-
-  const keyFieldId = settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre';
-  const keyLabel = getKeyFieldLabel(keyFieldId, settings, t);
-
-  // Reset tagFilter and ratingFilter when keyFieldId changes
-  const prevKeyFieldRef = React.useRef(keyFieldId);
-  useEffect(() => {
-    if (prevKeyFieldRef.current !== keyFieldId) {
-      prevKeyFieldRef.current = keyFieldId;
-      setTagFilter('all');
-      setRatingFilter('all');
-      setSearchQuery('');
-    }
-  }, [keyFieldId]);
+  }, [sortOrder, ratingFilter, tagFilter, searchQuery, isInitialized, databaseState.activeId, activeKeyField]);
 
   // Reset filters when active database changes
   const prevActiveDbRef = React.useRef(databaseState.activeId);
@@ -81,12 +108,11 @@ export default function KeyItemsPage() {
       setTagFilter('all');
       setRatingFilter('all');
       setSearchQuery('');
-      try {
-        sessionStorage.removeItem('movie_manager_key_items_page_state');
-      } catch (e) {}
     }
     prevActiveDbRef.current = databaseState.activeId;
   }, [databaseState.activeId]);
+
+  const loading = appLoading || groupsLoading;
 
   if (loading) {
     return (
@@ -145,9 +171,16 @@ export default function KeyItemsPage() {
     return true;
   });
 
+  const handleRatingChange = async (signature: string, newRating: number) => {
+    setKeyGroups((prev) =>
+      prev.map((g) => (g.key_signature === signature ? { ...g, rating: newRating } : g))
+    );
+    await updateKeyItemRating(signature, newRating);
+  };
+
   const sortedGroups = [...filteredGroups].sort((a, b) => {
-    const aVal = (keyFieldId === 'cast' && a.sort_key) ? a.sort_key : Object.values(a.key_values).join(' / ');
-    const bVal = (keyFieldId === 'cast' && b.sort_key) ? b.sort_key : Object.values(b.key_values).join(' / ');
+    const aVal = (activeKeyField === 'cast' && a.sort_key) ? a.sort_key : Object.values(a.key_values).join(' / ');
+    const bVal = (activeKeyField === 'cast' && b.sort_key) ? b.sort_key : Object.values(b.key_values).join(' / ');
     return sortOrder === 'desc' ? bVal.localeCompare(aVal, 'ja') : aVal.localeCompare(bVal, 'ja');
   });
 
@@ -364,7 +397,7 @@ export default function KeyItemsPage() {
                       <RatingStars
                         rating={group.rating}
                         size="sm"
-                        onChange={(newRating) => updateKeyItemRating(group.key_signature, newRating)}
+                        onChange={(newRating) => handleRatingChange(group.key_signature, newRating)}
                       />
                     </div>
 
@@ -438,5 +471,14 @@ export default function KeyItemsPage() {
         </div>
       )}
     </>
+  );
+}
+
+export default function KeyItemsPage() {
+  const { t } = useApp();
+  return (
+    <Suspense fallback={<div className="flex justify-center p-12 text-slate-400">{t('loading')}</div>}>
+      <KeyItemsContent />
+    </Suspense>
   );
 }

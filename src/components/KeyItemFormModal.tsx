@@ -48,9 +48,10 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
 
   if (!isOpen || !group) return null;
 
-  const keyFieldId = settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre';
-  const isCastKey = Boolean(settings?.key_fields?.includes('cast') || (group?.key_values && 'cast' in group.key_values));
-  const keyLabel = getKeyFieldLabel(keyFieldId, settings, t);
+  const groupFields = group?.key_values ? Object.keys(group.key_values) : [];
+  const currentKeyFieldId = groupFields.length > 0 ? groupFields[0] : (settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre');
+  const isCastKey = groupFields.includes('cast') || currentKeyFieldId === 'cast';
+  const keyLabel = getKeyFieldLabel(currentKeyFieldId, settings, t);
   const titleString = Object.values(group.key_values).join(' / ');
 
   const handleSubmit = async (e: React.FormEvent) => {

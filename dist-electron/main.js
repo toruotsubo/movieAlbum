@@ -562,11 +562,11 @@ function updateMovieRating(id, rating) {
   saveDatabase();
   return movie;
 }
-function getKeyItemGroups() {
+function getKeyItemGroups(field) {
   const settings = getAppSettings();
-  const keyFields = settings.key_fields;
+  const keyFields = field ? [field] : settings.key_fields;
   const movies = getAllMovies();
-  if (keyFields.length === 0) return [];
+  if (!keyFields || keyFields.length === 0) return [];
   const groupsMap = /* @__PURE__ */ new Map();
   for (const movie of movies) {
     const combinations = buildKeyCombinations(movie, keyFields);
@@ -628,20 +628,22 @@ function updateKeyItemDetails(input) {
     jsonDb.keyRatings[key_signature] = rating;
   }
   if (cast_kana !== void 0) {
-    const settings = getAppSettings();
-    const keyFields = settings.key_fields;
     const movies = jsonDb.movies;
     let targetCastVal = null;
+    let matchFields = ["cast"];
     try {
       const parsedKeyValues = JSON.parse(key_signature);
-      if (parsedKeyValues && typeof parsedKeyValues === "object" && parsedKeyValues.cast) {
-        targetCastVal = parsedKeyValues.cast;
+      if (parsedKeyValues && typeof parsedKeyValues === "object") {
+        matchFields = Object.keys(parsedKeyValues);
+        if (parsedKeyValues.cast) {
+          targetCastVal = parsedKeyValues.cast;
+        }
       }
     } catch (e) {
       console.error("Failed to parse key_signature in updateKeyItemDetails:", e);
     }
     for (const movie of movies) {
-      const combinations = buildKeyCombinations(movie, keyFields);
+      const combinations = buildKeyCombinations(movie, matchFields);
       const isMatch = combinations.some((comb) => JSON.stringify(comb) === key_signature);
       if (isMatch) {
         if (targetCastVal && movie.cast) {
@@ -1507,7 +1509,7 @@ import_electron3.ipcMain.handle(
 import_electron3.ipcMain.handle("movies:extractMetadata", async (_, filePath) => {
   return extractVideoMetadata(filePath);
 });
-import_electron3.ipcMain.handle("keyItems:getAll", async () => getKeyItemGroups());
+import_electron3.ipcMain.handle("keyItems:getAll", async (_, field) => getKeyItemGroups(field));
 import_electron3.ipcMain.handle(
   "keyItems:updateRating",
   async (_, { key_signature, rating }) => updateKeyItemRating(key_signature, rating)

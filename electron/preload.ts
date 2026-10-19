@@ -40,7 +40,7 @@ export const api = {
   deleteMovie: (id: number): Promise<boolean> => ipcRenderer.invoke('movies:delete', id),
   updateMovieRating: (id: number, rating: number): Promise<Movie> => ipcRenderer.invoke('movies:updateRating', { id, rating }),
 
-  getKeyItemGroups: (): Promise<KeyItemGroup[]> => ipcRenderer.invoke('keyItems:getAll'),
+  getKeyItemGroups: (field?: string): Promise<KeyItemGroup[]> => ipcRenderer.invoke('keyItems:getAll', field),
   updateKeyItemRating: (key_signature: string, rating: number): Promise<void> =>
     ipcRenderer.invoke('keyItems:updateRating', { key_signature, rating }),
   updateKeyItemDetails: (input: UpdateKeyItemInput): Promise<void> =>
