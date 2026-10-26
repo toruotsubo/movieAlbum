@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
-type SortKey = 'title' | 'genre' | 'key_field' | 'release';
+type SortKey = 'title' | 'genre' | 'key_field' | 'release' | string;
 
 function MoviesContent() {
   const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, loading, t, lang: language, setHeaderMovieCount, setHeaderFilterText, databaseState } = useApp();
@@ -239,6 +239,25 @@ function MoviesContent() {
         result = compareFileNames(a.title || a.file_name || '', b.title || b.file_name || '');
       } else if (sortKey === 'genre') {
         result = (a.genre || '').localeCompare(b.genre || '');
+      } else if (sortKey.startsWith('key_field_')) {
+        const targetField = sortKey.replace('key_field_', '');
+        if (targetField === 'cast') {
+          const aVal = a.cast_kana || a.cast || '';
+          const bVal = b.cast_kana || b.cast || '';
+          result = aVal.localeCompare(bVal, 'ja');
+        } else if (targetField === 'release_year' || targetField === 'release_date') {
+          const aYear = a.release_year || 0;
+          const bYear = b.release_year || 0;
+          if (aYear !== bYear) {
+            result = aYear - bYear;
+          } else {
+            result = (a.release_date || '').localeCompare(b.release_date || '');
+          }
+        } else {
+          const aVal = String((a as any)[targetField] || '');
+          const bVal = String((b as any)[targetField] || '');
+          result = aVal.localeCompare(bVal, 'ja');
+        }
       } else if (sortKey === 'key_field') {
         if (keyFieldId === 'cast') {
           const aVal = a.cast_kana || a.cast || '';
@@ -340,9 +359,12 @@ function MoviesContent() {
   const sortItems: { id: SortKey; label: string }[] = [
     { id: 'title', label: t('field_title') },
     { id: 'genre', label: t('field_genre') },
-    ...(keyFieldId !== 'title' && keyFieldId !== 'genre' && keyFieldId !== 'release_year' && keyFieldId !== 'release_date'
-      ? [{ id: 'key_field' as SortKey, label: keyLabel }]
-      : []),
+    ...keyFields
+      .filter((kf) => kf !== 'title' && kf !== 'genre' && kf !== 'release_year' && kf !== 'release_date')
+      .map((kf) => ({
+        id: `key_field_${kf}`,
+        label: getKeyFieldLabel(kf, settings, t),
+      })),
     { id: 'release', label: t('field_release_full') },
   ];
 

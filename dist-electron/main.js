@@ -378,24 +378,41 @@ function isMatchingGroupAttributes(movieA, movieB, keyFields) {
   }
   return true;
 }
-function syncGroupingForMovie(movie) {
+function syncGroupingForMovie(movie, oldMovie) {
   if (!jsonDb) return;
   const keyFields = jsonDb.settings.key_fields || ["genre"];
   if (movie.is_grouped) {
     for (const m of jsonDb.movies) {
       if (m.id === movie.id) continue;
       if (isMatchingGroupAttributes(movie, m, keyFields)) {
+        m.is_grouped = true;
         m.parent_movie_id = movie.id;
         m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
       }
     }
+    movie.parent_movie_id = null;
   } else {
-    for (const m of jsonDb.movies) {
-      if (m.parent_movie_id === movie.id) {
-        m.parent_movie_id = null;
-        m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+    const wasGrouped = Boolean(
+      oldMovie?.is_grouped || oldMovie?.parent_movie_id || movie.parent_movie_id || oldMovie && jsonDb.movies.some((m) => m.parent_movie_id === oldMovie.id) || jsonDb.movies.some((m) => m.parent_movie_id === movie.id)
+    );
+    if (wasGrouped) {
+      const targetOld = oldMovie || movie;
+      for (const m of jsonDb.movies) {
+        if (m.id === movie.id) continue;
+        const isChildOfThis = m.parent_movie_id === targetOld.id || m.parent_movie_id === movie.id;
+        const isParentOrSibling = Boolean(
+          targetOld.parent_movie_id && (m.id === targetOld.parent_movie_id || m.parent_movie_id === targetOld.parent_movie_id)
+        );
+        const isMatchingAndGrouped = (m.is_grouped || m.parent_movie_id !== null) && isMatchingGroupAttributes(targetOld, m, keyFields);
+        if (isChildOfThis || isParentOrSibling || isMatchingAndGrouped) {
+          m.is_grouped = false;
+          m.parent_movie_id = null;
+          m.updated_at = (/* @__PURE__ */ new Date()).toISOString();
+        }
       }
     }
+    movie.is_grouped = false;
+    movie.parent_movie_id = null;
   }
 }
 function buildKeyCombinations(movie, keyFields) {
@@ -444,7 +461,9 @@ function saveAppSettings(input) {
   };
   if (keyFieldsChanged) {
     for (const m of jsonDb.movies) {
-      syncGroupingForMovie(m);
+      if (m.is_grouped) {
+        syncGroupingForMovie(m);
+      }
     }
   }
   saveDatabase();
@@ -507,13 +526,14 @@ function updateMovie(movie) {
   if (!jsonDb) initDatabase();
   const index = jsonDb.movies.findIndex((m) => m.id === movie.id);
   if (index === -1) throw new Error(`Movie with id ${movie.id} not found.`);
+  const oldMovie = { ...jsonDb.movies[index] };
   const updatedMovie = {
     ...jsonDb.movies[index],
     ...movie,
     updated_at: (/* @__PURE__ */ new Date()).toISOString()
   };
   jsonDb.movies[index] = updatedMovie;
-  syncGroupingForMovie(updatedMovie);
+  syncGroupingForMovie(updatedMovie, oldMovie);
   saveDatabase();
   return updatedMovie;
 }
@@ -542,11 +562,11 @@ function updateMovieRating(id, rating) {
   saveDatabase();
   return movie;
 }
-function getKeyItemGroups() {
+function getKeyItemGroups(field) {
   const settings = getAppSettings();
-  const keyFields = settings.key_fields;
+  const keyFields = field ? [field] : settings.key_fields;
   const movies = getAllMovies();
-  if (keyFields.length === 0) return [];
+  if (!keyFields || keyFields.length === 0) return [];
   const groupsMap = /* @__PURE__ */ new Map();
   for (const movie of movies) {
     const combinations = buildKeyCombinations(movie, keyFields);
@@ -608,20 +628,22 @@ function updateKeyItemDetails(input) {
     jsonDb.keyRatings[key_signature] = rating;
   }
   if (cast_kana !== void 0) {
-    const settings = getAppSettings();
-    const keyFields = settings.key_fields;
     const movies = jsonDb.movies;
     let targetCastVal = null;
+    let matchFields = ["cast"];
     try {
       const parsedKeyValues = JSON.parse(key_signature);
-      if (parsedKeyValues && typeof parsedKeyValues === "object" && parsedKeyValues.cast) {
-        targetCastVal = parsedKeyValues.cast;
+      if (parsedKeyValues && typeof parsedKeyValues === "object") {
+        matchFields = Object.keys(parsedKeyValues);
+        if (parsedKeyValues.cast) {
+          targetCastVal = parsedKeyValues.cast;
+        }
       }
     } catch (e) {
       console.error("Failed to parse key_signature in updateKeyItemDetails:", e);
     }
     for (const movie of movies) {
-      const combinations = buildKeyCombinations(movie, keyFields);
+      const combinations = buildKeyCombinations(movie, matchFields);
       const isMatch = combinations.some((comb) => JSON.stringify(comb) === key_signature);
       if (isMatch) {
         if (targetCastVal && movie.cast) {
@@ -1487,7 +1509,7 @@ import_electron3.ipcMain.handle(
 import_electron3.ipcMain.handle("movies:extractMetadata", async (_, filePath) => {
   return extractVideoMetadata(filePath);
 });
-import_electron3.ipcMain.handle("keyItems:getAll", async () => getKeyItemGroups());
+import_electron3.ipcMain.handle("keyItems:getAll", async (_, field) => getKeyItemGroups(field));
 import_electron3.ipcMain.handle(
   "keyItems:updateRating",
   async (_, { key_signature, rating }) => updateKeyItemRating(key_signature, rating)

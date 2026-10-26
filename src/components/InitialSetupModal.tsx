@@ -54,7 +54,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [custom1DisplayInList, setCustom1DisplayInList] = useState(true);
   const [custom2DisplayInList, setCustom2DisplayInList] = useState(true);
   const [custom3DisplayInList, setCustom3DisplayInList] = useState(true);
-  const [selectedKeyField, setSelectedKeyField] = useState<string>('genre');
+  const [selectedKeyFields, setSelectedKeyFields] = useState<string[]>(['genre']);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageSetting>('auto');
   const [activeTab, setActiveTab] = useState<'settings' | 'licenses'>('settings');
 
@@ -184,9 +184,9 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       setSelectedLanguage(currentSettings.language || 'auto');
 
       if (currentSettings.key_fields && currentSettings.key_fields.length > 0) {
-        setSelectedKeyField(currentSettings.key_fields[0]);
+        setSelectedKeyFields(currentSettings.key_fields.slice(0, 3));
       } else {
-        setSelectedKeyField('genre');
+        setSelectedKeyFields(['genre']);
       }
 
       // Initialize field_order without 'title' and 'rating'
@@ -281,6 +281,18 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   };
 
+  const handleToggleKeyField = (fieldId: string) => {
+    if (selectedKeyFields.includes(fieldId)) {
+      if (selectedKeyFields.length > 1) {
+        setSelectedKeyFields(selectedKeyFields.filter((id) => id !== fieldId));
+      }
+    } else {
+      if (selectedKeyFields.length < 3) {
+        setSelectedKeyFields([...selectedKeyFields, fieldId]);
+      }
+    }
+  };
+
   const handleSave = () => {
     const fullFieldOrder = ['title', 'rating', ...reorderableFieldIds];
     onSave({
@@ -292,7 +304,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       custom_field_1_display_in_list: custom1DisplayInList,
       custom_field_2_display_in_list: custom2DisplayInList,
       custom_field_3_display_in_list: custom3DisplayInList,
-      key_fields: [selectedKeyField], // Always single selection
+      key_fields: selectedKeyFields.length > 0 ? selectedKeyFields : ['genre'],
       field_order: fullFieldOrder,
       language: selectedLanguage,
     });
@@ -313,7 +325,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setCustom1DisplayInList(true);
     setCustom2DisplayInList(true);
     setCustom3DisplayInList(true);
-    setSelectedKeyField('genre');
+    setSelectedKeyFields(['genre']);
     setSelectedLanguage('auto');
     setReorderableFieldIds(DEFAULT_FIELD_ORDER.filter((id) => id !== 'title' && id !== 'rating'));
   };
@@ -429,66 +441,88 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
         {/* Section 2: Key item selection & Reordering */}
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
-            {t('settings_section2')}
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
+              {t('settings_section2')}
+            </h3>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-950/70 border border-blue-500/40 text-blue-300 font-semibold">
+              {t('settings_key_fields_count', { count: selectedKeyFields.length }) || `キー項目: ${selectedKeyFields.length} / 3`}
+            </span>
+          </div>
           <p className="text-xs text-slate-400">
             {t('settings_section2_desc')}
           </p>
 
           <div className="space-y-2">
             {/* Title (Fixed at position 1) */}
-            <div
-              onClick={() => setSelectedKeyField('title')}
-              className={clsx(
-                'flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
-                selectedKeyField === 'title'
-                  ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
-                  : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                {selectedKeyField === 'title' ? (
-                  <Radio className="w-5 h-5 text-blue-400 shrink-0" />
-                ) : (
-                  <Circle className="w-5 h-5 text-slate-600 shrink-0" />
-                )}
-                <span>{t('field_title')}</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60">
-                <Lock className="w-3 h-3" />
-                <span>{t('settings_fixed_position')}</span>
-              </div>
-            </div>
+            {(() => {
+              const titleKeyIndex = selectedKeyFields.indexOf('title');
+              const isTitleSelected = titleKeyIndex !== -1;
+              return (
+                <div
+                  onClick={() => handleToggleKeyField('title')}
+                  className={clsx(
+                    'flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
+                    isTitleSelected
+                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
+                      : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    {isTitleSelected ? (
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
+                        {titleKeyIndex + 1}
+                      </span>
+                    ) : (
+                      <span className="w-5 h-5 rounded-full border border-slate-600/80 flex items-center justify-center shrink-0" />
+                    )}
+                    <span>{t('field_title')}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60">
+                    <Lock className="w-3 h-3" />
+                    <span>{t('settings_fixed_position')}</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Rating (Fixed at position 2, directly under Title) */}
-            <div
-              onClick={() => setSelectedKeyField('rating')}
-              className={clsx(
-                'flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
-                selectedKeyField === 'rating'
-                  ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
-                  : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-              )}
-            >
-              <div className="flex items-center gap-3">
-                {selectedKeyField === 'rating' ? (
-                  <Radio className="w-5 h-5 text-blue-400 shrink-0" />
-                ) : (
-                  <Circle className="w-5 h-5 text-slate-600 shrink-0" />
-                )}
-                <span>{t('field_rating')}</span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60">
-                <Lock className="w-3 h-3" />
-                <span>{t('settings_fixed_position')}</span>
-              </div>
-            </div>
+            {(() => {
+              const ratingKeyIndex = selectedKeyFields.indexOf('rating');
+              const isRatingSelected = ratingKeyIndex !== -1;
+              return (
+                <div
+                  onClick={() => handleToggleKeyField('rating')}
+                  className={clsx(
+                    'flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
+                    isRatingSelected
+                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
+                      : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    {isRatingSelected ? (
+                      <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
+                        {ratingKeyIndex + 1}
+                      </span>
+                    ) : (
+                      <span className="w-5 h-5 rounded-full border border-slate-600/80 flex items-center justify-center shrink-0" />
+                    )}
+                    <span>{t('field_rating')}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60">
+                    <Lock className="w-3 h-3" />
+                    <span>{t('settings_fixed_position')}</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Reorderable Items List */}
             <div className="grid grid-cols-1 gap-2 pt-1">
               {reorderableFieldIds.map((fieldId, index) => {
-                const isSelected = selectedKeyField === fieldId;
+                const keyIndex = selectedKeyFields.indexOf(fieldId);
+                const isSelected = keyIndex !== -1;
                 const isDragging = draggedIndex === index;
                 const isDragOver = dragOverIndex === index;
 
@@ -500,7 +534,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
-                    onClick={() => setSelectedKeyField(fieldId)}
+                    onClick={() => handleToggleKeyField(fieldId)}
                     className={clsx(
                       'flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
                       isSelected
@@ -522,9 +556,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                       </div>
 
                       {isSelected ? (
-                        <Radio className="w-5 h-5 text-blue-400 shrink-0" />
+                        <span className="w-5 h-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-sm">
+                          {keyIndex + 1}
+                        </span>
                       ) : (
-                        <Circle className="w-5 h-5 text-slate-600 shrink-0" />
+                        <span className="w-5 h-5 rounded-full border border-slate-600/80 flex items-center justify-center shrink-0" />
                       )}
 
                       <span className="truncate">{getFieldLabel(fieldId)}</span>

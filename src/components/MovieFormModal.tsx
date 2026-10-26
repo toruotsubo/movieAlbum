@@ -86,6 +86,12 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
         initDate = splitResult.date;
       }
 
+      const isInitiallyGrouped = Boolean(
+        movie.is_grouped ||
+        movie.parent_movie_id ||
+        (movie.id && movies.some((m) => m.parent_movie_id === movie.id))
+      );
+
       setFormData({
         title: movie.title || movie.file_name || '',
         genre: movie.genre || '',
@@ -99,7 +105,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
         custom1: movie.custom_field_1 || '',
         custom2: movie.custom_field_2 || '',
         custom3: movie.custom_field_3 || '',
-        isGrouped: Boolean(movie.is_grouped),
+        isGrouped: isInitiallyGrouped,
       });
 
       setSummaryImagePath(movie.summary_image_path || null);
@@ -123,7 +129,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
         }).catch((err) => console.warn('Failed to extract metadata in modal:', err));
       }
     }
-  }, [isOpen, movie]);
+  }, [isOpen, movie, movies]);
 
   const handleFieldChange = <K extends keyof MovieFormData>(field: K, value: MovieFormData[K]) => {
     setFormData((prev) => {
