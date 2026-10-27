@@ -32,6 +32,30 @@ interface VideoThumbnailPlayerProps {
   onErrorModal: (title: string, description: string) => void;
 }
 
+/**
+ * Draw video frame onto a 720x405 canvas preserving original aspect ratio (letterbox/pillarbox)
+ */
+function drawVideoFrameContain(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  targetW = 720,
+  targetH = 405
+) {
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, targetW, targetH);
+
+  const videoW = video.videoWidth || targetW;
+  const videoH = video.videoHeight || targetH;
+
+  const scale = Math.min(targetW / videoW, targetH / videoH);
+  const drawW = Math.round(videoW * scale);
+  const drawH = Math.round(videoH * scale);
+  const dx = Math.round((targetW - drawW) / 2);
+  const dy = Math.round((targetH - drawH) / 2);
+
+  ctx.drawImage(video, dx, dy, drawW, drawH);
+}
+
 export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, VideoThumbnailPlayerProps>(
   (
     {
@@ -215,7 +239,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
               canvas.height = 405;
               const ctx = canvas.getContext('2d');
               if (ctx) {
-                ctx.drawImage(video, 0, 0, 720, 405);
+                drawVideoFrameContain(ctx, video, 720, 405);
                 const dataUrl = canvas.toDataURL('image/png');
                 let savedPath = dataUrl;
                 if (window.api?.saveSummaryImage) {
@@ -262,7 +286,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       });
     };
 
-    // Capture screenshot (720px x 405px)
+    // Capture screenshot (720px x 405px, maintaining aspect ratio)
     const captureFrame = async (): Promise<string | null> => {
       if (!videoRef.current || !canvasRef.current) return null;
       const video = videoRef.current;
@@ -274,7 +298,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       if (!ctx) return null;
 
       try {
-        ctx.drawImage(video, 0, 0, 720, 405);
+        drawVideoFrameContain(ctx, video, 720, 405);
         const dataUrl = canvas.toDataURL('image/png');
 
         if (window.api?.saveSummaryImage) {
