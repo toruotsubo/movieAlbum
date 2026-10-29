@@ -202,7 +202,13 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   }, [isOpen, currentSettings, databaseState?.activeId]);
 
-  if (!isOpen) return null;
+  // Check if a field is disabled (custom field with empty name)
+  const isFieldDisabled = (id: string): boolean => {
+    if (id === 'custom_field_1') return !custom1.trim();
+    if (id === 'custom_field_2') return !custom2.trim();
+    if (id === 'custom_field_3') return !custom3.trim();
+    return false;
+  };
 
   // Helper to get field label by ID
   const getFieldLabel = (id: string): string => {
@@ -217,6 +223,25 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     if (id === 'custom_field_3') return custom3.trim() || t('field_custom_3_default');
     return id;
   };
+
+  // Automatically remove disabled custom fields from selected key fields
+  useEffect(() => {
+    if (!isOpen) return;
+    const disabledIds: string[] = [];
+    if (!custom1.trim()) disabledIds.push('custom_field_1');
+    if (!custom2.trim()) disabledIds.push('custom_field_2');
+    if (!custom3.trim()) disabledIds.push('custom_field_3');
+
+    if (disabledIds.length > 0) {
+      setSelectedKeyFields((prev) => {
+        const filtered = prev.filter((id) => !disabledIds.includes(id));
+        if (filtered.length === prev.length) return prev;
+        return filtered.length > 0 ? filtered : ['genre'];
+      });
+    }
+  }, [isOpen, custom1, custom2, custom3]);
+
+  if (!isOpen) return null;
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -282,6 +307,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   };
 
   const handleToggleKeyField = (fieldId: string) => {
+    if (isFieldDisabled(fieldId)) return;
     if (selectedKeyFields.includes(fieldId)) {
       if (selectedKeyFields.length > 1) {
         setSelectedKeyFields(selectedKeyFields.filter((id) => id !== fieldId));
@@ -295,6 +321,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   const handleSave = () => {
     const fullFieldOrder = ['title', 'rating', ...reorderableFieldIds];
+    const validKeyFields = selectedKeyFields.filter((id) => !isFieldDisabled(id));
     onSave({
       is_initialized: true,
       database_name: databaseName.trim() || '設定ファイル_00',
@@ -304,7 +331,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       custom_field_1_display_in_list: custom1DisplayInList,
       custom_field_2_display_in_list: custom2DisplayInList,
       custom_field_3_display_in_list: custom3DisplayInList,
-      key_fields: selectedKeyFields.length > 0 ? selectedKeyFields : ['genre'],
+      key_fields: validKeyFields.length > 0 ? validKeyFields : ['genre'],
       field_order: fullFieldOrder,
       language: selectedLanguage,
     });
@@ -521,34 +548,53 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             {/* Reorderable Items List */}
             <div className="grid grid-cols-1 gap-2 pt-1">
               {reorderableFieldIds.map((fieldId, index) => {
+                const isDisabled = isFieldDisabled(fieldId);
                 const keyIndex = selectedKeyFields.indexOf(fieldId);
-                const isSelected = keyIndex !== -1;
+                const isSelected = !isDisabled && keyIndex !== -1;
                 const isDragging = draggedIndex === index;
                 const isDragOver = dragOverIndex === index;
 
                 return (
                   <div
                     key={fieldId}
-                    draggable={canDragIndex === index}
-                    onDragStart={(e) => handleDragStart(e, index)}
+                    draggable={!isDisabled && canDragIndex === index}
+                    onDragStart={(e) => {
+                      if (isDisabled) {
+                        e.preventDefault();
+                        return;
+                      }
+                      handleDragStart(e, index);
+                    }}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
-                    onClick={() => handleToggleKeyField(fieldId)}
+                    onClick={() => {
+                      if (isDisabled) return;
+                      handleToggleKeyField(fieldId);
+                    }}
                     className={clsx(
-                      'flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
-                      isSelected
-                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
-                        : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200',
-                      isDragging && 'opacity-40 border-dashed border-blue-400',
-                      isDragOver && 'border-blue-400 bg-blue-600/10 scale-[1.01]'
+                      'flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition-all select-none',
+                      isDisabled
+                        ? 'bg-slate-900/30 border-slate-800/40 text-slate-500 opacity-40 cursor-not-allowed'
+                        : isSelected
+                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500 cursor-pointer'
+                        : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 cursor-pointer',
+                      !isDisabled && isDragging && 'opacity-40 border-dashed border-blue-400',
+                      !isDisabled && isDragOver && 'border-blue-400 bg-blue-600/10 scale-[1.01]'
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 rounded transition-colors"
-                        title={t('settings_drag_to_reorder')}
-                        onMouseEnter={() => setCanDragIndex(index)}
+                        className={clsx(
+                          'p-1 rounded transition-colors',
+                          isDisabled
+                            ? 'text-slate-700 cursor-not-allowed'
+                            : 'cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300'
+                        )}
+                        title={isDisabled ? undefined : t('settings_drag_to_reorder')}
+                        onMouseEnter={() => {
+                          if (!isDisabled) setCanDragIndex(index);
+                        }}
                         onMouseLeave={() => setCanDragIndex(null)}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -560,7 +606,12 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                           {keyIndex + 1}
                         </span>
                       ) : (
-                        <span className="w-5 h-5 rounded-full border border-slate-600/80 flex items-center justify-center shrink-0" />
+                        <span
+                          className={clsx(
+                            'w-5 h-5 rounded-full border flex items-center justify-center shrink-0',
+                            isDisabled ? 'border-slate-700/50' : 'border-slate-600/80'
+                          )}
+                        />
                       )}
 
                       <span className="truncate">{getFieldLabel(fieldId)}</span>
@@ -569,11 +620,20 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                     <div className="flex items-center gap-3 shrink-0">
                       {fieldId.startsWith('custom_field_') && (
                         <label
-                          className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white cursor-pointer select-none"
-                          onClick={(e) => e.stopPropagation()}
+                          className={clsx(
+                            'flex items-center gap-1.5 text-xs select-none',
+                            isDisabled
+                              ? 'text-slate-600 cursor-not-allowed'
+                              : 'text-slate-300 hover:text-white cursor-pointer'
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isDisabled) e.preventDefault();
+                          }}
                         >
                           <input
                             type="checkbox"
+                            disabled={isDisabled}
                             checked={
                               fieldId === 'custom_field_1'
                                 ? custom1DisplayInList
@@ -582,16 +642,19 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                                 : custom3DisplayInList
                             }
                             onChange={(e) => {
+                              if (isDisabled) return;
                               if (fieldId === 'custom_field_1') setCustom1DisplayInList(e.target.checked);
                               else if (fieldId === 'custom_field_2') setCustom2DisplayInList(e.target.checked);
                               else if (fieldId === 'custom_field_3') setCustom3DisplayInList(e.target.checked);
                             }}
-                            className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-3.5 h-3.5 cursor-pointer"
+                            className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-3.5 h-3.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                           />
                           <span>{t('settings_custom_display_in_list')}</span>
                         </label>
                       )}
-                      <span className="text-xs text-slate-600 font-mono">#{index + 1}</span>
+                      <span className={clsx('text-xs font-mono', isDisabled ? 'text-slate-700' : 'text-slate-600')}>
+                        #{index + 1}
+                      </span>
                     </div>
                   </div>
                 );
