@@ -24,13 +24,17 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
   onSave,
   onClose,
 }) => {
-  const { settings, showKana, t } = useApp();
+  const { settings, showKana, t, keyGroups } = useApp();
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen && !!group);
   const [castKana, setCastKana] = useState('');
   const [tags, setTags] = useState('');
   const [rating, setRating] = useState<number>(3);
   const [saving, setSaving] = useState(false);
+  const [fieldGroups, setFieldGroups] = useState<KeyItemGroup[]>([]);
   const loadedGroupKeyRef = React.useRef<string | null>(null);
+
+  const groupFields = group?.key_values ? Object.keys(group.key_values) : [];
+  const currentKeyFieldId = groupFields.length > 0 ? groupFields[0] : (settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre');
 
   useEffect(() => {
     if (!isOpen || !group) {
@@ -44,12 +48,37 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
       setTags(group.tags || '');
       setRating(group.rating || 3);
     }
-  }, [isOpen, group, initialCastKana]);
+
+    if (typeof window !== 'undefined' && window.api?.getKeyItemGroups) {
+      window.api
+        .getKeyItemGroups(currentKeyFieldId)
+        .then((data) => {
+          setFieldGroups(data);
+        })
+        .catch((err) => {
+          console.error('Failed to load key item groups for tag suggestions:', err);
+        });
+    }
+  }, [isOpen, group, initialCastKana, currentKeyFieldId]);
+
+  const existingKeyTags = React.useMemo(() => {
+    const sourceGroups = fieldGroups.length > 0 ? fieldGroups : keyGroups;
+    return Array.from(
+      new Set(
+        sourceGroups.flatMap((g) =>
+          g.tags
+            ? g.tags
+                .split(/[,、，]/)
+                .map((tag) => tag.trim())
+                .filter(Boolean)
+            : []
+        )
+      )
+    ).sort((a, b) => a.localeCompare(b, 'ja'));
+  }, [fieldGroups, keyGroups]);
 
   if (!isOpen || !group) return null;
 
-  const groupFields = group?.key_values ? Object.keys(group.key_values) : [];
-  const currentKeyFieldId = groupFields.length > 0 ? groupFields[0] : (settings?.key_fields && settings.key_fields.length > 0 ? settings.key_fields[0] : 'genre');
   const isCastKey = groupFields.includes('cast') || currentKeyFieldId === 'cast';
   const keyLabel = getKeyFieldLabel(currentKeyFieldId, settings, t);
   const titleString = Object.values(group.key_values).join(' / ');
@@ -74,9 +103,9 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div ref={modalRef} className="glass-card w-full max-w-lg rounded-2xl border border-slate-800 shadow-2xl overflow-hidden flex flex-col">
+      <div ref={modalRef} className="glass-card w-full max-w-lg rounded-2xl border border-slate-800 shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/60">
+        <div className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/60 rounded-t-2xl">
           <div>
             <h2 className="text-lg font-bold text-white">
               {titleString}
@@ -135,6 +164,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
               value={tags}
               onChange={setTags}
               placeholder={t('key_modal_tags_placeholder')}
+              existingTags={existingKeyTags}
             />
           </div>
 

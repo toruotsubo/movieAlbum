@@ -40,6 +40,21 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
 }) => {
   const { t, movies } = useApp();
 
+  const existingMovieTags = React.useMemo(() => {
+    return Array.from(
+      new Set(
+        movies.flatMap((m) =>
+          m.tags
+            ? m.tags
+                .split(/[,、，]/)
+                .map((tag) => tag.trim())
+                .filter(Boolean)
+            : []
+        )
+      )
+    ).sort((a, b) => a.localeCompare(b, 'ja'));
+  }, [movies]);
+
   const handleCastBlur = () => {
     if (showKana && formData.cast) {
       const autoKana = findKanaForCast(formData.cast, movies, formData.castKana);
@@ -236,6 +251,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
           value={formData.tags}
           onChange={(newTags) => onFieldChange('tags', newTags)}
           placeholder={t('form_tags_placeholder')}
+          existingTags={existingMovieTags}
         />
       </div>
 
