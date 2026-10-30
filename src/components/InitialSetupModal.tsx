@@ -20,6 +20,7 @@ interface InitialSetupModalProps {
   onDeleteDatabase?: (id: string) => Promise<void>;
   onSave: (settings: {
     is_initialized: boolean;
+    cast_label?: string | null;
     custom_field_1_name: string | null;
     custom_field_2_name: string | null;
     custom_field_3_name: string | null;
@@ -50,6 +51,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const { t } = useApp();
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   const [databaseName, setDatabaseName] = useState('設定ファイル_00');
+  const [castLabel, setCastLabel] = useState('');
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
   const [custom3, setCustom3] = useState('');
@@ -177,6 +179,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       isLoadedRef.current = true;
       loadedDbIdRef.current = currentDbId;
       setDatabaseName(currentSettings.database_name || '設定ファイル_00');
+      setCastLabel(currentSettings.cast_label || '');
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
       setCustom3(currentSettings.custom_field_3_name || '');
@@ -216,7 +219,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const getFieldLabel = (id: string): string => {
     if (id === 'title') return t('field_title');
     if (id === 'genre') return t('field_genre');
-    if (id === 'cast') return t('field_cast');
+    if (id === 'cast') return castLabel.trim() || t('field_cast');
     if (id === 'release_year') return t('field_release_year');
     if (id === 'release_date') return t('field_release_date');
     if (id === 'rating') return t('field_rating');
@@ -335,6 +338,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     onSave({
       is_initialized: true,
       database_name: databaseName.trim() || '設定ファイル_00',
+      cast_label: castLabel.trim() || null,
       custom_field_1_name: custom1.trim() || null,
       custom_field_2_name: custom2.trim() || null,
       custom_field_3_name: custom3.trim() || null,
@@ -356,6 +360,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     if (onResetData) {
       await onResetData();
     }
+    setCastLabel('');
     setCustom1('');
     setCustom2('');
     setCustom3('');
@@ -624,7 +629,19 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                         />
                       )}
 
-                      <span className="truncate">{getFieldLabel(fieldId)}</span>
+                      {fieldId === 'cast' ? (
+                        <input
+                          type="text"
+                          value={castLabel}
+                          onChange={(e) => setCastLabel(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          placeholder={t('field_cast')}
+                          className="bg-slate-950/80 border border-slate-700/80 hover:border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-1 text-sm text-white placeholder-slate-400 focus:outline-none w-48 sm:w-64 select-text"
+                        />
+                      ) : (
+                        <span className="truncate">{getFieldLabel(fieldId)}</span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, getSplitValues, formatReleaseDate, getSavedSliderIndex, saveSliderIndex } from '@/lib/utils';
+import { formatMediaUrl, getSplitValues, formatReleaseDate, getSavedSliderIndex, saveSliderIndex, getCastLabel } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import {
   Play,
@@ -280,7 +280,7 @@ export function MovieCardSlider({
                                             onKeyItemClick('cast', cVal);
                                           }}
                                           className="text-blue-400 hover:underline font-semibold cursor-pointer"
-                                          title={t('filter_by_cast', { value: cVal })}
+                                          title={t('filter_by_field', { field: getCastLabel(settings, t), value: cVal })}
                                         >
                                           {cVal}
                                         </button>

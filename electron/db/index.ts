@@ -498,6 +498,7 @@ export function saveAppSettings(input: SaveSettingsInput): AppSettings {
     ...input,
     database_name: newDatabaseName,
     is_initialized: input.is_initialized !== undefined ? input.is_initialized : jsonDb!.settings.is_initialized,
+    cast_label: input.cast_label !== undefined ? input.cast_label : jsonDb!.settings.cast_label || null,
     custom_field_1_display_in_list:
       input.custom_field_1_display_in_list !== undefined
         ? input.custom_field_1_display_in_list

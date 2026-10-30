@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { KeyItemGroup } from '@/lib/types';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { getKeyFieldLabel } from '@/lib/utils';
+import { getKeyFieldLabel, getCastKanaLabel } from '@/lib/utils';
 import { X, Save } from 'lucide-react';
 import { useFocusTrap } from '@/lib/useFocusTrap';
 import { TagInput } from '@/components/TagInput';
@@ -111,7 +111,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
           {showKana && isCastKey && (
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-300 block select-none">
-                {t('key_modal_cast_kana_label')}
+                {getCastKanaLabel(settings, t)}
               </label>
               <input
                 type="text"

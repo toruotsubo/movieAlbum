@@ -49,6 +49,7 @@ var import_electron = require("electron");
 var DEFAULT_APP_SETTINGS = {
   id: 1,
   is_initialized: false,
+  cast_label: null,
   custom_field_1_name: null,
   custom_field_2_name: null,
   custom_field_3_name: null,
@@ -488,6 +489,7 @@ function saveAppSettings(input) {
     ...input,
     database_name: newDatabaseName,
     is_initialized: input.is_initialized !== void 0 ? input.is_initialized : jsonDb.settings.is_initialized,
+    cast_label: input.cast_label !== void 0 ? input.cast_label : jsonDb.settings.cast_label || null,
     custom_field_1_display_in_list: input.custom_field_1_display_in_list !== void 0 ? input.custom_field_1_display_in_list : jsonDb.settings.custom_field_1_display_in_list !== false,
     custom_field_2_display_in_list: input.custom_field_2_display_in_list !== void 0 ? input.custom_field_2_display_in_list : jsonDb.settings.custom_field_2_display_in_list !== false,
     custom_field_3_display_in_list: input.custom_field_3_display_in_list !== void 0 ? input.custom_field_3_display_in_list : jsonDb.settings.custom_field_3_display_in_list !== false,

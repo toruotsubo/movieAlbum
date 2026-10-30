@@ -3,7 +3,7 @@
 import React, { Suspense, useMemo, useEffect, useState } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, formatReleaseDate, getSplitValues, getGroupMatches, getSavedSliderIndex, saveSliderIndex } from '@/lib/utils';
+import { formatMediaUrl, formatReleaseDate, getSplitValues, getGroupMatches, getSavedSliderIndex, saveSliderIndex, getCastLabel } from '@/lib/utils';
 import { formatDuration, formatResolution, formatFrameRate, formatFileSize } from '@/lib/metadataExtractor';
 import { ensureLegacyMovieMetadata } from '@/lib/legacyMetadataFetcher';
 import { useSearchParams, useRouter } from 'next/navigation';
@@ -400,7 +400,7 @@ function MovieDetailContent() {
                             return (
                               <div key="cast" className="space-y-1">
                                 <span className="text-xs text-slate-500 font-medium flex items-center gap-1.5 select-none">
-                                  <User className="w-3.5 h-3.5" /> {t('field_cast')}
+                                  <User className="w-3.5 h-3.5" /> {getCastLabel(settings, t)}
                                 </span>
                                 <p className="text-sm font-medium text-slate-200">
                                   {item.cast || '-'}
