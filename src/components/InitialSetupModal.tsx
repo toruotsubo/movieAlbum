@@ -16,6 +16,7 @@ interface InitialSetupModalProps {
   databaseState?: DatabaseState;
   onSwitchDatabase?: (id: string) => Promise<void>;
   onCreateDatabase?: (name?: string) => Promise<void>;
+  onDuplicateDatabase?: (name?: string) => Promise<void>;
   onDeleteDatabase?: (id: string) => Promise<void>;
   onSave: (settings: {
     is_initialized: boolean;
@@ -40,6 +41,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   databaseState,
   onSwitchDatabase,
   onCreateDatabase,
+  onDuplicateDatabase,
   onDeleteDatabase,
   onSave,
   onResetData,
@@ -299,6 +301,14 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   };
 
+  const handleDuplicateDatabase = async () => {
+    if (onDuplicateDatabase) {
+      const baseName = currentDbDisplayName || databaseName.trim() || '設定ファイル_00';
+      const copyName = t('settings_db_copy_name', { name: baseName });
+      await onDuplicateDatabase(copyName);
+    }
+  };
+
   const executeDeleteDb = async () => {
     setShowDeleteDbConfirm(false);
     if (onDeleteDatabase && databaseState?.activeId) {
@@ -359,7 +369,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div ref={modalRef} className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
+      <div ref={modalRef} className="glass-card w-full max-w-4xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Tab Navigation & Version */}
         <div className="flex items-center justify-between border-b border-slate-700/60">
           <div className="flex items-center gap-2 -mb-px">
@@ -840,15 +850,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       )}
 
         {/* Footer actions */}
-        <div className="pt-4 border-t border-slate-700/60 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="pt-4 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {activeTab === 'settings' && (
               <>
                 {!hasMultipleDbs ? (
                   <button
                     type="button"
                     onClick={handleResetData}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                     title={t('settings_reset_data_tooltip')}
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -858,7 +868,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowDeleteDbConfirm(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                     title={t('settings_delete_db')}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -869,11 +879,21 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddDatabase}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                   title={t('settings_add_db')}
                 >
                   <Plus className="w-4 h-4" />
                   <span>{t('settings_add_db')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDuplicateDatabase}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
+                  title={t('settings_duplicate_db')}
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>{t('settings_duplicate_db')}</span>
                 </button>
               </>
             )}

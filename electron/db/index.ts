@@ -297,6 +297,50 @@ export function createDatabase(nameInput?: string): { state: DatabaseState; sett
   };
 }
 
+export function duplicateDatabase(nameInput?: string): { state: DatabaseState; settings: AppSettings } {
+  if (!jsonDb) initDatabase();
+  saveDatabase();
+
+  const manifest = loadManifest();
+  const numStr = getNextDatabaseNumber(manifest);
+  const id = `db_${numStr}`;
+  const filename = `${id}.json`;
+  const filePath = path.join(getDbDir(), filename);
+
+  const sourceName = jsonDb!.settings.database_name || '設定ファイル_00';
+  const finalName = nameInput?.trim() || `${sourceName}_copy`;
+
+  const duplicatedDb: JsonDatabaseSchema = {
+    settings: {
+      ...JSON.parse(JSON.stringify(jsonDb!.settings)),
+      database_name: finalName,
+    },
+    movies: JSON.parse(JSON.stringify(jsonDb!.movies || [])),
+    keyRatings: JSON.parse(JSON.stringify(jsonDb!.keyRatings || {})),
+    keyTags: JSON.parse(JSON.stringify(jsonDb!.keyTags || {})),
+  };
+
+  fs.writeFileSync(filePath, JSON.stringify(duplicatedDb, null, 2), 'utf-8');
+
+  manifest.databases.push({
+    id,
+    name: finalName,
+    filename,
+    created_at: new Date().toISOString(),
+  });
+  manifest.activeId = id;
+  saveManifest(manifest);
+
+  currentDbId = id;
+  currentDbFilePath = filePath;
+  jsonDb = duplicatedDb;
+
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings,
+  };
+}
+
 export function deleteDatabase(id: string): { state: DatabaseState; settings: AppSettings } {
   const manifest = loadManifest();
   if (manifest.databases.length <= 1) {

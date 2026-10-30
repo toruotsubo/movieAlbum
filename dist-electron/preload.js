@@ -36,6 +36,7 @@ var api = {
   getDatabaseState: () => import_electron.ipcRenderer.invoke("databases:getState"),
   switchDatabase: (id) => import_electron.ipcRenderer.invoke("databases:switch", id),
   createDatabase: (name) => import_electron.ipcRenderer.invoke("databases:create", name),
+  duplicateDatabase: (name) => import_electron.ipcRenderer.invoke("databases:duplicate", name),
   deleteDatabase: (id) => import_electron.ipcRenderer.invoke("databases:delete", id),
   getSettings: () => import_electron.ipcRenderer.invoke("settings:get"),
   saveSettings: (input) => import_electron.ipcRenderer.invoke("settings:save", input),

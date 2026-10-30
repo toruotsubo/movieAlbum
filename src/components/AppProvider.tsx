@@ -25,6 +25,7 @@ interface AppContextType {
   refreshData: () => Promise<void>;
   switchDatabase: (id: string) => Promise<void>;
   createDatabase: (name?: string) => Promise<void>;
+  duplicateDatabase: (name?: string) => Promise<void>;
   deleteDatabase: (id: string) => Promise<void>;
   updateMovieRating: (id: number, rating: number) => Promise<void>;
   updateKeyItemRating: (signature: string, rating: number) => Promise<void>;
@@ -187,6 +188,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const handleDuplicateDatabase = async (name?: string) => {
+    if (window.api?.duplicateDatabase) {
+      setLoading(true);
+      clearPageFilters();
+      try {
+        const res = await window.api.duplicateDatabase(name);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to duplicate database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const handleDeleteDatabase = async (id: string) => {
     if (window.api?.deleteDatabase) {
       setLoading(true);
@@ -339,6 +357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshData,
         switchDatabase: handleSwitchDatabase,
         createDatabase: handleCreateDatabase,
+        duplicateDatabase: handleDuplicateDatabase,
         deleteDatabase: handleDeleteDatabase,
         updateMovieRating,
         updateKeyItemRating,
@@ -365,6 +384,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           databaseState={databaseState}
           onSwitchDatabase={handleSwitchDatabase}
           onCreateDatabase={handleCreateDatabase}
+          onDuplicateDatabase={handleDuplicateDatabase}
           onDeleteDatabase={handleDeleteDatabase}
           onSave={handleSaveSettings}
           onResetData={handleResetData}

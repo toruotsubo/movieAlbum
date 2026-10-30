@@ -337,6 +337,42 @@ function createDatabase(nameInput) {
     settings: jsonDb.settings
   };
 }
+function duplicateDatabase(nameInput) {
+  if (!jsonDb) initDatabase();
+  saveDatabase();
+  const manifest = loadManifest();
+  const numStr = getNextDatabaseNumber(manifest);
+  const id = `db_${numStr}`;
+  const filename = `${id}.json`;
+  const filePath = import_path.default.join(getDbDir(), filename);
+  const sourceName = jsonDb.settings.database_name || "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00";
+  const finalName = nameInput?.trim() || `${sourceName}_copy`;
+  const duplicatedDb = {
+    settings: {
+      ...JSON.parse(JSON.stringify(jsonDb.settings)),
+      database_name: finalName
+    },
+    movies: JSON.parse(JSON.stringify(jsonDb.movies || [])),
+    keyRatings: JSON.parse(JSON.stringify(jsonDb.keyRatings || {})),
+    keyTags: JSON.parse(JSON.stringify(jsonDb.keyTags || {}))
+  };
+  import_fs.default.writeFileSync(filePath, JSON.stringify(duplicatedDb, null, 2), "utf-8");
+  manifest.databases.push({
+    id,
+    name: finalName,
+    filename,
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  });
+  manifest.activeId = id;
+  saveManifest(manifest);
+  currentDbId = id;
+  currentDbFilePath = filePath;
+  jsonDb = duplicatedDb;
+  return {
+    state: getDatabaseState(),
+    settings: jsonDb.settings
+  };
+}
 function deleteDatabase(id) {
   const manifest = loadManifest();
   if (manifest.databases.length <= 1) {
@@ -1495,6 +1531,7 @@ import_electron3.ipcMain.handle("settings:save", async (_, input) => saveAppSett
 import_electron3.ipcMain.handle("databases:getState", async () => getDatabaseState());
 import_electron3.ipcMain.handle("databases:switch", async (_, id) => switchDatabase(id));
 import_electron3.ipcMain.handle("databases:create", async (_, name) => createDatabase(name));
+import_electron3.ipcMain.handle("databases:duplicate", async (_, name) => duplicateDatabase(name));
 import_electron3.ipcMain.handle("databases:delete", async (_, id) => deleteDatabase(id));
 import_electron3.ipcMain.handle("movies:getAll", async () => getAllMovies());
 import_electron3.ipcMain.handle("movies:getById", async (_, id) => getMovieById(id));
