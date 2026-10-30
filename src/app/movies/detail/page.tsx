@@ -31,12 +31,30 @@ import { SlideItem } from '@/components/SlideItem';
 function MovieDetailContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, refreshData, loading, showKana, t, lang: language } = useApp();
+  const { movies, settings, updateMovieRating, openMoviePlayer, openEditMovieModal, refreshData, loading, showKana, t, lang: language, databaseState } = useApp();
 
   const movieId = Number(searchParams.get('id'));
   const filterSignature = searchParams.get('filter');
   const slideParam = searchParams.get('slide');
   const movie = movies.find((m) => m.id === movieId);
+
+  // 設定ファイルが変更された場合は絞り込みが解除された動画一覧画面へ遷移
+  const prevActiveDbRef = React.useRef(databaseState.activeId);
+  const isDbChanged = Boolean(
+    prevActiveDbRef.current &&
+      databaseState.activeId &&
+      prevActiveDbRef.current !== databaseState.activeId
+  );
+
+  useEffect(() => {
+    if (prevActiveDbRef.current && databaseState.activeId && prevActiveDbRef.current !== databaseState.activeId) {
+      try {
+        sessionStorage.removeItem('movie_manager_movies_page_state');
+      } catch (e) {}
+      router.replace('/movies');
+    }
+    prevActiveDbRef.current = databaseState.activeId;
+  }, [databaseState.activeId, router]);
 
   // グループ化動画の取得: 親動画の概念を廃止し、ファイル名順でソートされた動画リストを取得（先頭がインデックス0）
   const groupMovies = useMemo(() => {
@@ -120,7 +138,7 @@ function MovieDetailContent() {
     }
   };
 
-  if (loading) {
+  if (loading || isDbChanged) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500" />

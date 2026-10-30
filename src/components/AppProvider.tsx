@@ -147,6 +147,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         sessionStorage.removeItem('movie_manager_key_items_page_state');
         sessionStorage.removeItem('movie_manager_movies_page_state');
+        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+          const key = sessionStorage.key(i);
+          if (key && key.startsWith('movie_manager_key_items_page_state_')) {
+            sessionStorage.removeItem(key);
+          }
+        }
       } catch (e) {
         console.error('Failed to clear sessionStorage filters:', e);
       }
