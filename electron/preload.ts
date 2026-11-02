@@ -26,6 +26,8 @@ export const api = {
     ipcRenderer.invoke('databases:switch', id),
   createDatabase: (name?: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
     ipcRenderer.invoke('databases:create', name),
+  duplicateDatabase: (name?: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
+    ipcRenderer.invoke('databases:duplicate', name),
   deleteDatabase: (id: string): Promise<{ state: DatabaseState; settings: AppSettings }> =>
     ipcRenderer.invoke('databases:delete', id),
 

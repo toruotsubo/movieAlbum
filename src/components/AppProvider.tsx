@@ -25,6 +25,7 @@ interface AppContextType {
   refreshData: () => Promise<void>;
   switchDatabase: (id: string) => Promise<void>;
   createDatabase: (name?: string) => Promise<void>;
+  duplicateDatabase: (name?: string) => Promise<void>;
   deleteDatabase: (id: string) => Promise<void>;
   updateMovieRating: (id: number, rating: number) => Promise<void>;
   updateKeyItemRating: (signature: string, rating: number) => Promise<void>;
@@ -146,6 +147,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         sessionStorage.removeItem('movie_manager_key_items_page_state');
         sessionStorage.removeItem('movie_manager_movies_page_state');
+        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+          const key = sessionStorage.key(i);
+          if (key && key.startsWith('movie_manager_key_items_page_state_')) {
+            sessionStorage.removeItem(key);
+          }
+        }
       } catch (e) {
         console.error('Failed to clear sessionStorage filters:', e);
       }
@@ -181,6 +188,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await refreshData();
       } catch (err) {
         console.error('Failed to create database:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleDuplicateDatabase = async (name?: string) => {
+    if (window.api?.duplicateDatabase) {
+      setLoading(true);
+      clearPageFilters();
+      try {
+        const res = await window.api.duplicateDatabase(name);
+        setDatabaseState(res.state);
+        setSettings(res.settings);
+        await refreshData();
+      } catch (err) {
+        console.error('Failed to duplicate database:', err);
       } finally {
         setLoading(false);
       }
@@ -339,6 +363,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         refreshData,
         switchDatabase: handleSwitchDatabase,
         createDatabase: handleCreateDatabase,
+        duplicateDatabase: handleDuplicateDatabase,
         deleteDatabase: handleDeleteDatabase,
         updateMovieRating,
         updateKeyItemRating,
@@ -365,6 +390,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           databaseState={databaseState}
           onSwitchDatabase={handleSwitchDatabase}
           onCreateDatabase={handleCreateDatabase}
+          onDuplicateDatabase={handleDuplicateDatabase}
           onDeleteDatabase={handleDeleteDatabase}
           onSave={handleSaveSettings}
           onResetData={handleResetData}

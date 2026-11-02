@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Plus } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { X, Plus, Tag } from 'lucide-react';
 import { useApp } from '@/components/AppProvider';
+import { clsx } from 'clsx';
 
 interface TagInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  existingTags?: string[];
 }
 
 export const TagInput: React.FC<TagInputProps> = ({
@@ -16,17 +18,65 @@ export const TagInput: React.FC<TagInputProps> = ({
   onChange,
   placeholder,
   className = '',
+  existingTags = [],
 }) => {
   const { t } = useApp();
   const [inputValue, setInputValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // カンマや読点区切りで分割してタグの配列を取得
-  const tags = value
-    ? value
-        .split(/[,、，]/)
-        .map((item) => item.trim())
-        .filter(Boolean)
-    : [];
+  const tags = useMemo(
+    () =>
+      value
+        ? value
+            .split(/[,、，]/)
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [],
+    [value]
+  );
+
+  // 入力文字と前方一致する既存タグ候補（未入力時は表示しない、追加済みタグは除外）
+  const matchingSuggestions = useMemo(() => {
+    const query = inputValue.trim();
+    if (!query) return [];
+
+    const lowerQuery = query.toLowerCase();
+    const currentSet = new Set(tags);
+
+    return existingTags.filter(
+      (tag) => !currentSet.has(tag) && tag.toLowerCase().startsWith(lowerQuery)
+    );
+  }, [inputValue, existingTags, tags]);
+
+  // 入力内容が変わったらハイライト位置をリセット
+  useEffect(() => {
+    setHighlightedIndex(-1);
+  }, [inputValue]);
+
+  // キーボード操作時にハイライト項目へスクロール追従
+  useEffect(() => {
+    if (highlightedIndex >= 0 && listRef.current) {
+      const itemEl = listRef.current.children[highlightedIndex] as HTMLElement | undefined;
+      if (itemEl) {
+        itemEl.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [highlightedIndex]);
+
+  const handleSelectSuggestion = (selectedTag: string) => {
+    const currentSet = new Set(tags);
+    if (!currentSet.has(selectedTag)) {
+      currentSet.add(selectedTag);
+      onChange(Array.from(currentSet).join(', '));
+    }
+    setInputValue('');
+    setHighlightedIndex(-1);
+    inputRef.current?.focus();
+  };
 
   const handleAdd = () => {
     const trimmed = inputValue.trim();
@@ -54,17 +104,55 @@ export const TagInput: React.FC<TagInputProps> = ({
       onChange(Array.from(currentSet).join(', '));
     }
     setInputValue('');
+    setHighlightedIndex(-1);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // 日本語変換等のIME確定中のEnterでは追加しない
-    if (e.key === 'Enter') {
-      if (e.nativeEvent.isComposing) {
-        return;
+    // 日本語変換等のIME確定中のキー操作では処理しない
+    if (e.nativeEvent.isComposing) {
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      if (matchingSuggestions.length > 0) {
+        e.preventDefault();
+        setHighlightedIndex((prev) =>
+          prev < matchingSuggestions.length - 1 ? prev + 1 : 0
+        );
       }
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      if (matchingSuggestions.length > 0) {
+        e.preventDefault();
+        setHighlightedIndex((prev) =>
+          prev > 0 ? prev - 1 : matchingSuggestions.length - 1
+        );
+      }
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      if (matchingSuggestions.length > 0 && highlightedIndex !== -1) {
+        e.preventDefault();
+        e.stopPropagation();
+        setHighlightedIndex(-1);
+      }
+      return;
+    }
+
+    if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
-      handleAdd();
+      if (
+        highlightedIndex >= 0 &&
+        highlightedIndex < matchingSuggestions.length
+      ) {
+        handleSelectSuggestion(matchingSuggestions[highlightedIndex]);
+      } else {
+        handleAdd();
+      }
     }
   };
 
@@ -72,6 +160,8 @@ export const TagInput: React.FC<TagInputProps> = ({
     const updatedTags = tags.filter((item) => item !== tagToRemove);
     onChange(updatedTags.join(', '));
   };
+
+  const showSuggestions = isFocused && matchingSuggestions.length > 0;
 
   return (
     <div className={`space-y-2.5 ${className}`}>
@@ -99,16 +189,59 @@ export const TagInput: React.FC<TagInputProps> = ({
         </div>
       )}
 
-      {/* 新規タグUI (inputフォーム + 追加ボタン) */}
+      {/* 新規タグUI (inputフォーム + 候補ドロップダウン + 追加ボタン) */}
       <div className="flex gap-2">
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder || t('form_tags_placeholder')}
-          className="flex-1 min-w-0 bg-slate-900/80 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-        />
+        <div className="relative flex-1 min-w-0">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder || t('form_tags_placeholder')}
+            className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+          />
+
+          {/* 前方一致候補リスト */}
+          {showSuggestions && (
+            <div
+              ref={listRef}
+              className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-48 overflow-y-auto rounded-xl bg-slate-900 border border-slate-700/80 shadow-xl py-1 select-none"
+            >
+              {matchingSuggestions.map((suggestion, index) => {
+                const isHighlighted = index === highlightedIndex;
+                return (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectSuggestion(suggestion);
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={clsx(
+                      'w-full flex items-center gap-2 px-3.5 py-2 text-left text-xs font-medium transition-colors cursor-pointer',
+                      isHighlighted
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-200 hover:bg-slate-800'
+                    )}
+                  >
+                    <Tag
+                      className={clsx(
+                        'w-3.5 h-3.5 shrink-0',
+                        isHighlighted ? 'text-blue-200' : 'text-blue-400'
+                      )}
+                    />
+                    <span className="truncate">{suggestion}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           onClick={handleAdd}

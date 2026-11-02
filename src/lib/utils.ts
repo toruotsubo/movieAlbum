@@ -155,16 +155,38 @@ export function split8DigitYear(
 }
 
 /**
+ * Get display label for the 'cast' field with custom setting fallback
+ */
+export function getCastLabel(
+  settings: AppSettings | null | undefined,
+  tFunc: (k: any, params?: Record<string, string | number>) => string
+): string {
+  const custom = settings?.cast_label?.trim();
+  return custom || tFunc('field_cast');
+}
+
+/**
+ * Get display label for the 'cast_kana' field linked to 'cast' label
+ */
+export function getCastKanaLabel(
+  settings: AppSettings | null | undefined,
+  tFunc: (k: any, params?: Record<string, string | number>) => string
+): string {
+  const castLabel = getCastLabel(settings, tFunc);
+  return tFunc('field_cast_kana', { label: castLabel });
+}
+
+/**
  * Get display label for a key field ID with translation fallback
  */
 export function getKeyFieldLabel(
   keyId: string,
   settings: AppSettings | null,
-  tFunc: (k: any) => string
+  tFunc: (k: any, params?: Record<string, string | number>) => string
 ): string {
   if (keyId === 'title') return tFunc('field_title');
   if (keyId === 'genre') return tFunc('field_genre');
-  if (keyId === 'cast') return tFunc('field_cast');
+  if (keyId === 'cast') return getCastLabel(settings, tFunc);
   if (keyId === 'release_year') return tFunc('field_release_year');
   if (keyId === 'release_date') return tFunc('field_release_date');
   if (keyId === 'rating') return tFunc('field_rating');

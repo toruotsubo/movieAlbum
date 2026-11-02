@@ -22,6 +22,7 @@ import {
   getDatabaseState,
   switchDatabase,
   createDatabase,
+  duplicateDatabase,
   deleteDatabase,
   cleanOrphanThumbnails,
 } from './db';
@@ -358,6 +359,7 @@ ipcMain.handle('settings:save', async (_, input) => saveAppSettings(input));
 ipcMain.handle('databases:getState', async () => getDatabaseState());
 ipcMain.handle('databases:switch', async (_, id: string) => switchDatabase(id));
 ipcMain.handle('databases:create', async (_, name?: string) => createDatabase(name));
+ipcMain.handle('databases:duplicate', async (_, name?: string) => duplicateDatabase(name));
 ipcMain.handle('databases:delete', async (_, id: string) => deleteDatabase(id));
 
 ipcMain.handle('movies:getAll', async () => getAllMovies());

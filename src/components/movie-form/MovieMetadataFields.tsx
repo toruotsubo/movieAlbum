@@ -4,7 +4,7 @@ import React from 'react';
 import { AppSettings, DEFAULT_FIELD_ORDER } from '../../lib/types';
 import { RatingStars } from '../RatingStars';
 import { useApp } from '../AppProvider';
-import { getKeyFieldLabel, split8DigitYear, findKanaForCast } from '../../lib/utils';
+import { getKeyFieldLabel, getCastLabel, getCastKanaLabel, split8DigitYear, findKanaForCast } from '../../lib/utils';
 import { TagInput } from '../TagInput';
 
 export interface MovieFormData {
@@ -39,6 +39,21 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
   onToggleGrouping,
 }) => {
   const { t, movies } = useApp();
+
+  const existingMovieTags = React.useMemo(() => {
+    return Array.from(
+      new Set(
+        movies.flatMap((m) =>
+          m.tags
+            ? m.tags
+                .split(/[,、，]/)
+                .map((tag) => tag.trim())
+                .filter(Boolean)
+            : []
+        )
+      )
+    ).sort((a, b) => a.localeCompare(b, 'ja'));
+  }, [movies]);
 
   const handleCastBlur = () => {
     if (showKana && formData.cast) {
@@ -129,7 +144,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
           return (
             <React.Fragment key="cast">
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">{t('field_cast')}</label>
+                <label className="text-xs text-slate-400 mb-1 block">{getCastLabel(settings, t)}</label>
                 <input
                   type="text"
                   value={formData.cast}
@@ -141,7 +156,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
               </div>
               {showKana && (
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">{t('field_cast_kana')}</label>
+                  <label className="text-xs text-slate-400 mb-1 block">{getCastKanaLabel(settings, t)}</label>
                   <input
                     type="text"
                     value={formData.castKana}
@@ -193,8 +208,8 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
             num === '1'
               ? settings?.custom_field_1_name
               : num === '2'
-              ? settings?.custom_field_2_name
-              : settings?.custom_field_3_name;
+                ? settings?.custom_field_2_name
+                : settings?.custom_field_3_name;
 
           if (!customName) return null;
 
@@ -236,6 +251,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
           value={formData.tags}
           onChange={(newTags) => onFieldChange('tags', newTags)}
           placeholder={t('form_tags_placeholder')}
+          existingTags={existingMovieTags}
         />
       </div>
 
@@ -250,11 +266,10 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
         <button
           type="button"
           onClick={onToggleGrouping}
-          className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-            formData.isGrouped
+          className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${formData.isGrouped
               ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/30'
               : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
-          }`}
+            }`}
         >
           {formData.isGrouped ? t('on') : t('off')}
         </button>

@@ -1,6 +1,7 @@
 export interface AppSettings {
   id: number;
   is_initialized: boolean;
+  cast_label?: string | null;
   custom_field_1_name: string | null;
   custom_field_2_name: string | null;
   custom_field_3_name: string | null;
@@ -28,6 +29,7 @@ export type SaveSettingsInput = Partial<Omit<AppSettings, 'id'>>;
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 1,
   is_initialized: false,
+  cast_label: null,
   custom_field_1_name: null,
   custom_field_2_name: null,
   custom_field_3_name: null,

@@ -16,9 +16,11 @@ interface InitialSetupModalProps {
   databaseState?: DatabaseState;
   onSwitchDatabase?: (id: string) => Promise<void>;
   onCreateDatabase?: (name?: string) => Promise<void>;
+  onDuplicateDatabase?: (name?: string) => Promise<void>;
   onDeleteDatabase?: (id: string) => Promise<void>;
   onSave: (settings: {
     is_initialized: boolean;
+    cast_label?: string | null;
     custom_field_1_name: string | null;
     custom_field_2_name: string | null;
     custom_field_3_name: string | null;
@@ -40,6 +42,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   databaseState,
   onSwitchDatabase,
   onCreateDatabase,
+  onDuplicateDatabase,
   onDeleteDatabase,
   onSave,
   onResetData,
@@ -48,6 +51,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const { t } = useApp();
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   const [databaseName, setDatabaseName] = useState('設定ファイル_00');
+  const [castLabel, setCastLabel] = useState('');
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
   const [custom3, setCustom3] = useState('');
@@ -175,6 +179,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       isLoadedRef.current = true;
       loadedDbIdRef.current = currentDbId;
       setDatabaseName(currentSettings.database_name || '設定ファイル_00');
+      setCastLabel(currentSettings.cast_label || '');
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
       setCustom3(currentSettings.custom_field_3_name || '');
@@ -202,13 +207,19 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   }, [isOpen, currentSettings, databaseState?.activeId]);
 
-  if (!isOpen) return null;
+  // Check if a field is disabled (custom field with empty name)
+  const isFieldDisabled = (id: string): boolean => {
+    if (id === 'custom_field_1') return !custom1.trim();
+    if (id === 'custom_field_2') return !custom2.trim();
+    if (id === 'custom_field_3') return !custom3.trim();
+    return false;
+  };
 
   // Helper to get field label by ID
   const getFieldLabel = (id: string): string => {
     if (id === 'title') return t('field_title');
     if (id === 'genre') return t('field_genre');
-    if (id === 'cast') return t('field_cast');
+    if (id === 'cast') return castLabel.trim() || t('field_cast');
     if (id === 'release_year') return t('field_release_year');
     if (id === 'release_date') return t('field_release_date');
     if (id === 'rating') return t('field_rating');
@@ -217,6 +228,25 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     if (id === 'custom_field_3') return custom3.trim() || t('field_custom_3_default');
     return id;
   };
+
+  // Automatically remove disabled custom fields from selected key fields
+  useEffect(() => {
+    if (!isOpen) return;
+    const disabledIds: string[] = [];
+    if (!custom1.trim()) disabledIds.push('custom_field_1');
+    if (!custom2.trim()) disabledIds.push('custom_field_2');
+    if (!custom3.trim()) disabledIds.push('custom_field_3');
+
+    if (disabledIds.length > 0) {
+      setSelectedKeyFields((prev) => {
+        const filtered = prev.filter((id) => !disabledIds.includes(id));
+        if (filtered.length === prev.length) return prev;
+        return filtered.length > 0 ? filtered : ['genre'];
+      });
+    }
+  }, [isOpen, custom1, custom2, custom3]);
+
+  if (!isOpen) return null;
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -274,6 +304,14 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   };
 
+  const handleDuplicateDatabase = async () => {
+    if (onDuplicateDatabase) {
+      const baseName = currentDbDisplayName || databaseName.trim() || '設定ファイル_00';
+      const copyName = t('settings_db_copy_name', { name: baseName });
+      await onDuplicateDatabase(copyName);
+    }
+  };
+
   const executeDeleteDb = async () => {
     setShowDeleteDbConfirm(false);
     if (onDeleteDatabase && databaseState?.activeId) {
@@ -282,6 +320,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   };
 
   const handleToggleKeyField = (fieldId: string) => {
+    if (isFieldDisabled(fieldId)) return;
     if (selectedKeyFields.includes(fieldId)) {
       if (selectedKeyFields.length > 1) {
         setSelectedKeyFields(selectedKeyFields.filter((id) => id !== fieldId));
@@ -295,16 +334,18 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   const handleSave = () => {
     const fullFieldOrder = ['title', 'rating', ...reorderableFieldIds];
+    const validKeyFields = selectedKeyFields.filter((id) => !isFieldDisabled(id));
     onSave({
       is_initialized: true,
       database_name: databaseName.trim() || '設定ファイル_00',
+      cast_label: castLabel.trim() || null,
       custom_field_1_name: custom1.trim() || null,
       custom_field_2_name: custom2.trim() || null,
       custom_field_3_name: custom3.trim() || null,
       custom_field_1_display_in_list: custom1DisplayInList,
       custom_field_2_display_in_list: custom2DisplayInList,
       custom_field_3_display_in_list: custom3DisplayInList,
-      key_fields: selectedKeyFields.length > 0 ? selectedKeyFields : ['genre'],
+      key_fields: validKeyFields.length > 0 ? validKeyFields : ['genre'],
       field_order: fullFieldOrder,
       language: selectedLanguage,
     });
@@ -319,6 +360,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     if (onResetData) {
       await onResetData();
     }
+    setCastLabel('');
     setCustom1('');
     setCustom2('');
     setCustom3('');
@@ -332,7 +374,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div ref={modalRef} className="glass-card w-full max-w-2xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
+      <div ref={modalRef} className="glass-card w-full max-w-4xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Tab Navigation & Version */}
         <div className="flex items-center justify-between border-b border-slate-700/60">
           <div className="flex items-center gap-2 -mb-px">
@@ -521,34 +563,53 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
             {/* Reorderable Items List */}
             <div className="grid grid-cols-1 gap-2 pt-1">
               {reorderableFieldIds.map((fieldId, index) => {
+                const isDisabled = isFieldDisabled(fieldId);
                 const keyIndex = selectedKeyFields.indexOf(fieldId);
-                const isSelected = keyIndex !== -1;
+                const isSelected = !isDisabled && keyIndex !== -1;
                 const isDragging = draggedIndex === index;
                 const isDragOver = dragOverIndex === index;
 
                 return (
                   <div
                     key={fieldId}
-                    draggable={canDragIndex === index}
-                    onDragStart={(e) => handleDragStart(e, index)}
+                    draggable={!isDisabled && canDragIndex === index}
+                    onDragStart={(e) => {
+                      if (isDisabled) {
+                        e.preventDefault();
+                        return;
+                      }
+                      handleDragStart(e, index);
+                    }}
                     onDragOver={(e) => handleDragOver(e, index)}
                     onDrop={(e) => handleDrop(e, index)}
                     onDragEnd={handleDragEnd}
-                    onClick={() => handleToggleKeyField(fieldId)}
+                    onClick={() => {
+                      if (isDisabled) return;
+                      handleToggleKeyField(fieldId);
+                    }}
                     className={clsx(
-                      'flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
-                      isSelected
-                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
-                        : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200',
-                      isDragging && 'opacity-40 border-dashed border-blue-400',
-                      isDragOver && 'border-blue-400 bg-blue-600/10 scale-[1.01]'
+                      'flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition-all select-none',
+                      isDisabled
+                        ? 'bg-slate-900/30 border-slate-800/40 text-slate-500 opacity-40 cursor-not-allowed'
+                        : isSelected
+                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500 cursor-pointer'
+                        : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 cursor-pointer',
+                      !isDisabled && isDragging && 'opacity-40 border-dashed border-blue-400',
+                      !isDisabled && isDragOver && 'border-blue-400 bg-blue-600/10 scale-[1.01]'
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="cursor-grab active:cursor-grabbing p-1 text-slate-500 hover:text-slate-300 rounded transition-colors"
-                        title={t('settings_drag_to_reorder')}
-                        onMouseEnter={() => setCanDragIndex(index)}
+                        className={clsx(
+                          'p-1 rounded transition-colors',
+                          isDisabled
+                            ? 'text-slate-700 cursor-not-allowed'
+                            : 'cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300'
+                        )}
+                        title={isDisabled ? undefined : t('settings_drag_to_reorder')}
+                        onMouseEnter={() => {
+                          if (!isDisabled) setCanDragIndex(index);
+                        }}
                         onMouseLeave={() => setCanDragIndex(null)}
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -560,20 +621,46 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                           {keyIndex + 1}
                         </span>
                       ) : (
-                        <span className="w-5 h-5 rounded-full border border-slate-600/80 flex items-center justify-center shrink-0" />
+                        <span
+                          className={clsx(
+                            'w-5 h-5 rounded-full border flex items-center justify-center shrink-0',
+                            isDisabled ? 'border-slate-700/50' : 'border-slate-600/80'
+                          )}
+                        />
                       )}
 
-                      <span className="truncate">{getFieldLabel(fieldId)}</span>
+                      {fieldId === 'cast' ? (
+                        <input
+                          type="text"
+                          value={castLabel}
+                          onChange={(e) => setCastLabel(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          placeholder={t('field_cast')}
+                          className="bg-slate-950/80 border border-slate-700/80 hover:border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-1 text-sm text-white placeholder-slate-400 focus:outline-none w-48 sm:w-64 select-text"
+                        />
+                      ) : (
+                        <span className="truncate">{getFieldLabel(fieldId)}</span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
                       {fieldId.startsWith('custom_field_') && (
                         <label
-                          className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-white cursor-pointer select-none"
-                          onClick={(e) => e.stopPropagation()}
+                          className={clsx(
+                            'flex items-center gap-1.5 text-xs select-none',
+                            isDisabled
+                              ? 'text-slate-600 cursor-not-allowed'
+                              : 'text-slate-300 hover:text-white cursor-pointer'
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isDisabled) e.preventDefault();
+                          }}
                         >
                           <input
                             type="checkbox"
+                            disabled={isDisabled}
                             checked={
                               fieldId === 'custom_field_1'
                                 ? custom1DisplayInList
@@ -582,16 +669,19 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                                 : custom3DisplayInList
                             }
                             onChange={(e) => {
+                              if (isDisabled) return;
                               if (fieldId === 'custom_field_1') setCustom1DisplayInList(e.target.checked);
                               else if (fieldId === 'custom_field_2') setCustom2DisplayInList(e.target.checked);
                               else if (fieldId === 'custom_field_3') setCustom3DisplayInList(e.target.checked);
                             }}
-                            className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-3.5 h-3.5 cursor-pointer"
+                            className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-3.5 h-3.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                           />
                           <span>{t('settings_custom_display_in_list')}</span>
                         </label>
                       )}
-                      <span className="text-xs text-slate-600 font-mono">#{index + 1}</span>
+                      <span className={clsx('text-xs font-mono', isDisabled ? 'text-slate-700' : 'text-slate-600')}>
+                        #{index + 1}
+                      </span>
                     </div>
                   </div>
                 );
@@ -777,15 +867,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       )}
 
         {/* Footer actions */}
-        <div className="pt-4 border-t border-slate-700/60 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="pt-4 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             {activeTab === 'settings' && (
               <>
                 {!hasMultipleDbs ? (
                   <button
                     type="button"
                     onClick={handleResetData}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                     title={t('settings_reset_data_tooltip')}
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -795,7 +885,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowDeleteDbConfirm(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                     title={t('settings_delete_db')}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -806,11 +896,21 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddDatabase}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                   title={t('settings_add_db')}
                 >
                   <Plus className="w-4 h-4" />
                   <span>{t('settings_add_db')}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDuplicateDatabase}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
+                  title={t('settings_duplicate_db')}
+                >
+                  <Copy className="w-4 h-4" />
+                  <span>{t('settings_duplicate_db')}</span>
                 </button>
               </>
             )}
