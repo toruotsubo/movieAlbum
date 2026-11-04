@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
-import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Settings, Scale } from 'lucide-react';
+import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Settings, Scale, Edit, Save, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -52,6 +52,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   const [databaseName, setDatabaseName] = useState('設定ファイル_00');
   const [castLabel, setCastLabel] = useState('');
+  const [isEditingCastLabel, setIsEditingCastLabel] = useState(false);
+  const [editingCastLabelValue, setEditingCastLabelValue] = useState('');
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
   const [custom3, setCustom3] = useState('');
@@ -169,6 +171,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setActiveTab('settings');
+      setIsEditingCastLabel(false);
       isLoadedRef.current = false;
       loadedDbIdRef.current = null;
       return;
@@ -180,6 +183,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       loadedDbIdRef.current = currentDbId;
       setDatabaseName(currentSettings.database_name || '設定ファイル_00');
       setCastLabel(currentSettings.cast_label || '');
+      setIsEditingCastLabel(false);
+      setEditingCastLabelValue(currentSettings.cast_label || '');
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
       setCustom3(currentSettings.custom_field_3_name || '');
@@ -361,6 +366,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       await onResetData();
     }
     setCastLabel('');
+    setIsEditingCastLabel(false);
+    setEditingCastLabelValue('');
     setCustom1('');
     setCustom2('');
     setCustom3('');
@@ -630,15 +637,81 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                       )}
 
                       {fieldId === 'cast' ? (
-                        <input
-                          type="text"
-                          value={castLabel}
-                          onChange={(e) => setCastLabel(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          placeholder={t('field_cast')}
-                          className="bg-slate-950/80 border border-slate-700/80 hover:border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-1 text-sm text-white placeholder-slate-400 focus:outline-none w-48 sm:w-64 select-text"
-                        />
+                        isEditingCastLabel ? (
+                          <div
+                            className="flex items-center gap-1.5 min-w-0"
+                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
+                            <input
+                              type="text"
+                              value={editingCastLabelValue}
+                              onChange={(e) => setEditingCastLabelValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  const trimmed = editingCastLabelValue.trim();
+                                  setCastLabel(trimmed === t('field_cast') ? '' : trimmed);
+                                  setIsEditingCastLabel(false);
+                                } else if (e.key === 'Escape') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setEditingCastLabelValue(castLabel);
+                                  setIsEditingCastLabel(false);
+                                }
+                              }}
+                              placeholder={t('field_cast')}
+                              autoFocus
+                              className="bg-slate-950/80 border border-slate-700/80 hover:border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-0.5 text-sm text-white placeholder-slate-400 focus:outline-none w-40 sm:w-56 select-text"
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const trimmed = editingCastLabelValue.trim();
+                                setCastLabel(trimmed === t('field_cast') ? '' : trimmed);
+                                setIsEditingCastLabel(false);
+                              }}
+                              title={t('save')}
+                              aria-label={t('save')}
+                              className="p-1 rounded-lg bg-blue-600/80 hover:bg-blue-500 text-white transition-colors shrink-0 cursor-pointer"
+                            >
+                              <Save className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCastLabelValue(castLabel);
+                                setIsEditingCastLabel(false);
+                              }}
+                              title={t('cancel')}
+                              aria-label={t('cancel')}
+                              className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors shrink-0 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="truncate">{getFieldLabel(fieldId)}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCastLabelValue(castLabel);
+                                setIsEditingCastLabel(true);
+                              }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              title={t('edit')}
+                              aria-label={t('edit')}
+                              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors shrink-0 cursor-pointer"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <span className="truncate">{getFieldLabel(fieldId)}</span>
                       )}
