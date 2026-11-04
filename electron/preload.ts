@@ -69,6 +69,18 @@ export const api = {
     targetTime?: number | null
   ): Promise<{ imagePath: string; duration: number | null; targetTime: number } | null> =>
     ipcRenderer.invoke('app:generateThumbnail', { filePath, targetTime }),
+  generateTimelineThumbnail: (
+    filePath: string,
+    duration?: number | null,
+    width?: number | null,
+    height?: number | null
+  ): Promise<{
+    imagePath: string;
+    duration: number | null;
+    width: number | null;
+    height: number | null;
+  } | null> =>
+    ipcRenderer.invoke('app:generateTimelineThumbnail', { filePath, duration, width, height }),
   cleanThumbnails: (): Promise<{ deletedCount: number }> => ipcRenderer.invoke('app:cleanThumbnails'),
   resetData: (): Promise<AppSettings> => ipcRenderer.invoke('app:resetData'),
   openExternal: (url: string): Promise<boolean> => ipcRenderer.invoke('app:openExternal', url),

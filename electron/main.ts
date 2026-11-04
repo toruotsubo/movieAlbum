@@ -329,6 +329,121 @@ export async function generateThumbnailWithFFmpeg(
   });
 }
 
+const TIMELINE_RATIOS = [0.08, 0.20, 0.32, 0.46, 0.58, 0.70, 0.82, 0.94];
+
+/**
+ * Generate 8-point timeline composite screenshot (720px width) from video file using FFmpeg.
+ * Landscape / Square (width >= height): 180px width per cell, 4 columns x 2 rows.
+ * Portrait (width < height): 90px width per cell, 8 columns x 1 row.
+ */
+export async function generateTimelineThumbnailWithFFmpeg(
+  filePath: string,
+  durationInput?: number | null,
+  widthInput?: number | null,
+  heightInput?: number | null
+): Promise<{
+  imagePath: string;
+  duration: number | null;
+  width: number | null;
+  height: number | null;
+} | null> {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return null;
+  }
+
+  let duration = durationInput && durationInput > 0 ? durationInput : null;
+  let width = widthInput && widthInput > 0 ? widthInput : null;
+  let height = heightInput && heightInput > 0 ? heightInput : null;
+
+  if (!duration || !width || !height) {
+    const meta = await extractVideoMetadata(filePath);
+    if (meta) {
+      if (!duration && meta.duration && meta.duration > 0) duration = meta.duration;
+      if (!width && meta.width && meta.width > 0) width = meta.width;
+      if (!height && meta.height && meta.height > 0) height = meta.height;
+    }
+  }
+
+  const isPortrait = Boolean(width && height && height > width);
+
+  const userDataPath = app.getPath('userData');
+  const thumbDir = path.join(userDataPath, 'thumbnails');
+  if (!fs.existsSync(thumbDir)) {
+    fs.mkdirSync(thumbDir, { recursive: true });
+  }
+
+  const filename = `timeline_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
+  const fullPath = path.join(thumbDir, filename);
+
+  const buildFilterComplex = (portrait: boolean): string => {
+    const cellWidth = portrait ? 90 : 180;
+    const scales = TIMELINE_RATIOS.map(
+      (_, i) => `[${i}:v]scale=${cellWidth}:-1,setsar=1[v${i}]`
+    ).join(';');
+
+    if (portrait) {
+      return `${scales};[v0][v1][v2][v3][v4][v5][v6][v7]hstack=inputs=8[out]`;
+    }
+    return `${scales};[v0][v1][v2][v3]hstack=inputs=4[r0];[v4][v5][v6][v7]hstack=inputs=4[r1];[r0][r1]vstack=inputs=2[out]`;
+  };
+
+  const filterComplex = buildFilterComplex(isPortrait);
+
+  const runFFmpegTimeline = (timestamps: number[]): Promise<boolean> => {
+    return new Promise((res) => {
+      const args: string[] = ['-y'];
+      for (const t of timestamps) {
+        args.push('-ss', Math.max(0, t).toFixed(3), '-i', filePath);
+      }
+      args.push(
+        '-filter_complex',
+        filterComplex,
+        '-map',
+        '[out]',
+        '-frames:v',
+        '1',
+        fullPath
+      );
+
+      execFile(getFFmpegPath(), args, { timeout: 30000 }, (err) => {
+        if (!err && fs.existsSync(fullPath)) {
+          res(true);
+        } else {
+          res(false);
+        }
+      });
+    });
+  };
+
+  const validDur = duration && duration > 0 ? duration : 0;
+
+  // Primary attempt: exact 8%, 20%, 32%, 46%, 58%, 70%, 82%, 94%
+  const primaryTimes = TIMELINE_RATIOS.map((r) => (validDur > 0 ? validDur * r : 0));
+  if (await runFFmpegTimeline(primaryTimes)) {
+    return { imagePath: fullPath, duration, width, height };
+  }
+
+  // Fallback 1: step back slightly from container end to avoid EOF demuxer issues on last frames
+  if (validDur > 0.5) {
+    const safeDur = Math.max(0.1, validDur - 0.8);
+    const fallbackTimes = TIMELINE_RATIOS.map((r) => Math.max(0, safeDur * r * 0.9));
+    if (await runFFmpegTimeline(fallbackTimes)) {
+      return { imagePath: fullPath, duration, width, height };
+    }
+  }
+
+  // Fallback 2: all at 0s for very short / single-frame videos
+  if (validDur > 0) {
+    const zeroTimes = TIMELINE_RATIOS.map(() => 0);
+    if (await runFFmpegTimeline(zeroTimes)) {
+      return { imagePath: fullPath, duration, width, height };
+    }
+  }
+
+  console.error('FFmpeg timeline thumbnail generation failed for:', filePath);
+  return null;
+}
+
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   registerAppProtocol();
@@ -365,7 +480,27 @@ ipcMain.handle('databases:delete', async (_, id: string) => deleteDatabase(id));
 ipcMain.handle('movies:getAll', async () => getAllMovies());
 ipcMain.handle('movies:getById', async (_, id: number) => getMovieById(id));
 ipcMain.handle('movies:getByPath', async (_, filePath: string) => getMovieByFilePath(filePath));
-ipcMain.handle('movies:add', async (_, movie) => addMovie(movie));
+ipcMain.handle('movies:add', async (_, movie) => {
+  if (!movie.timeline_image_path && movie.file_path) {
+    try {
+      const timelineRes = await generateTimelineThumbnailWithFFmpeg(
+        movie.file_path,
+        movie.duration,
+        movie.width,
+        movie.height
+      );
+      if (timelineRes?.imagePath) {
+        movie.timeline_image_path = timelineRes.imagePath;
+        if (!movie.duration && timelineRes.duration) movie.duration = timelineRes.duration;
+        if (!movie.width && timelineRes.width) movie.width = timelineRes.width;
+        if (!movie.height && timelineRes.height) movie.height = timelineRes.height;
+      }
+    } catch (err) {
+      console.error('Failed to auto-generate timeline image on movies:add:', err);
+    }
+  }
+  return addMovie(movie);
+});
 ipcMain.handle('movies:update', async (_, movie) => updateMovie(movie));
 ipcMain.handle('movies:delete', async (_, id: number) => deleteMovie(id));
 ipcMain.handle('movies:updateRating', async (_, { id, rating }: { id: number; rating: number }) =>
@@ -438,6 +573,27 @@ ipcMain.handle('app:saveSummaryImage', async (_, base64Data: string) => {
 ipcMain.handle('app:generateThumbnail', async (_, { filePath, targetTime }: { filePath: string; targetTime?: number | null }) => {
   return generateThumbnailWithFFmpeg(filePath, targetTime);
 });
+
+// Generate 8-point timeline composite thumbnail via FFmpeg IPC handler
+ipcMain.handle(
+  'app:generateTimelineThumbnail',
+  async (
+    _,
+    {
+      filePath,
+      duration,
+      width,
+      height,
+    }: {
+      filePath: string;
+      duration?: number | null;
+      width?: number | null;
+      height?: number | null;
+    }
+  ) => {
+    return generateTimelineThumbnailWithFFmpeg(filePath, duration, width, height);
+  }
+);
 
 // Clean orphan thumbnails IPC handler
 ipcMain.handle('app:cleanThumbnails', async () => {

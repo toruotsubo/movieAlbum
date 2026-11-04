@@ -559,6 +559,7 @@ export function addMovie(movie: CreateMovieInput): Movie {
     file_path: movie.file_path,
     file_name: movie.file_name,
     summary_image_path: movie.summary_image_path || null,
+    timeline_image_path: movie.timeline_image_path || null,
     title: movie.title || null,
     genre: movie.genre || null,
     cast: movie.cast || null,
@@ -812,6 +813,10 @@ export async function cleanOrphanThumbnails(): Promise<{ deletedCount: number }>
           for (const m of dbContent.movies) {
             if (m.summary_image_path) {
               const basename = path.basename(m.summary_image_path).toLowerCase();
+              usedFilenames.add(basename);
+            }
+            if (m.timeline_image_path) {
+              const basename = path.basename(m.timeline_image_path).toLowerCase();
               usedFilenames.add(basename);
             }
           }
