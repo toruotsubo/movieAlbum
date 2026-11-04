@@ -2,7 +2,9 @@ import { Movie } from './types';
 import { extractMetadataFromUrl } from './metadataExtractor';
 import { formatMediaUrl } from './utils';
 
-const timelineAttemptedKeys = new Set<string>();
+const inFlightTimelinePaths = new Set<string>();
+const failedTimelinePaths = new Set<string>();
+const generatedTimelineCache = new Map<string, { imagePath: string; duration?: number | null; width?: number | null; height?: number | null }>();
 
 /**
  * 登録済み動画データの詳細画面表示時に、メタデータ（duration, width, height, frame_rate, file_size）
@@ -22,8 +24,10 @@ export async function ensureLegacyMovieMetadata(
   const hasTimelineImage = Boolean(movie.timeline_image_path);
 
   const needsMetadata = !(hasDuration && hasResolution && hasFrameRate && hasFileSize);
-  const timelineKey = `${movie.id}:${movie.file_path}`;
-  const needsTimeline = !hasTimelineImage && !timelineAttemptedKeys.has(timelineKey);
+  const needsTimeline =
+    !hasTimelineImage &&
+    !inFlightTimelinePaths.has(movie.file_path) &&
+    !failedTimelinePaths.has(movie.file_path);
 
   if (!needsMetadata && !needsTimeline) {
     return;
@@ -62,20 +66,45 @@ export async function ensureLegacyMovieMetadata(
       }
     }
 
-    // 3. 8時点スクリーンショットまとめ画像の自動生成
+    // 3. 8時点スクリーンショットまとめ画像の自動生成（または別設定ファイルで生成済みのキャッシュ再利用）
     if (needsTimeline && window.api?.generateTimelineThumbnail) {
-      timelineAttemptedKeys.add(timelineKey);
-      const timelineRes = await window.api.generateTimelineThumbnail(
-        movie.file_path,
-        duration,
-        width,
-        height
-      );
-      if (timelineRes?.imagePath) {
-        timelineImagePath = timelineRes.imagePath;
-        if (duration == null && timelineRes.duration) duration = timelineRes.duration;
-        if (width == null && timelineRes.width) width = timelineRes.width;
-        if (height == null && timelineRes.height) height = timelineRes.height;
+      const cached = generatedTimelineCache.get(movie.file_path);
+      const cachedExists =
+        cached?.imagePath && window.api?.checkFileExists
+          ? await window.api.checkFileExists(cached.imagePath)
+          : false;
+
+      if (cached && cachedExists) {
+        timelineImagePath = cached.imagePath;
+        if (duration == null && cached.duration) duration = cached.duration;
+        if (width == null && cached.width) width = cached.width;
+        if (height == null && cached.height) height = cached.height;
+      } else {
+        inFlightTimelinePaths.add(movie.file_path);
+        try {
+          const timelineRes = await window.api.generateTimelineThumbnail(
+            movie.file_path,
+            duration,
+            width,
+            height
+          );
+          if (timelineRes?.imagePath) {
+            timelineImagePath = timelineRes.imagePath;
+            if (duration == null && timelineRes.duration) duration = timelineRes.duration;
+            if (width == null && timelineRes.width) width = timelineRes.width;
+            if (height == null && timelineRes.height) height = timelineRes.height;
+            generatedTimelineCache.set(movie.file_path, {
+              imagePath: timelineRes.imagePath,
+              duration: timelineRes.duration,
+              width: timelineRes.width,
+              height: timelineRes.height,
+            });
+          } else {
+            failedTimelinePaths.add(movie.file_path);
+          }
+        } finally {
+          inFlightTimelinePaths.delete(movie.file_path);
+        }
       }
     }
 

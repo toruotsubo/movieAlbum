@@ -112,7 +112,7 @@ function MovieDetailContent() {
         }
       });
     }
-  }, [currentMovie?.id]);
+  }, [currentMovie?.id, databaseState.activeId]);
 
   const changeSlide = (newIndex: number) => {
     const clamped = Math.min(Math.max(0, newIndex), Math.max(0, totalCount - 1));
