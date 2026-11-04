@@ -50,12 +50,15 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
 
   // Media & Metadata State
   const [summaryImagePath, setSummaryImagePath] = useState<string | null>(null);
+  const [timelineImagePath, setTimelineImagePath] = useState<string | null>(null);
   const [capturedTime, setCapturedTime] = useState<number | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [width, setWidth] = useState<number | null>(null);
   const [height, setHeight] = useState<number | null>(null);
   const [frameRate, setFrameRate] = useState<number | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
+
+  const timelinePromiseRef = useRef<Promise<string | null> | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -109,6 +112,8 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
       });
 
       setSummaryImagePath(movie.summary_image_path || null);
+      setTimelineImagePath(movie.timeline_image_path || null);
+      timelinePromiseRef.current = null;
       setCapturedTime(movie.captured_time !== undefined ? movie.captured_time : null);
       setDuration(movie.duration || null);
       setWidth(movie.width || null);
@@ -127,6 +132,31 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
             if (meta.frame_rate && (!movie.frame_rate || movie.frame_rate <= 0)) setFrameRate(meta.frame_rate);
           }
         }).catch((err) => console.warn('Failed to extract metadata in modal:', err));
+      }
+
+      // Generate 8-point timeline image when registering a new video (or if missing)
+      if (!movie.timeline_image_path && movie.file_path && window.api?.generateTimelineThumbnail) {
+        timelinePromiseRef.current = window.api
+          .generateTimelineThumbnail(
+            movie.file_path,
+            movie.duration || null,
+            movie.width || null,
+            movie.height || null
+          )
+          .then((res) => {
+            if (res?.imagePath) {
+              setTimelineImagePath(res.imagePath);
+              if (res.duration && (!movie.duration || movie.duration <= 0)) setDuration(res.duration);
+              if (res.width && !movie.width) setWidth(res.width);
+              if (res.height && !movie.height) setHeight(res.height);
+              return res.imagePath;
+            }
+            return null;
+          })
+          .catch((err) => {
+            console.warn('Failed to generate timeline thumbnail in modal:', err);
+            return null;
+          });
       }
     }
   }, [isOpen, movie, movies]);
@@ -185,6 +215,11 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
       }
     }
 
+    let finalTimelineImagePath = timelineImagePath;
+    if (!finalTimelineImagePath && timelinePromiseRef.current) {
+      finalTimelineImagePath = await timelinePromiseRef.current;
+    }
+
     const payload: Partial<Movie> = {
       ...movie,
       title: formData.title.trim() || movie?.file_name || null,
@@ -201,6 +236,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
       custom_field_3: formData.custom3.trim() || null,
       is_grouped: formData.isGrouped,
       summary_image_path: finalImagePath,
+      timeline_image_path: finalTimelineImagePath,
       captured_time: finalCapturedTime,
       duration,
       width,

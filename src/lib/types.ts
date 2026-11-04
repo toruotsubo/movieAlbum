@@ -57,6 +57,7 @@ export interface Movie {
   file_path: string;
   file_name: string;
   summary_image_path: string | null;
+  timeline_image_path?: string | null;
   title: string | null;
   genre: string | null;
   cast: string | null;
@@ -102,6 +103,7 @@ export interface CreateMovieInput {
   file_path: string;
   file_name: string;
   summary_image_path?: string | null;
+  timeline_image_path?: string | null;
   title?: string | null;
   genre?: string | null;
   cast?: string | null;

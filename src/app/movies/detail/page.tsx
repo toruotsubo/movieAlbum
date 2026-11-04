@@ -94,14 +94,25 @@ function MovieDetailContent() {
     }
   }, [leadId, totalCount, safeIndex]);
 
-  // 【後日削除予定】登録済み動画への対応: メタデータ欠損がある場合に自動取得
+  const [generatingTimelineIds, setGeneratingTimelineIds] = useState<number[]>([]);
+
+  // 登録済み動画への対応: メタデータ欠損および8時点まとめ画像未生成がある場合に自動取得・作成
   useEffect(() => {
     if (currentMovie) {
+      const targetId = currentMovie.id;
+      const needsTimeline = !currentMovie.timeline_image_path && Boolean(currentMovie.file_path);
+      if (needsTimeline) {
+        setGeneratingTimelineIds((prev) => (prev.includes(targetId) ? prev : [...prev, targetId]));
+      }
       ensureLegacyMovieMetadata(currentMovie, () => {
         refreshData();
+      }).finally(() => {
+        if (needsTimeline) {
+          setGeneratingTimelineIds((prev) => prev.filter((id) => id !== targetId));
+        }
       });
     }
-  }, [currentMovie?.id]);
+  }, [currentMovie?.id, databaseState.activeId]);
 
   const changeSlide = (newIndex: number) => {
     const clamped = Math.min(Math.max(0, newIndex), Math.max(0, totalCount - 1));
@@ -491,6 +502,34 @@ function MovieDetailContent() {
                           </div>
                         </div>
                       )}
+
+                      {/* 8-point Timeline Composite Screenshot */}
+                      {(() => {
+                        const timelineImageSrc = formatMediaUrl(item.timeline_image_path);
+                        const isGeneratingTimeline = generatingTimelineIds.includes(item.id);
+                        if (!timelineImageSrc && !isGeneratingTimeline) return null;
+
+                        return (
+                          <div className="sm:col-span-2">
+                            <div className="w-full rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-lg select-none">
+                              {timelineImageSrc ? (
+                                <img
+                                  src={timelineImageSrc}
+                                  alt={item.title || 'Timeline'}
+                                  draggable={false}
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="w-full h-auto block pointer-events-none"
+                                />
+                              ) : (
+                                <div className="w-full py-8 flex items-center justify-center bg-slate-900/80 text-slate-400">
+                                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </SlideItem>

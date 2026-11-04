@@ -30,7 +30,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // electron/main.ts
 var main_exports = {};
 __export(main_exports, {
-  generateThumbnailWithFFmpeg: () => generateThumbnailWithFFmpeg
+  generateThumbnailWithFFmpeg: () => generateThumbnailWithFFmpeg,
+  generateTimelineThumbnailWithFFmpeg: () => generateTimelineThumbnailWithFFmpeg
 });
 module.exports = __toCommonJS(main_exports);
 var import_electron3 = require("electron");
@@ -532,6 +533,7 @@ function addMovie(movie) {
     file_path: movie.file_path,
     file_name: movie.file_name,
     summary_image_path: movie.summary_image_path || null,
+    timeline_image_path: movie.timeline_image_path || null,
     title: movie.title || null,
     genre: movie.genre || null,
     cast: movie.cast || null,
@@ -741,6 +743,10 @@ async function cleanOrphanThumbnails() {
           for (const m of dbContent.movies) {
             if (m.summary_image_path) {
               const basename = import_path.default.basename(m.summary_image_path).toLowerCase();
+              usedFilenames.add(basename);
+            }
+            if (m.timeline_image_path) {
+              const basename = import_path.default.basename(m.timeline_image_path).toLowerCase();
               usedFilenames.add(basename);
             }
           }
@@ -1510,6 +1516,86 @@ async function generateThumbnailWithFFmpeg(filePath, targetTimeInput) {
     resolve(null);
   });
 }
+var TIMELINE_RATIOS = [0.08, 0.2, 0.32, 0.46, 0.58, 0.7, 0.82, 0.94];
+async function generateTimelineThumbnailWithFFmpeg(filePath, durationInput, widthInput, heightInput) {
+  if (!filePath || !import_fs4.default.existsSync(filePath)) {
+    return null;
+  }
+  let duration = durationInput && durationInput > 0 ? durationInput : null;
+  let width = widthInput && widthInput > 0 ? widthInput : null;
+  let height = heightInput && heightInput > 0 ? heightInput : null;
+  if (!duration || !width || !height) {
+    const meta = await extractVideoMetadata(filePath);
+    if (meta) {
+      if (!duration && meta.duration && meta.duration > 0) duration = meta.duration;
+      if (!width && meta.width && meta.width > 0) width = meta.width;
+      if (!height && meta.height && meta.height > 0) height = meta.height;
+    }
+  }
+  const isPortrait = Boolean(width && height && height > width);
+  const userDataPath = import_electron3.app.getPath("userData");
+  const thumbDir = import_path4.default.join(userDataPath, "thumbnails");
+  if (!import_fs4.default.existsSync(thumbDir)) {
+    import_fs4.default.mkdirSync(thumbDir, { recursive: true });
+  }
+  const filename = `timeline_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.png`;
+  const fullPath = import_path4.default.join(thumbDir, filename);
+  const buildFilterComplex = (portrait) => {
+    const cellWidth = portrait ? 90 : 180;
+    const scales = TIMELINE_RATIOS.map(
+      (_, i) => `[${i}:v]scale=${cellWidth}:-1,setsar=1[v${i}]`
+    ).join(";");
+    if (portrait) {
+      return `${scales};[v0][v1][v2][v3][v4][v5][v6][v7]hstack=inputs=8[out]`;
+    }
+    return `${scales};[v0][v1][v2][v3]hstack=inputs=4[r0];[v4][v5][v6][v7]hstack=inputs=4[r1];[r0][r1]vstack=inputs=2[out]`;
+  };
+  const filterComplex = buildFilterComplex(isPortrait);
+  const runFFmpegTimeline = (timestamps) => {
+    return new Promise((res) => {
+      const args = ["-y"];
+      for (const t of timestamps) {
+        args.push("-ss", Math.max(0, t).toFixed(3), "-i", filePath);
+      }
+      args.push(
+        "-filter_complex",
+        filterComplex,
+        "-map",
+        "[out]",
+        "-frames:v",
+        "1",
+        fullPath
+      );
+      (0, import_child_process2.execFile)(getFFmpegPath(), args, { timeout: 3e4 }, (err) => {
+        if (!err && import_fs4.default.existsSync(fullPath)) {
+          res(true);
+        } else {
+          res(false);
+        }
+      });
+    });
+  };
+  const validDur = duration && duration > 0 ? duration : 0;
+  const primaryTimes = TIMELINE_RATIOS.map((r) => validDur > 0 ? validDur * r : 0);
+  if (await runFFmpegTimeline(primaryTimes)) {
+    return { imagePath: fullPath, duration, width, height };
+  }
+  if (validDur > 0.5) {
+    const safeDur = Math.max(0.1, validDur - 0.8);
+    const fallbackTimes = TIMELINE_RATIOS.map((r) => Math.max(0, safeDur * r * 0.9));
+    if (await runFFmpegTimeline(fallbackTimes)) {
+      return { imagePath: fullPath, duration, width, height };
+    }
+  }
+  if (validDur > 0) {
+    const zeroTimes = TIMELINE_RATIOS.map(() => 0);
+    if (await runFFmpegTimeline(zeroTimes)) {
+      return { imagePath: fullPath, duration, width, height };
+    }
+  }
+  console.error("FFmpeg timeline thumbnail generation failed for:", filePath);
+  return null;
+}
 import_electron3.app.whenReady().then(() => {
   import_electron3.Menu.setApplicationMenu(null);
   registerAppProtocol();
@@ -1538,7 +1624,27 @@ import_electron3.ipcMain.handle("databases:delete", async (_, id) => deleteDatab
 import_electron3.ipcMain.handle("movies:getAll", async () => getAllMovies());
 import_electron3.ipcMain.handle("movies:getById", async (_, id) => getMovieById(id));
 import_electron3.ipcMain.handle("movies:getByPath", async (_, filePath) => getMovieByFilePath(filePath));
-import_electron3.ipcMain.handle("movies:add", async (_, movie) => addMovie(movie));
+import_electron3.ipcMain.handle("movies:add", async (_, movie) => {
+  if (!movie.timeline_image_path && movie.file_path) {
+    try {
+      const timelineRes = await generateTimelineThumbnailWithFFmpeg(
+        movie.file_path,
+        movie.duration,
+        movie.width,
+        movie.height
+      );
+      if (timelineRes?.imagePath) {
+        movie.timeline_image_path = timelineRes.imagePath;
+        if (!movie.duration && timelineRes.duration) movie.duration = timelineRes.duration;
+        if (!movie.width && timelineRes.width) movie.width = timelineRes.width;
+        if (!movie.height && timelineRes.height) movie.height = timelineRes.height;
+      }
+    } catch (err) {
+      console.error("Failed to auto-generate timeline image on movies:add:", err);
+    }
+  }
+  return addMovie(movie);
+});
 import_electron3.ipcMain.handle("movies:update", async (_, movie) => updateMovie(movie));
 import_electron3.ipcMain.handle("movies:delete", async (_, id) => deleteMovie(id));
 import_electron3.ipcMain.handle(
@@ -1600,6 +1706,17 @@ import_electron3.ipcMain.handle("app:saveSummaryImage", async (_, base64Data) =>
 import_electron3.ipcMain.handle("app:generateThumbnail", async (_, { filePath, targetTime }) => {
   return generateThumbnailWithFFmpeg(filePath, targetTime);
 });
+import_electron3.ipcMain.handle(
+  "app:generateTimelineThumbnail",
+  async (_, {
+    filePath,
+    duration,
+    width,
+    height
+  }) => {
+    return generateTimelineThumbnailWithFFmpeg(filePath, duration, width, height);
+  }
+);
 import_electron3.ipcMain.handle("app:cleanThumbnails", async () => {
   return cleanOrphanThumbnails();
 });
@@ -1656,5 +1773,6 @@ import_electron3.ipcMain.handle("app:getThirdPartyLicenses", async () => {
 });
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  generateThumbnailWithFFmpeg
+  generateThumbnailWithFFmpeg,
+  generateTimelineThumbnailWithFFmpeg
 });
