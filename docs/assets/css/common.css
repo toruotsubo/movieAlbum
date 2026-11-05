@@ -180,8 +180,21 @@ body {
 .main section ul.horizontal li:nth-last-child(n+2)::after {
   content: ",";
 }
-.main section figure {
+.main section .images {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2em;
   margin: 2em 0;
+}
+@media screen and (max-width: 750px) {
+  .main section .images {
+    display: flex;
+    flex-direction: column;
+  }
+}
+.main section .images figcaption {
+  margin: 0.5em 0 0;
+  font-size: 0.9em;
 }
 .main section dl {
   display: grid;

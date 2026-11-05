@@ -90,8 +90,21 @@ body {
 			}
 		}
 
-		figure {
+		.images {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 2em;
 			margin: 2em 0;
+
+			@include sp {
+				display: flex;
+				flex-direction: column;
+			}
+
+			figcaption {
+				margin: .5em 0 0;
+				font-size: .9em;
+			}
 		}
 
 		dl {
@@ -122,8 +135,6 @@ body {
 // #footer
 // #############################################################################################
 .footer {
-	@include sp {}
-
 	margin: 2em 0;
 	text-align: center;
 }
