@@ -195,7 +195,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2em;
-  margin: 2em 0;
+  margin: 1em 0 0;
 }
 @media screen and (max-width: 750px) {
   .main section .images {
