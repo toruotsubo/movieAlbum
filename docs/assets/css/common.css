@@ -180,6 +180,17 @@ body {
 .main section ul.horizontal li:nth-last-child(n+2)::after {
   content: ",";
 }
+.main section table {
+  margin: 1em 0 0;
+}
+.main section table th,
+.main section table td {
+  border: 1px solid #888;
+  padding: 0.5em 1em;
+}
+.main section table th {
+  background: #f3f3f3;
+}
 .main section .images {
   display: grid;
   grid-template-columns: 1fr 1fr;
