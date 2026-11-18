@@ -25,8 +25,8 @@ interface MovieCardSliderProps {
   movies: Movie[]; // グループの全動画（初期表示の代表動画がインデックス0）
   filterValues: Record<string, string> | null;
   filterSignature: string | null;
-  tagFilter: string;
-  onTagFilterChange: (tag: string) => void;
+  selectedTags: string[];
+  onToggleTag: (tag: string) => void;
   onKeyItemClick: (fieldId: string, val: string | number) => void;
 }
 
@@ -34,8 +34,8 @@ export function MovieCardSlider({
   movies,
   filterValues,
   filterSignature,
-  tagFilter,
-  onTagFilterChange,
+  selectedTags,
+  onToggleTag,
   onKeyItemClick,
 }: MovieCardSliderProps) {
   const { settings, updateMovieRating, openMoviePlayer, openEditMovieModal, t, lang: language } = useApp();
@@ -376,12 +376,12 @@ export function MovieCardSlider({
                         <div className="flex flex-wrap items-center gap-1.5 pt-1">
                           <Tag className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                           {displayTags.map((tag, idx) => {
-                            const isSelected = tagFilter === tag;
+                            const isSelected = selectedTags.includes(tag);
                             return (
                               <button
                                 key={idx}
                                 type="button"
-                                onClick={() => onTagFilterChange(isSelected ? 'all' : tag)}
+                                onClick={() => onToggleTag(tag)}
                                 className={clsx(
                                   'px-2 py-0.5 rounded-md border text-[11px] font-medium transition-colors cursor-pointer',
                                   isSelected

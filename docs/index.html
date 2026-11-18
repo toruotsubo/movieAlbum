@@ -6,7 +6,8 @@
 	<!-- title -->
 	<title>MovieAlbum</title>
 	<!-- meta -->
-	<meta name="description" content="A Windows application designed to help you efficiently organize and browse your video collection.">
+	<meta name="description"
+		content="A Windows application designed to help you efficiently organize and browse your video collection.">
 	<meta name="viewport" content="width=device-width">
 	<meta name="format-detection" content="telephone=no">
 	<!-- link -->
@@ -43,37 +44,59 @@
 
 				<section>
 					<h3 class="title">Examples of use</h3>
-					<ul>
-						<li>Movie collection: Organized by genre, lead actor, and director</li>
-						<li>Travel memories: Organized by destination, year, and the people who went along</li>
-						<li>Food/dining videos: Organized by genre, area, and price range</li>
-					</ul>
+					<table>
+						<thead>
+							<tr>
+								<th>Genre</th>
+								<th>Organized by</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<th>Movie collection</th>
+								<td>Genre, Lead actor, Director</td>
+							</tr>
+							<tr>
+								<th>Travel memories</th>
+								<td>Destination, Year, Members</td>
+							</tr>
+							<tr>
+								<th>Food/dining videos</th>
+								<td>Genre, Area, Price range</td>
+							</tr>
+						</tbody>
+					</table>
 				</section>
 
-				<div class="banner">
-					<a href="https://apps.microsoft.com/detail/9MT92DS8L95V?referrer=appbadge&mode=full" target="_blank" rel="noopener noreferrer">
-						<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" />
-					</a>
-				</div>
-
-				<figure class="images">
-					<figure class="image">
-						<img src="assets/imgs/mainIndex.webp" alt="Video list screen" width="640" height="360">
-						<figcaption>Video list screen.<br>You can filter videos by category, name, year, tags, and rating, and sort them by title, category, name, or publication date. Clicking a thumbnail launches the video player.</figcaption>
+				<section>
+					<h3 class="title">Screenshots</h3>
+					<figure class="images">
+						<figure class="image">
+							<img src="assets/imgs/mainIndex.webp" alt="Video list screen" width="640" height="360">
+							<figcaption><strong>Video list screen.</strong><br>You can filter videos by category, name,
+								year, tags, and rating, and sort them by title, category, name, or publication date.
+								Clicking a thumbnail launches the video player.</figcaption>
+						</figure>
+						<figure class="image">
+							<img src="assets/imgs/customIndex.webp" alt="Custom index based on user-defined categories"
+								width="640" height="360">
+							<figcaption><strong>Custom index screen.</strong><br>You can assign tags and ratings to
+								these categories independently of the individual videos. Filtering by tags or ratings
+								and sorting by the defined categories are supported. Clicking a thumbnail navigates to a
+								filtered list of videos.</figcaption>
+						</figure>
+						<figure class="image">
+							<img src="assets/imgs/detail.webp" alt="Video details screen." width="640" height="360">
+							<figcaption><strong>Video details screen.</strong><br>Grouped videos are displayed in a
+								slider format. Clicking a thumbnail launches the video player.</figcaption>
+						</figure>
+						<figure class="image">
+							<img src="assets/imgs/edit.webp" alt="Video data editing screen" width="640" height="360">
+							<figcaption><strong>Video data editing screen.</strong><br>You can set a favorite moment as
+								the thumbnail (some limitations apply depending on the video format).</figcaption>
+						</figure>
 					</figure>
-					<figure class="image">
-						<img src="assets/imgs/customIndex.webp" alt="Custom index based on user-defined categories" width="640" height="360">
-						<figcaption>Custom index based on user-defined categories.<br>You can assign tags and ratings to these categories independently of the individual videos. Filtering by tags or ratings and sorting by the defined categories are supported. Clicking a thumbnail navigates to a filtered list of videos.</figcaption>
-					</figure>
-					<figure class="image">
-						<img src="assets/imgs/detail.webp" alt="Video details screen." width="640" height="360">
-						<figcaption>Video details screen.<br>Grouped videos are displayed in a slider format. Clicking a thumbnail launches the video player.</figcaption>
-					</figure>
-					<figure class="image">
-						<img src="assets/imgs/edit.webp" alt="Video data editing screen" width="640" height="360">
-						<figcaption>Video data editing screen.<br>You can set a favorite moment as the thumbnail (some limitations apply depending on the video format).</figcaption>
-					</figure>
-				</figure>
+				</section>
 
 				<section>
 					<h3 class="title">Key Features</h3>
@@ -109,11 +132,24 @@
 				<p>
 					Download MovieAlbum today and elevate your video viewing experience!
 				</p>
+
+				<div class="banner">
+					<a href="https://apps.microsoft.com/detail/9MT92DS8L95V?referrer=appbadge&mode=full" target="_blank"
+						rel="noopener noreferrer">
+						<img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" />
+					</a>
+				</div>
 			</section>
 
 			<section>
 				<h2 class="title">Update History</h2>
 				<dl>
+					<dt>version 1.4.1</dt>
+					<dd>
+						<ul>
+							<li>Improved the UI of the filtering feature.</li>
+						</ul>
+					</dd>
 					<dt>version 1.4.0</dt>
 					<dd>
 						<ul>
@@ -185,7 +221,7 @@
 				</dl>
 			</section>
 
-			<section>
+			<section id="privacyPolicy">
 				<h2 class="title">Privacy Policy</h2>
 				<ul>
 					<li>This app does not collect, store, or transmit any personal data.</li>
@@ -197,7 +233,9 @@
 				<h2 class="title">License & Acknowledgements</h2>
 				<p>
 					MovieAlbum is released under the MIT License.<br>
-					This application bundles and uses <a href="https://ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a> (GNU GPL v3.0, <a href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" rel="noopener noreferrer">gyan.dev
+					This application bundles and uses <a href="https://ffmpeg.org/" target="_blank"
+						rel="noopener noreferrer">FFmpeg</a> (GNU GPL v3.0, <a
+						href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" rel="noopener noreferrer">gyan.dev
 						build</a>) for video thumbnail generation and metadata parsing. For inquiries regarding the
 					source code of bundled binaries, please contact us via the GitHub repository or developer.
 				</p>

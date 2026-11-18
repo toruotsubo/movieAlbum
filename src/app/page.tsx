@@ -5,10 +5,12 @@ import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
 import { formatMediaUrl, getKeyFieldLabel } from '@/lib/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowUpDown, Film, Star, Edit, Tag, X, Search } from 'lucide-react';
+import { ArrowUpDown, Film, Edit, Tag, X, Search, RotateCcw } from 'lucide-react';
 import { clsx } from 'clsx';
 import { KeyItemGroup } from '@/lib/types';
 import { useFocusTrap } from '@/lib/useFocusTrap';
+import { TagFilterPopover } from '@/components/TagFilterPopover';
+import { RatingRangeFilter } from '@/components/RatingRangeFilter';
 
 function KeyItemsContent() {
   const { settings, updateKeyItemRating, openEditKeyItemModal, loading: appLoading, t, databaseState, movies } = useApp();
@@ -24,8 +26,8 @@ function KeyItemsContent() {
   const [groupsLoading, setGroupsLoading] = useState(true);
 
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  const [ratingFilter, setRatingFilter] = useState<string | number>('all');
-  const [tagFilter, setTagFilter] = useState<string>('all');
+  const [ratingRange, setRatingRange] = useState<[number, number]>([1, 5]);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isTextListModalOpen, setIsTextListModalOpen] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -67,13 +69,38 @@ function KeyItemsContent() {
         const savedState = JSON.parse(savedStateStr);
         if (!savedState.dbId || !databaseState.activeId || savedState.dbId === databaseState.activeId) {
           if (savedState.sortOrder) setSortOrder(savedState.sortOrder);
-          if (savedState.ratingFilter !== undefined) setRatingFilter(savedState.ratingFilter);
-          if (savedState.tagFilter) setTagFilter(savedState.tagFilter);
+          if (
+            Array.isArray(savedState.ratingRange) &&
+            savedState.ratingRange.length === 2
+          ) {
+            setRatingRange([
+              Number(savedState.ratingRange[0]) || 1,
+              Number(savedState.ratingRange[1]) || 5,
+            ]);
+          } else if (savedState.ratingFilter !== undefined) {
+            if (savedState.ratingFilter === 'gte4') {
+              setRatingRange([4, 5]);
+            } else if (savedState.ratingFilter === 'gte3') {
+              setRatingRange([3, 5]);
+            } else if (savedState.ratingFilter !== 'all') {
+              const r = Number(savedState.ratingFilter);
+              if (r >= 1 && r <= 5) setRatingRange([r, r]);
+            } else {
+              setRatingRange([1, 5]);
+            }
+          }
+          if (Array.isArray(savedState.selectedTags)) {
+            setSelectedTags(savedState.selectedTags);
+          } else if (savedState.tagFilter && savedState.tagFilter !== 'all') {
+            setSelectedTags([savedState.tagFilter]);
+          } else {
+            setSelectedTags([]);
+          }
           if (savedState.searchQuery !== undefined) setSearchQuery(savedState.searchQuery);
         }
       } else {
-        setTagFilter('all');
-        setRatingFilter('all');
+        setSelectedTags([]);
+        setRatingRange([1, 5]);
         setSearchQuery('');
         setSortOrder('asc');
       }
@@ -91,22 +118,22 @@ function KeyItemsContent() {
       const stateToSave = {
         dbId: databaseState.activeId,
         sortOrder,
-        ratingFilter,
-        tagFilter,
+        ratingRange,
+        selectedTags,
         searchQuery,
       };
       sessionStorage.setItem(storageKey, JSON.stringify(stateToSave));
     } catch (e) {
       console.error('Failed to save filter state to sessionStorage:', e);
     }
-  }, [sortOrder, ratingFilter, tagFilter, searchQuery, isInitialized, databaseState.activeId, activeKeyField]);
+  }, [sortOrder, ratingRange, selectedTags, searchQuery, isInitialized, databaseState.activeId, activeKeyField]);
 
   // Reset filters when active database changes
   const prevActiveDbRef = React.useRef(databaseState.activeId);
   useEffect(() => {
     if (prevActiveDbRef.current && databaseState.activeId && prevActiveDbRef.current !== databaseState.activeId) {
-      setTagFilter('all');
-      setRatingFilter('all');
+      setSelectedTags([]);
+      setRatingRange([1, 5]);
       setSearchQuery('');
     }
     prevActiveDbRef.current = databaseState.activeId;
@@ -146,18 +173,31 @@ function KeyItemsContent() {
     )
   ).sort((a, b) => a.localeCompare(b, 'ja'));
 
+  const toggleTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const isRatingFiltered = ratingRange[0] > 1 || ratingRange[1] < 5;
+
+  const hasActiveFilters =
+    selectedTags.length > 0 || isRatingFiltered || searchQuery.trim() !== '';
+
+  const resetAllFilters = () => {
+    setSelectedTags([]);
+    setRatingRange([1, 5]);
+    setSearchQuery('');
+  };
+
   const filteredGroups = keyGroups.filter((g) => {
-    if (ratingFilter === 'gte4') {
-      if (g.rating < 4) return false;
-    } else if (ratingFilter === 'gte3') {
-      if (g.rating < 3) return false;
-    } else if (ratingFilter !== 'all' && g.rating !== Number(ratingFilter)) {
+    if (g.rating < ratingRange[0] || g.rating > ratingRange[1]) {
       return false;
     }
-    if (tagFilter !== 'all') {
+    if (selectedTags.length > 0) {
       if (!g.tags) return false;
       const groupTags = g.tags.split(',').map((t) => t.trim());
-      if (!groupTags.includes(tagFilter)) return false;
+      if (!selectedTags.every((tag) => groupTags.includes(tag))) return false;
     }
     if (searchQuery.trim()) {
       const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -198,102 +238,106 @@ function KeyItemsContent() {
     <>
       <div className="space-y-6">
         {/* Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-800/80 select-none">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Tag Filter Controls */}
-            {availableTags.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5 text-slate-400" /> {t('movies_list_filter_tag')}
-                </span>
-                <select
-                  value={tagFilter}
-                  onChange={(e) => setTagFilter(e.target.value)}
-                  className="px-3 py-2 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer hover:border-slate-700"
-                >
-                  <option value="all">{t('all')}</option>
-                  {availableTags.map((tag) => (
-                    <option key={tag} value={tag}>
-                      {tag}
-                    </option>
-                  ))}
-                </select>
+        <div className="space-y-3 pb-6 border-b border-slate-800/80 select-none">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            {/* Left Group: Search + Tag Filter + Rating Filter + Reset */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              {/* Search Form */}
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('movies_list_search_placeholder')}
+                  className="pl-8 pr-7 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all w-44 sm:w-56 hover:border-slate-700"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 text-slate-400 hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
+                    title={t('movies_list_search_clear')}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
-            )}
 
-            {/* Rating Filter Controls */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-                <Star className="w-3.5 h-3.5 text-slate-400" /> {t('movies_list_filter_rating')}
-              </span>
-              <select
-                value={ratingFilter}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === 'all' || val === 'gte4' || val === 'gte3') {
-                    setRatingFilter(val);
-                  } else {
-                    setRatingFilter(Number(val));
-                  }
-                }}
-                className="px-3 py-2 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all cursor-pointer hover:border-slate-700"
-              >
-                <option value="all">{t('all')}</option>
-                {[5, 4, 3, 2, 1].map((r) => (
-                  <option key={r} value={r}>
-                    ★{r}
-                  </option>
-                ))}
-                <hr className="border-slate-800 my-1" />
-                <option value="gte4">{t('movies_list_rating_gte4')}</option>
-                <option value="gte3">{t('movies_list_rating_gte3')}</option>
-              </select>
-            </div>
-
-            {/* Sort Bar */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
-                <ArrowUpDown className="w-3.5 h-3.5" /> {t('key_list_sort_label')}
-              </span>
-              <button
-                onClick={toggleSort}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 hover:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
-              >
-                <span>{keyLabel}</span>
-                <ArrowUpDown className="w-3 h-3 text-blue-400" />
-              </button>
-            </div>
-
-            {/* Search Form */}
-            <div className="relative flex items-center">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t('movies_list_search_placeholder')}
-                className="pl-8 pr-7 py-2 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all w-40 sm:w-56 hover:border-slate-700"
+              {/* Tag Filter Controls (Multi-select Popover) */}
+              <TagFilterPopover
+                availableTags={availableTags}
+                selectedTags={selectedTags}
+                onChange={setSelectedTags}
+                onToggleTag={toggleTag}
               />
-              {searchQuery && (
+
+              {/* Rating Filter Controls (2-Thumb Range Slider) */}
+              <RatingRangeFilter
+                value={ratingRange}
+                onChange={setRatingRange}
+              />
+
+              {/* Clear All Filters Button (inline when active) */}
+              {hasActiveFilters && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 text-slate-400 hover:text-slate-200 p-0.5 rounded transition-colors"
-                  title={t('movies_list_search_clear')}
+                  onClick={resetAllFilters}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-all cursor-pointer"
+                  title={t('filter_reset_all')}
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
+                  <span>{t('filter_clear_short')}</span>
                 </button>
               )}
             </div>
+
+            {/* Right Group: Sort Bar & Text List Button */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Sort Bar */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                  <ArrowUpDown className="w-3.5 h-3.5" /> {t('key_list_sort_label')}
+                </span>
+                <button
+                  onClick={toggleSort}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 hover:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
+                >
+                  <span>{keyLabel}</span>
+                  <ArrowUpDown className="w-3 h-3 text-blue-400" />
+                </button>
+              </div>
+
+              {/* Text List Button */}
+              <button
+                onClick={() => setIsTextListModalOpen(true)}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-medium bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 border border-blue-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
+              >
+                <span>{t('key_list_text_display')}</span>
+              </button>
+            </div>
           </div>
 
-          {/* Text List Button */}
-          <button
-            onClick={() => setIsTextListModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 border border-blue-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
-          >
-            <span>{t('key_list_text_display')}</span>
-          </button>
+          {/* Active Selected Tags Pills Row */}
+          {selectedTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {selectedTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-lg bg-blue-600/25 border border-blue-500/50 text-blue-200 text-xs font-medium"
+                >
+                  <span>{tag}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    className="p-0.5 rounded hover:bg-blue-500/30 text-blue-300 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Empty State */}
@@ -304,10 +348,22 @@ function KeyItemsContent() {
             </div>
             <h3 className="text-lg font-semibold text-slate-200 tracking-tight">{t('key_list_empty')}</h3>
             <p className="text-sm text-slate-400 max-w-md mx-auto">
-              {tagFilter !== 'all' || ratingFilter !== 'all' || searchQuery.trim() !== ''
+              {hasActiveFilters
                 ? t('movies_list_empty_filter_desc')
                 : t('key_list_empty_desc')}
             </p>
+            {hasActiveFilters && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 transition-all cursor-pointer active:scale-95"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>{t('filter_reset_all')}</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -372,11 +428,11 @@ function KeyItemsContent() {
                         {group.tags.split(',').map((t, idx) => {
                           const trimmedTag = t.trim();
                           if (!trimmedTag) return null;
-                          const isSelected = tagFilter === trimmedTag;
+                          const isSelected = selectedTags.includes(trimmedTag);
                           return (
                             <button
                               key={idx}
-                              onClick={() => setTagFilter(isSelected ? 'all' : trimmedTag)}
+                              onClick={() => toggleTag(trimmedTag)}
                               className={clsx(
                                 'px-2.5 py-1 rounded-lg border text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer',
                                 isSelected
