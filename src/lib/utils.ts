@@ -155,6 +155,17 @@ export function split8DigitYear(
 }
 
 /**
+ * Get display label for the 'genre' field with custom setting fallback
+ */
+export function getGenreLabel(
+  settings: AppSettings | null | undefined,
+  tFunc: (k: any, params?: Record<string, string | number>) => string
+): string {
+  const custom = settings?.genre_label?.trim();
+  return custom || tFunc('field_genre');
+}
+
+/**
  * Get display label for the 'cast' field with custom setting fallback
  */
 export function getCastLabel(
@@ -185,7 +196,7 @@ export function getKeyFieldLabel(
   tFunc: (k: any, params?: Record<string, string | number>) => string
 ): string {
   if (keyId === 'title') return tFunc('field_title');
-  if (keyId === 'genre') return tFunc('field_genre');
+  if (keyId === 'genre') return getGenreLabel(settings, tFunc);
   if (keyId === 'cast') return getCastLabel(settings, tFunc);
   if (keyId === 'release_year') return tFunc('field_release_year');
   if (keyId === 'release_date') return tFunc('field_release_date');

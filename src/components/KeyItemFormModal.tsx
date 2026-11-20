@@ -102,18 +102,18 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div ref={modalRef} className="glass-card w-full max-w-lg rounded-2xl border border-slate-800 shadow-2xl flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-slate-950/80 backdrop-blur-md animate-fade-in">
+      <div ref={modalRef} className="glass-card w-full max-w-lg rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/60 rounded-t-2xl">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/90 dark:bg-slate-900/60 rounded-t-2xl">
           <div>
-            <h2 className="text-lg font-bold text-white">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
               {titleString}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/60 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -124,10 +124,10 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
 
           {/* Rating Field (Key Item Specific) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 block select-none">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block select-none">
               {t('key_modal_rating_label')} ({keyLabel})
             </label>
-            <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-slate-100/80 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <RatingStars
                 rating={rating}
                 onChange={(newRating) => setRating(newRating)}
@@ -139,7 +139,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
           {/* Cast Kana Field (Only shown in Japanese when key field is 'cast') */}
           {showKana && isCastKey && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-300 block select-none">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block select-none">
                 {getCastKanaLabel(settings, t)}
               </label>
               <input
@@ -147,7 +147,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
                 value={castKana}
                 onChange={(e) => setCastKana(e.target.value)}
                 placeholder={t('key_modal_cast_kana_placeholder')}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-white text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white text-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 select-none">
                 {t('key_modal_cast_kana_note', { title: titleString })}
@@ -157,7 +157,7 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
 
           {/* Tags Field (Key Item Specific) */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 block select-none">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block select-none">
               {t('key_modal_tags_label')} ({keyLabel})
             </label>
             <TagInput
@@ -169,11 +169,11 @@ export const KeyItemFormModal: React.FC<KeyItemFormModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-800/80">
+          <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800/80">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-900 border border-slate-800 hover:bg-slate-800 transition-colors select-none"
+              className="px-4 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 border border-slate-300 hover:bg-slate-200 dark:text-slate-400 dark:hover:text-slate-200 dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800 transition-colors select-none"
             >
               {t('cancel')}
             </button>

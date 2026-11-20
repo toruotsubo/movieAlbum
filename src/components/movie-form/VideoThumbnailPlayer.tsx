@@ -466,7 +466,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       <div className="space-y-2">
         <canvas ref={canvasRef} className="hidden" />
 
-        <div className="relative w-full aspect-video max-w-[720px] mx-auto rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-xl group">
+        <div className="relative w-full aspect-video max-w-[720px] mx-auto rounded-2xl overflow-hidden bg-slate-200 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-xl group">
           {!isPlayingVideo ? (
             <button
               type="button"
@@ -518,7 +518,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 group-focus-visible:scale-105"
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-slate-500">
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-500">
                   <Film className="w-12 h-12 mb-2 opacity-50" />
                   <span className="text-sm">{t('form_no_summary_click')}</span>
                 </div>

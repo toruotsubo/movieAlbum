@@ -43,21 +43,21 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     switch (variant) {
       case 'danger':
         return {
-          iconBg: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
-          icon: <AlertTriangle className="w-6 h-6 text-rose-400" />,
+          iconBg: 'bg-rose-50 text-rose-600 border-rose-200 dark:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/30',
+          icon: <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400" />,
           buttonBg: 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20',
         };
       case 'warning':
         return {
-          iconBg: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-          icon: <AlertCircle className="w-6 h-6 text-amber-400" />,
+          iconBg: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-500/30',
+          icon: <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400" />,
           buttonBg: 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/20',
         };
       case 'info':
       default:
         return {
-          iconBg: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-          icon: <Info className="w-6 h-6 text-blue-400" />,
+          iconBg: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-500/30',
+          icon: <Info className="w-6 h-6 text-blue-600 dark:text-blue-400" />,
           buttonBg: 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20',
         };
     }
@@ -66,11 +66,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   const styles = getVariantStyles();
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div ref={modalRef} className="glass-card w-full max-w-md rounded-2xl border border-slate-700/60 shadow-2xl p-6 space-y-5 text-slate-100 relative select-none">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 dark:bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+      <div ref={modalRef} className="glass-card w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xl p-6 space-y-5 text-slate-900 dark:text-slate-100 relative select-none">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:hover:text-white dark:hover:bg-slate-800 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -80,8 +80,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             {styles.icon}
           </div>
           <div className="space-y-1.5 pt-1">
-            <h3 className="text-lg font-bold text-white leading-snug">{title}</h3>
-            {description && <p className="text-sm text-slate-300 leading-relaxed">{description}</p>}
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug">{title}</h3>
+            {description && <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{description}</p>}
           </div>
         </div>
 
@@ -90,7 +90,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+              className="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 transition-colors"
             >
               {effectiveCancelText}
             </button>

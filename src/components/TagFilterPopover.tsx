@@ -67,7 +67,7 @@ export const TagFilterPopover: React.FC<TagFilterPopoverProps> = ({
 
   return (
     <div ref={containerRef} className="relative flex items-center gap-2">
-      <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
         <Tag className="w-3.5 h-3.5 text-slate-400" />
         {t('movies_list_filter_tag')}
       </span>
@@ -78,8 +78,8 @@ export const TagFilterPopover: React.FC<TagFilterPopoverProps> = ({
         className={clsx(
           'flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
           hasSelection
-            ? 'bg-blue-600/20 border-blue-500/60 text-blue-200 hover:bg-blue-600/30'
-            : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700'
+            ? 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 dark:bg-blue-600/20 dark:border-blue-500/60 dark:text-blue-200 dark:hover:bg-blue-600/30'
+            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:border-slate-700'
         )}
       >
         <span className="max-w-[140px] truncate">
@@ -97,13 +97,13 @@ export const TagFilterPopover: React.FC<TagFilterPopoverProps> = ({
         <ChevronDown
           className={clsx(
             'w-3.5 h-3.5 text-slate-400 transition-transform duration-200',
-            isOpen && 'rotate-180 text-blue-400'
+            isOpen && 'rotate-180 text-blue-500 dark:text-blue-400'
           )}
         />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-2 z-30 w-80 sm:w-96 rounded-xl bg-slate-900 border border-slate-700/80 shadow-2xl p-3 space-y-3 animate-fade-in">
+        <div className="absolute left-0 top-full mt-2 z-30 w-80 sm:w-96 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 shadow-2xl p-3 space-y-3 animate-fade-in">
           {/* Header: Tag Search & Clear Selection */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -114,13 +114,13 @@ export const TagFilterPopover: React.FC<TagFilterPopoverProps> = ({
                 value={tagSearch}
                 onChange={(e) => setTagSearch(e.target.value)}
                 placeholder={t('tag_filter_search_placeholder')}
-                className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs bg-slate-950/80 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+                className="w-full pl-8 pr-7 py-1.5 rounded-lg text-xs bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
               />
               {tagSearch && (
                 <button
                   type="button"
                   onClick={() => setTagSearch('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -131,7 +131,7 @@ export const TagFilterPopover: React.FC<TagFilterPopoverProps> = ({
               <button
                 type="button"
                 onClick={() => onChange([])}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors whitespace-nowrap cursor-pointer shrink-0"
+                className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-300 dark:text-slate-300 dark:hover:text-white dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 transition-colors whitespace-nowrap cursor-pointer shrink-0"
               >
                 {t('tag_filter_clear')}
               </button>
@@ -154,7 +154,7 @@ export const TagFilterPopover: React.FC<TagFilterPopoverProps> = ({
                       'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all cursor-pointer',
                       !hasSelection
                         ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                        : 'bg-slate-800/80 border-slate-700/70 text-slate-300 hover:bg-slate-800 hover:text-white'
+                        : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-800/80 dark:border-slate-700/70 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
                     )}
                   >
                     {!hasSelection && <Check className="w-3 h-3 stroke-[2.5]" />}
@@ -173,7 +173,7 @@ export const TagFilterPopover: React.FC<TagFilterPopoverProps> = ({
                         'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-all cursor-pointer',
                         isSelected
                           ? 'bg-blue-600 text-white border-blue-500 font-semibold shadow-sm'
-                          : 'bg-blue-600/15 border-blue-500/30 text-blue-300 hover:bg-blue-600/25 hover:border-blue-500/50'
+                          : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 hover:border-blue-300 dark:bg-blue-600/15 dark:border-blue-500/30 dark:text-blue-300 dark:hover:bg-blue-600/25 dark:hover:border-blue-500/50'
                       )}
                     >
                       {isSelected && <Check className="w-3 h-3 stroke-[2.5] shrink-0" />}

@@ -50,6 +50,7 @@ var import_electron = require("electron");
 var DEFAULT_APP_SETTINGS = {
   id: 1,
   is_initialized: false,
+  genre_label: null,
   cast_label: null,
   custom_field_1_name: null,
   custom_field_2_name: null,
@@ -70,6 +71,7 @@ var DEFAULT_APP_SETTINGS = {
     "custom_field_3"
   ],
   language: "auto",
+  theme: "dark",
   database_name: "\u8A2D\u5B9A\u30D5\u30A1\u30A4\u30EB_00"
 };
 var DEFAULT_FIELD_ORDER = [
@@ -490,13 +492,15 @@ function saveAppSettings(input) {
     ...input,
     database_name: newDatabaseName,
     is_initialized: input.is_initialized !== void 0 ? input.is_initialized : jsonDb.settings.is_initialized,
+    genre_label: input.genre_label !== void 0 ? input.genre_label : jsonDb.settings.genre_label || null,
     cast_label: input.cast_label !== void 0 ? input.cast_label : jsonDb.settings.cast_label || null,
     custom_field_1_display_in_list: input.custom_field_1_display_in_list !== void 0 ? input.custom_field_1_display_in_list : jsonDb.settings.custom_field_1_display_in_list !== false,
     custom_field_2_display_in_list: input.custom_field_2_display_in_list !== void 0 ? input.custom_field_2_display_in_list : jsonDb.settings.custom_field_2_display_in_list !== false,
     custom_field_3_display_in_list: input.custom_field_3_display_in_list !== void 0 ? input.custom_field_3_display_in_list : jsonDb.settings.custom_field_3_display_in_list !== false,
     key_fields: newKeyFields,
     field_order: input.field_order || jsonDb.settings.field_order || DEFAULT_FIELD_ORDER,
-    language: input.language !== void 0 ? input.language : jsonDb.settings.language || "auto"
+    language: input.language !== void 0 ? input.language : jsonDb.settings.language || "auto",
+    theme: input.theme !== void 0 ? input.theme : jsonDb.settings.theme || "dark"
   };
   if (keyFieldsChanged) {
     for (const m of jsonDb.movies) {
@@ -1288,9 +1292,52 @@ import_electron3.protocol.registerSchemesAsPrivileged([
 ]);
 var isDev = !import_electron3.app.isPackaged && process.env.NODE_ENV !== "production";
 var mainWindow = null;
+var THEME_WINDOW_COLORS = {
+  dark: {
+    backgroundColor: "#0b0f19",
+    overlayColor: "#090d16",
+    symbolColor: "#94a3b8"
+  },
+  light: {
+    backgroundColor: "#f8fafc",
+    overlayColor: "#f1f5f9",
+    symbolColor: "#475569"
+  }
+};
+function resolveIsDarkTheme(themeSetting) {
+  if (themeSetting === "light") return false;
+  if (themeSetting === "auto") return import_electron3.nativeTheme.shouldUseDarkColors;
+  return true;
+}
+function applyWindowTheme(themeSetting) {
+  const effectiveSetting = themeSetting || "dark";
+  import_electron3.nativeTheme.themeSource = effectiveSetting === "auto" ? "system" : effectiveSetting;
+  const isDark = resolveIsDarkTheme(effectiveSetting);
+  const colors = isDark ? THEME_WINDOW_COLORS.dark : THEME_WINDOW_COLORS.light;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.setBackgroundColor(colors.backgroundColor);
+    } catch {
+    }
+    if (typeof mainWindow.setTitleBarOverlay === "function") {
+      try {
+        mainWindow.setTitleBarOverlay({
+          color: colors.overlayColor,
+          symbolColor: colors.symbolColor,
+          height: 36
+        });
+      } catch {
+      }
+    }
+  }
+}
 function createWindow() {
   const iconPath = import_path4.default.join(__dirname, "../build/icon.png");
   const winIcon = import_fs4.default.existsSync(iconPath) ? iconPath : void 0;
+  const initialSettings = getAppSettings();
+  const initialTheme = initialSettings?.theme || "dark";
+  import_electron3.nativeTheme.themeSource = initialTheme === "auto" ? "system" : initialTheme;
+  const initialColors = resolveIsDarkTheme(initialTheme) ? THEME_WINDOW_COLORS.dark : THEME_WINDOW_COLORS.light;
   mainWindow = new import_electron3.BrowserWindow({
     width: 1280,
     height: 800,
@@ -1298,11 +1345,11 @@ function createWindow() {
     minHeight: 700,
     title: "movieAlbum",
     icon: winIcon,
-    backgroundColor: "#0b0f19",
+    backgroundColor: initialColors.backgroundColor,
     titleBarStyle: "hidden",
     titleBarOverlay: {
-      color: "#090d16",
-      symbolColor: "#94a3b8",
+      color: initialColors.overlayColor,
+      symbolColor: initialColors.symbolColor,
       height: 36
     },
     autoHideMenuBar: true,
@@ -1602,6 +1649,12 @@ import_electron3.app.whenReady().then(() => {
   registerMediaProtocol();
   initDatabase();
   createWindow();
+  import_electron3.nativeTheme.on("updated", () => {
+    const currentSettings = getAppSettings();
+    if (currentSettings?.theme === "auto") {
+      applyWindowTheme("auto");
+    }
+  });
   setTimeout(() => {
     cleanOrphanThumbnails().catch((err) => {
       console.error("Failed to clean orphan thumbnails:", err);
@@ -1615,12 +1668,32 @@ import_electron3.app.on("window-all-closed", () => {
   if (process.platform !== "darwin") import_electron3.app.quit();
 });
 import_electron3.ipcMain.handle("settings:get", async () => getAppSettings());
-import_electron3.ipcMain.handle("settings:save", async (_, input) => saveAppSettings(input));
+import_electron3.ipcMain.handle("settings:save", async (_, input) => {
+  const saved = saveAppSettings(input);
+  applyWindowTheme(saved.theme);
+  return saved;
+});
 import_electron3.ipcMain.handle("databases:getState", async () => getDatabaseState());
-import_electron3.ipcMain.handle("databases:switch", async (_, id) => switchDatabase(id));
-import_electron3.ipcMain.handle("databases:create", async (_, name) => createDatabase(name));
-import_electron3.ipcMain.handle("databases:duplicate", async (_, name) => duplicateDatabase(name));
-import_electron3.ipcMain.handle("databases:delete", async (_, id) => deleteDatabase(id));
+import_electron3.ipcMain.handle("databases:switch", async (_, id) => {
+  const res = switchDatabase(id);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
+import_electron3.ipcMain.handle("databases:create", async (_, name) => {
+  const res = createDatabase(name);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
+import_electron3.ipcMain.handle("databases:duplicate", async (_, name) => {
+  const res = duplicateDatabase(name);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
+import_electron3.ipcMain.handle("databases:delete", async (_, id) => {
+  const res = deleteDatabase(id);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
 import_electron3.ipcMain.handle("movies:getAll", async () => getAllMovies());
 import_electron3.ipcMain.handle("movies:getById", async (_, id) => getMovieById(id));
 import_electron3.ipcMain.handle("movies:getByPath", async (_, filePath) => getMovieByFilePath(filePath));
@@ -1663,7 +1736,11 @@ import_electron3.ipcMain.handle(
   "keyItems:updateDetails",
   async (_, input) => updateKeyItemDetails(input)
 );
-import_electron3.ipcMain.handle("app:resetData", async () => resetAllData());
+import_electron3.ipcMain.handle("app:resetData", async () => {
+  const reset = resetAllData();
+  applyWindowTheme(reset.theme);
+  return reset;
+});
 import_electron3.ipcMain.handle("app:openMoviePlayer", async (_, filePath) => {
   try {
     if (!import_fs4.default.existsSync(filePath)) {

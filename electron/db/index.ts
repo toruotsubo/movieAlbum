@@ -498,6 +498,7 @@ export function saveAppSettings(input: SaveSettingsInput): AppSettings {
     ...input,
     database_name: newDatabaseName,
     is_initialized: input.is_initialized !== undefined ? input.is_initialized : jsonDb!.settings.is_initialized,
+    genre_label: input.genre_label !== undefined ? input.genre_label : jsonDb!.settings.genre_label || null,
     cast_label: input.cast_label !== undefined ? input.cast_label : jsonDb!.settings.cast_label || null,
     custom_field_1_display_in_list:
       input.custom_field_1_display_in_list !== undefined
@@ -514,6 +515,7 @@ export function saveAppSettings(input: SaveSettingsInput): AppSettings {
     key_fields: newKeyFields,
     field_order: input.field_order || jsonDb!.settings.field_order || DEFAULT_FIELD_ORDER,
     language: input.language !== undefined ? input.language : jsonDb!.settings.language || 'auto',
+    theme: input.theme !== undefined ? input.theme : jsonDb!.settings.theme || 'dark',
   };
 
   if (keyFieldsChanged) {
