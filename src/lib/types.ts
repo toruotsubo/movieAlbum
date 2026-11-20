@@ -1,6 +1,9 @@
+export type ThemeSetting = 'dark' | 'light' | 'auto';
+
 export interface AppSettings {
   id: number;
   is_initialized: boolean;
+  genre_label?: string | null;
   cast_label?: string | null;
   custom_field_1_name: string | null;
   custom_field_2_name: string | null;
@@ -11,6 +14,7 @@ export interface AppSettings {
   key_fields: string[]; // JSON array stored in DB
   field_order?: string[]; // Order of metadata fields
   language?: 'auto' | 'ja' | 'en' | 'zh-CN' | 'zh-TW' | null; // Language setting
+  theme?: ThemeSetting | null; // Color theme setting
   database_name?: string;
 }
 
@@ -29,6 +33,7 @@ export type SaveSettingsInput = Partial<Omit<AppSettings, 'id'>>;
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   id: 1,
   is_initialized: false,
+  genre_label: null,
   cast_label: null,
   custom_field_1_name: null,
   custom_field_2_name: null,
@@ -49,6 +54,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     'custom_field_3',
   ],
   language: 'auto',
+  theme: 'dark',
   database_name: '設定ファイル_00',
 };
 

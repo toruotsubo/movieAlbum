@@ -60,8 +60,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [headerMovieCount, setHeaderMovieCount] = useState<number | null>(null);
   const [headerFilterText, setHeaderFilterText] = useState<string | null>(null);
   const [detectedLang, setDetectedLang] = useState<Language>('ja');
+  const [systemTheme, setSystemTheme] = useState<'dark' | 'light'>('dark');
 
-  // Detect OS Language
+  // Detect OS Language & Color Scheme
   useEffect(() => {
     if (typeof window !== 'undefined' && window.navigator) {
       const navLang = (window.navigator.language || '').toLowerCase();
@@ -75,7 +76,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setDetectedLang('en');
       }
     }
+
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
+      const handleChange = (e: MediaQueryListEvent) => {
+        setSystemTheme(e.matches ? 'dark' : 'light');
+      };
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
   }, []);
+
+  const resolvedTheme: 'dark' | 'light' = React.useMemo(() => {
+    if (settings?.theme === 'light') return 'light';
+    if (settings?.theme === 'auto') return systemTheme;
+    return 'dark';
+  }, [settings?.theme, systemTheme]);
+
+  // Apply theme class to document root and cache for initial load
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const isDark = resolvedTheme === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.style.colorScheme = resolvedTheme;
+    try {
+      localStorage.setItem('movie_album_theme', resolvedTheme);
+    } catch {}
+  }, [resolvedTheme]);
 
   const currentLang: Language = React.useMemo(() => {
     if (settings?.language === 'ja') return 'ja';

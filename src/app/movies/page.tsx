@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, getSplitValues, formatReleaseDate, getKeyFieldLabel, groupAllMovies, compareFileNames } from '@/lib/utils';
+import { formatMediaUrl, getSplitValues, formatReleaseDate, getKeyFieldLabel, getGenreLabel, groupAllMovies, compareFileNames } from '@/lib/utils';
 import { MovieCardSlider } from '@/components/MovieCardSlider';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
@@ -382,7 +382,7 @@ function MoviesContent() {
 
   const sortItems: { id: SortKey; label: string }[] = [
     { id: 'title', label: t('field_title') },
-    { id: 'genre', label: t('field_genre') },
+    { id: 'genre', label: getGenreLabel(settings, t) },
     ...keyFields
       .filter((kf) => kf !== 'title' && kf !== 'genre' && kf !== 'release_year' && kf !== 'release_date')
       .map((kf) => ({
@@ -418,7 +418,7 @@ function MoviesContent() {
   return (
     <div className="space-y-6">
       {/* Filter & Sort Controls Row */}
-      <div className="space-y-3 pb-4 border-b border-slate-800 select-none">
+      <div className="space-y-3 pb-4 border-b border-slate-200 dark:border-slate-800 select-none">
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Left Group: Search + Tag Filter + Rating Filter + Reset */}
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
@@ -430,13 +430,13 @@ function MoviesContent() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('movies_list_search_placeholder')}
-                className="pl-8 pr-7 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors w-44 sm:w-56 hover:border-slate-700"
+                className="pl-8 pr-7 py-1.5 rounded-xl text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors w-44 sm:w-56 hover:border-slate-300 dark:hover:border-slate-700"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 text-slate-400 hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
+                  className="absolute right-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
                   title={t('movies_list_search_clear')}
                 >
                   <X className="w-3.5 h-3.5" />
@@ -463,10 +463,10 @@ function MoviesContent() {
               <button
                 type="button"
                 onClick={resetAllFilters}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 dark:bg-slate-800/90 dark:hover:bg-slate-700 dark:text-slate-200 dark:hover:text-white dark:border-slate-700 transition-all cursor-pointer"
                 title={t('filter_reset_all')}
               >
-                <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
+                <RotateCcw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{t('filter_clear_short')}</span>
               </button>
             )}
@@ -474,7 +474,7 @@ function MoviesContent() {
 
           {/* Right Group: Sort Bar */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <ArrowUpDown className="w-3.5 h-3.5" /> {t('key_list_sort_label')}
             </span>
             {sortItems.map((item) => (
@@ -484,8 +484,8 @@ function MoviesContent() {
                 className={clsx(
                   'flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer',
                   sortKey === item.id
-                    ? 'bg-blue-600/20 border-blue-500 text-blue-400'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                    ? 'bg-blue-50 border-blue-400 text-blue-700 dark:bg-blue-600/20 dark:border-blue-500 dark:text-blue-400'
+                    : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-700'
                 )}
               >
                 <span>{item.label}</span>
@@ -501,13 +501,13 @@ function MoviesContent() {
             {selectedTags.map((tag) => (
               <span
                 key={tag}
-                className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-lg bg-blue-600/25 border border-blue-500/50 text-blue-200 text-xs font-medium"
+                className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-lg bg-blue-100 border border-blue-300 text-blue-800 dark:bg-blue-600/25 dark:border-blue-500/50 dark:text-blue-200 text-xs font-medium"
               >
                 <span>{tag}</span>
                 <button
                   type="button"
                   onClick={() => toggleTag(tag)}
-                  className="p-0.5 rounded hover:bg-blue-500/30 text-blue-300 hover:text-white transition-colors cursor-pointer"
+                  className="p-0.5 rounded hover:bg-blue-200/80 dark:hover:bg-blue-500/30 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-white transition-colors cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -519,12 +519,12 @@ function MoviesContent() {
 
       {/* Empty State */}
       {sortedGroups.length === 0 && (
-        <div className="glass-card rounded-2xl p-12 text-center border border-slate-800 space-y-4">
-          <div className="w-16 h-16 rounded-full bg-slate-800/80 flex items-center justify-center mx-auto text-slate-500">
+        <div className="glass-card rounded-2xl p-12 text-center border border-slate-200 dark:border-slate-800 space-y-4">
+          <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center mx-auto text-slate-400 dark:text-slate-500">
             <Film className="w-8 h-8" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-200">{t('movies_list_empty')}</h3>
-          <p className="text-sm text-slate-400 max-w-md mx-auto">
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t('movies_list_empty')}</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
             {hasActiveFilters || filterSignature
               ? t('movies_list_empty_filter_desc')
               : t('movies_list_empty_desc')}

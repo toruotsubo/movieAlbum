@@ -99,12 +99,12 @@ export const DragDropWrapper: React.FC<DragDropWrapperProps> = ({ children, onFi
 
       {/* Dragging Overlay */}
       {isDragging && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-md border-4 border-dashed border-blue-500/80 animate-fadeIn pointer-events-none">
-          <div className="p-6 rounded-full bg-blue-600/20 border border-blue-500/40 text-blue-400 mb-4 animate-bounce">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/90 dark:bg-slate-950/85 backdrop-blur-md border-4 border-dashed border-blue-500/80 animate-fadeIn pointer-events-none">
+          <div className="p-6 rounded-full bg-blue-100 dark:bg-blue-600/20 border border-blue-300 dark:border-blue-500/40 text-blue-600 dark:text-blue-400 mb-4 animate-bounce">
             <DatabasePlus className="w-16 h-16" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">{t('drag_drop_overlay_title')}</h2>
-          <p className="text-slate-300 text-sm">{t('drag_drop_overlay_desc')}</p>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{t('drag_drop_overlay_title')}</h2>
+          <p className="text-slate-600 dark:text-slate-300 text-sm">{t('drag_drop_overlay_desc')}</p>
         </div>
       )}
 

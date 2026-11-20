@@ -55,8 +55,8 @@ export const RatingStars: React.FC<RatingStarsProps> = ({
               className={clsx(
                 starSizes[size],
                 isFilled
-                  ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]'
-                  : 'fill-slate-700/50 text-slate-500'
+                  ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.4)]'
+                  : 'fill-slate-200 text-slate-300 dark:fill-slate-700/50 dark:text-slate-500'
               )}
             />
           </button>

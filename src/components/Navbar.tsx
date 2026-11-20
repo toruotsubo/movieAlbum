@@ -26,11 +26,11 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
   const activeKeyField = currentFieldParam && keyFields.includes(currentFieldParam) ? currentFieldParam : keyFields[0];
 
   return (
-    <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-800 bg-slate-900/80 backdrop-blur-md select-none">
+    <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-200 dark:border-slate-800 bg-white/85 dark:bg-slate-900/80 backdrop-blur-md select-none">
       <div className="px-6 h-16 flex items-center justify-between">
 
         {/* Navigation Links */}
-        <nav className="flex items-center gap-2 bg-slate-950/60 p-1.5 rounded-xl border border-slate-800/80">
+        <nav className="flex items-center gap-2 bg-slate-100/90 dark:bg-slate-950/60 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800/80">
           {keyFields.map((fieldId, idx) => {
             const isActive = isKeyItemsPage && activeKeyField === fieldId;
             const keyLabel = getKeyFieldLabel(fieldId, settings, t);
@@ -44,7 +44,7 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
                   'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
                   isActive
                     ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50'
                 )}
               >
                 <LayoutGrid className="w-4 h-4" />
@@ -58,18 +58,18 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
               'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
               isMoviesActive
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800/50'
             )}
           >
             <List className="w-4 h-4" />
             <span>{t('movies_list_title')}</span>
           </Link>
           {headerFilterText && (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-blue-300 bg-blue-950/60 border border-blue-800/60 px-2.5 py-1.5 rounded-lg animate-fadeIn">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 px-2.5 py-1.5 rounded-lg animate-fadeIn">
               <span>{headerFilterText}</span>
               <button
                 onClick={() => router.push('/movies')}
-                className="p-0.5 hover:bg-blue-800/60 rounded text-blue-400 hover:text-white transition-colors"
+                className="p-0.5 hover:bg-blue-200/70 dark:hover:bg-blue-800/60 rounded text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-white transition-colors"
                 title={t('key_list_filter_clear')}
               >
                 <X className="w-3 h-3" />
@@ -77,7 +77,7 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
             </div>
           )}
           {headerMovieCount !== null && (
-            <span className="text-xs font-medium text-slate-300 bg-slate-800/80 border border-slate-700/50 px-2.5 py-1.5 rounded-lg">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/70 dark:border-slate-700/50 px-2.5 py-1.5 rounded-lg">
               {t('movies_list_movies_count', { count: headerMovieCount })}
             </span>
           )}
@@ -85,8 +85,8 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
 
         {/* Actions & Drop Hint */}
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-700/40">
-            <DatabasePlus className="w-4 h-4 text-blue-400 animate-pulse" />
+          <div className="hidden md:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/40 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700/40">
+            <DatabasePlus className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-pulse" />
             <span>{t('drag_drop_overlay_title')}</span>
           </div>
 
@@ -95,11 +95,11 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
             <select
               value={databaseState.activeId}
               onChange={(e) => switchDatabase(e.target.value)}
-              className="bg-slate-900 border border-slate-700 hover:border-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors max-w-[160px] truncate"
+              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors max-w-[160px] truncate"
               title={t('settings_db_select')}
             >
               {databaseState.databases.map((db) => (
-                <option key={db.id} value={db.id}>
+                <option key={db.id} value={db.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
                   {db.name}
                 </option>
               ))}
@@ -108,7 +108,7 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
 
           <button
             onClick={onOpenSettings}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-700"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800/80 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
             title={t('nav_settings')}
           >
             <Settings className="w-5 h-5" />

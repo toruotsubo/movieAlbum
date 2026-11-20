@@ -144,7 +144,7 @@ export const RatingRangeFilter: React.FC<RatingRangeFilterProps> = ({
 
   return (
     <div className="flex items-center gap-2 select-none">
-      <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+      <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
         <Star className="w-3.5 h-3.5 text-slate-400" />
         {t('movies_list_filter_rating')}
       </span>
@@ -153,11 +153,11 @@ export const RatingRangeFilter: React.FC<RatingRangeFilterProps> = ({
         className={clsx(
           'flex items-center gap-3 px-3 py-1.5 rounded-xl border transition-colors',
           isFiltered
-            ? 'bg-blue-600/15 border-blue-500/60'
-            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+            ? 'bg-blue-50 dark:bg-blue-600/15 border-blue-400 dark:border-blue-500/60'
+            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
         )}
       >
-        <span className="text-[11px] font-medium text-slate-400">★1</span>
+        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">★1</span>
 
         {/* Slider Track */}
         <div
@@ -166,7 +166,7 @@ export const RatingRangeFilter: React.FC<RatingRangeFilterProps> = ({
           className="relative w-24 sm:w-28 h-5 flex items-center cursor-pointer touch-none"
         >
           {/* Base Track */}
-          <div className="w-full h-1.5 rounded-full bg-slate-700/80 relative">
+          <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700/80 relative">
             {/* Step Dots (1..5) */}
             {[1, 2, 3, 4, 5].map((step) => {
               const pct = ((step - 1) / 4) * 100;
@@ -177,7 +177,7 @@ export const RatingRangeFilter: React.FC<RatingRangeFilterProps> = ({
                   style={{ left: `${pct}%` }}
                   className={clsx(
                     'absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full transition-colors pointer-events-none',
-                    inRange ? 'bg-blue-400' : 'bg-slate-600'
+                    inRange ? 'bg-blue-500 dark:bg-blue-400' : 'bg-slate-300 dark:bg-slate-600'
                   )}
                 />
               );
@@ -228,13 +228,13 @@ export const RatingRangeFilter: React.FC<RatingRangeFilterProps> = ({
           />
         </div>
 
-        <span className="text-[11px] font-medium text-slate-400">★5</span>
+        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">★5</span>
 
         {/* Current Range Readout */}
         <span
           className={clsx(
-            'text-xs font-semibold min-w-[44px] text-center pl-1 border-l border-slate-800',
-            isFiltered ? 'text-blue-200' : 'text-slate-300'
+            'text-xs font-semibold min-w-[44px] text-center pl-1 border-l border-slate-200 dark:border-slate-800',
+            isFiltered ? 'text-blue-700 dark:text-blue-200' : 'text-slate-700 dark:text-slate-300'
           )}
         >
           {displayLabel}

@@ -4,7 +4,7 @@
 <head>
 	<meta charset="UTF-8">
 	<!-- title -->
-	<title>MovieAlbum</title>
+	<title>movieAlbum</title>
 	<!-- meta -->
 	<meta name="description" content="動画を効率的に整理・閲覧するWindows用動画管理アプリ">
 	<meta name="viewport" content="width=device-width">
@@ -17,7 +17,7 @@
 <body id="body">
 	<header class="header">
 		<div class="wrap">
-			<h1 class="title">MovieAlbum</h1>
+			<h1 class="title">movieAlbum</h1>
 			<ul class="language">
 				<li><a href="index.html" lang="en">English</a></li>
 			</ul>
@@ -29,54 +29,88 @@
 	<main class="main">
 		<div class="wrap">
 			<section>
-				<h2 class="title">MovieAlbumについて</h2>
+				<h2 class="title">movieAlbumについて</h2>
 				<p>
-					MovieAlbumは動画コレクションを効率的に整理・閲覧できるWindows用動画管理アプリです。<br>
-					一般的な動画管理アプリは、動画自体に評価やタグ付けを行うものがほとんどです。<br>
-					これでは、たとえば映画のコレクションを主演俳優別に整理したいとき、俳優の情報と映画の情報を分けることができません。<br>
-					そこでMovieAlbumでは、それぞれの動画に加え、ユーザーが選択した項目でもリストを生成し、整理できるようにしました。
+					movieAlbumはPC内の動画コレクションを効率的に整理・閲覧できるWindows用動画管理アプリです。<br>
+					<br>
+					一般的な動画管理アプリは動画自体に評価やタグ付けを行うものがほとんど。<br>
+					これでは自分の関心に応じた整理は困難です。<br>
+					<br>
+					たとえばTVアニメを原作者で検索できるようにしたいとします。<br>
+					しかし何十本もの動画ひとつひとつに原作者のタグを打つのはたいへん。<br>
+					原作者と紐づくのはタイトルなのですから、タイトルごとに動画をまとめ、タグをつけられれば効率的です。<br>
+					<br>
+					そこでmovieAlbumでは、それぞれの動画に加え、ユーザーが選択した項目にも評価やタグ付けをできるようにしました。<br>
+					前編・後編などひとまとまりの動画はグループ化できます。<br>
+					設定ファイルを複数もつことも可能で、たとえば「映画コレクション」「旅行の思い出」「グルメ動画」のように使い分けることもできます。
 				</p>
+
+				<div class="banner">
+					<a href="https://apps.microsoft.com/detail/9MT92DS8L95V?referrer=appbadge&mode=full" target="_blank" rel="noopener noreferrer">
+						<img src="https://get.microsoft.com/images/ja%20dark.svg" width="200" />
+					</a>
+				</div>
 
 				<section>
 					<h3 class="title">活用例</h3>
 					<table>
 						<thead>
 							<tr>
-								<th>分野</th>
-								<th>リスト項目</th>
+								<th>設定ファイル</th>
+								<th colspan="3">リスト項目（タグ）</th>
 							</tr>
 						</thead>
 						<tbody>
 							<tr>
 								<th>映画コレクション</th>
-								<td>ジャンル、主演俳優、監督</td>
+								<td>ジャンル</td>
+								<td>公開年</td>
+								<td>主演俳優（特徴）</td>
 							</tr>
 							<tr>
 								<th>旅行の思い出</th>
-								<td>行先、年、参加メンバー</td>
+								<td>年</td>
+								<td>旅行先（おもな目的）</td>
+								<td>参加者</td>
 							</tr>
 							<tr>
 								<th>グルメ動画</th>
-								<td>ジャンル、エリア、価格帯</td>
+								<td>ジャンル</td>
+								<td>所在地（都道府県）</td>
+								<td>価格帯</td>
 							</tr>
 						</tbody>
 					</table>
 				</section>
 
 				<section>
+					<h3 class="title">安心してお使いください</h3>
+					<p>
+						動画再生は使い慣れたOSデフォルトの動画プレイヤーを利用します。<br>
+						各種データはアプリ内のデータベースで管理します。動画ファイルへの書き込み、外部へのデータ送信などはいっさい行いません。<br>
+						価格は500円です。30日間無料で試用できます。試用期間中の機能制限はありません。
+					</p>
+				</section>
+
+				<section class="screenShots">
 					<h3 class="title">スクリーンショット</h3>
 					<figure class="images">
 						<figure class="image">
 							<img src="assets/imgs/mainIndex_ja.webp" alt="動画一覧画面" width="640" height="360">
-							<figcaption><strong>動画一覧画面</strong><br>カテゴリ、名前、年、タグ、評価などによる絞り込みと、タイトル、カテゴリ、名前、年月日によるソートが可能。サムネイルクリックで動画プレイヤーが起動します。</figcaption>
+							<figcaption>
+								<strong>動画一覧画面</strong><br>カテゴリ、名前、年、タグ、評価などによる絞り込みとソートが可能。サムネイルクリックで動画プレイヤーが起動します。
+							</figcaption>
 						</figure>
 						<figure class="image">
 							<img src="assets/imgs/customIndex_ja.webp" alt="カスタムリスト" width="640" height="360">
-							<figcaption><strong>カスタムリスト画面</strong><br>ユーザーが指定した項目にタグ、評価をつけられます。タグ、評価による絞り込みと、項目によるソートができます。サムネイルクリックで動画一覧に遷移します。</figcaption>
+							<figcaption>
+								<strong>カスタムリスト画面</strong><br>指定した項目にタグ、評価をつけられます。タグ、評価による絞り込みと項目によるソートができます。サムネイルクリックで絞り込みを行った動画一覧に遷移します。
+							</figcaption>
 						</figure>
 						<figure class="image">
 							<img src="assets/imgs/detail_ja.webp" alt="動画詳細画面" width="640" height="360">
-							<figcaption><strong>動画詳細画面</strong><br>グループ動画はスライダー形式で表示。サムネイルクリックで動画プレイヤーが起動します。</figcaption>
+							<figcaption><strong>動画詳細画面</strong><br>グループ動画はスライダー形式で表示。サムネイルクリックで動画プレイヤーが起動します。
+							</figcaption>
 						</figure>
 						<figure class="image">
 							<img src="assets/imgs/edit_ja.webp" alt="動画データ編集画面" width="640" height="360">
@@ -89,10 +123,9 @@
 					<h3 class="title">主な機能</h3>
 					<ul>
 						<li>カテゴリ、名前、評価、タグなどで動画を分類できます。</li>
-						<li>メインの動画一覧に加え、ユーザーが選択した項目によるカスタムリストを作成できます。</li>
+						<li>メインの動画一覧に加え、選択した項目によるカスタムリストを作成できます。</li>
 						<li>お気に入りのシーンをサムネイル画像として設定できます。</li>
 						<li>複数の動画をグループ化することも可能です。</li>
-						<li>動画データ本体の変更は一切行いません。</li>
 					</ul>
 				</section>
 
@@ -112,7 +145,7 @@
 				</section>
 
 				<p>
-					MovieAlbumであなたの動画鑑賞をより快適に。
+					movieAlbumであなたの動画鑑賞をより快適に。
 				</p>
 
 				<div class="banner">
@@ -125,6 +158,13 @@
 			<section>
 				<h2 class="title">アップデート履歴</h2>
 				<dl>
+					<dt>version 1.4.2</dt>
+					<dd>
+						<ul>
+							<li>ライトテーマ追加。</li>
+							<li>UI改善。</li>
+						</ul>
+					</dd>
 					<dt>version 1.4.1</dt>
 					<dd>
 						<ul>
@@ -213,8 +253,9 @@
 			<section>
 				<h2 class="title">ライセンス・謝辞</h2>
 				<p>
-					MovieAlbumのソースコードはMIT Licenseに基づき公開されています。<br>
-					動画のサムネイル生成・メタデータ解析のために<a href="https://ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a>（GNU GPL v3.0、<a href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" rel="noopener noreferrer">gyan.dev ビルド</a>）を同梱・利用しています。同梱バイナリに対応するソースコード提供に関するお問い合わせは、GitHubリポジトリまたは開発者までご連絡ください。
+					movieAlbumのソースコードはMIT Licenseに基づき公開されています。<br>
+					動画のサムネイル生成・メタデータ解析のために<a href="https://ffmpeg.org/" target="_blank" rel="noopener noreferrer">FFmpeg</a>（GNU GPL v3.0、<a href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" rel="noopener noreferrer">gyan.dev
+						ビルド</a>）を同梱・利用しています。同梱バイナリに対応するソースコード提供に関するお問い合わせは、GitHubリポジトリまたは開発者までご連絡ください。
 				</p>
 			</section>
 		</div>

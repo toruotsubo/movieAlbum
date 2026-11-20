@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, protocol, Menu, net } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, protocol, Menu, net, nativeTheme } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import url from 'url';
@@ -59,9 +59,58 @@ const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 
 let mainWindow: BrowserWindow | null = null;
 
+const THEME_WINDOW_COLORS = {
+  dark: {
+    backgroundColor: '#0b0f19',
+    overlayColor: '#090d16',
+    symbolColor: '#94a3b8',
+  },
+  light: {
+    backgroundColor: '#f8fafc',
+    overlayColor: '#f1f5f9',
+    symbolColor: '#475569',
+  },
+} as const;
+
+function resolveIsDarkTheme(themeSetting?: 'dark' | 'light' | 'auto' | null): boolean {
+  if (themeSetting === 'light') return false;
+  if (themeSetting === 'auto') return nativeTheme.shouldUseDarkColors;
+  return true;
+}
+
+function applyWindowTheme(themeSetting?: 'dark' | 'light' | 'auto' | null) {
+  const effectiveSetting = themeSetting || 'dark';
+  nativeTheme.themeSource = effectiveSetting === 'auto' ? 'system' : effectiveSetting;
+
+  const isDark = resolveIsDarkTheme(effectiveSetting);
+  const colors = isDark ? THEME_WINDOW_COLORS.dark : THEME_WINDOW_COLORS.light;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.setBackgroundColor(colors.backgroundColor);
+    } catch {}
+    if (typeof mainWindow.setTitleBarOverlay === 'function') {
+      try {
+        mainWindow.setTitleBarOverlay({
+          color: colors.overlayColor,
+          symbolColor: colors.symbolColor,
+          height: 36,
+        });
+      } catch {}
+    }
+  }
+}
+
 function createWindow() {
   const iconPath = path.join(__dirname, '../build/icon.png');
   const winIcon = fs.existsSync(iconPath) ? iconPath : undefined;
+
+  const initialSettings = getAppSettings();
+  const initialTheme = initialSettings?.theme || 'dark';
+  nativeTheme.themeSource = initialTheme === 'auto' ? 'system' : initialTheme;
+  const initialColors = resolveIsDarkTheme(initialTheme)
+    ? THEME_WINDOW_COLORS.dark
+    : THEME_WINDOW_COLORS.light;
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -70,11 +119,11 @@ function createWindow() {
     minHeight: 700,
     title: 'movieAlbum',
     icon: winIcon,
-    backgroundColor: '#0b0f19',
+    backgroundColor: initialColors.backgroundColor,
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#090d16',
-      symbolColor: '#94a3b8',
+      color: initialColors.overlayColor,
+      symbolColor: initialColors.symbolColor,
       height: 36,
     },
     autoHideMenuBar: true,
@@ -451,6 +500,13 @@ app.whenReady().then(() => {
   initDatabase();
   createWindow();
 
+  nativeTheme.on('updated', () => {
+    const currentSettings = getAppSettings();
+    if (currentSettings?.theme === 'auto') {
+      applyWindowTheme('auto');
+    }
+  });
+
   // Run orphan thumbnail cleanup in background shortly after startup
   setTimeout(() => {
     cleanOrphanThumbnails().catch((err) => {
@@ -469,13 +525,33 @@ app.on('window-all-closed', () => {
 
 // IPC Handlers
 ipcMain.handle('settings:get', async () => getAppSettings());
-ipcMain.handle('settings:save', async (_, input) => saveAppSettings(input));
+ipcMain.handle('settings:save', async (_, input) => {
+  const saved = saveAppSettings(input);
+  applyWindowTheme(saved.theme);
+  return saved;
+});
 
 ipcMain.handle('databases:getState', async () => getDatabaseState());
-ipcMain.handle('databases:switch', async (_, id: string) => switchDatabase(id));
-ipcMain.handle('databases:create', async (_, name?: string) => createDatabase(name));
-ipcMain.handle('databases:duplicate', async (_, name?: string) => duplicateDatabase(name));
-ipcMain.handle('databases:delete', async (_, id: string) => deleteDatabase(id));
+ipcMain.handle('databases:switch', async (_, id: string) => {
+  const res = switchDatabase(id);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
+ipcMain.handle('databases:create', async (_, name?: string) => {
+  const res = createDatabase(name);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
+ipcMain.handle('databases:duplicate', async (_, name?: string) => {
+  const res = duplicateDatabase(name);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
+ipcMain.handle('databases:delete', async (_, id: string) => {
+  const res = deleteDatabase(id);
+  applyWindowTheme(res.settings.theme);
+  return res;
+});
 
 ipcMain.handle('movies:getAll', async () => getAllMovies());
 ipcMain.handle('movies:getById', async (_, id: number) => getMovieById(id));
@@ -520,7 +596,11 @@ ipcMain.handle('keyItems:updateDetails', async (_, input) =>
   updateKeyItemDetails(input)
 );
 
-ipcMain.handle('app:resetData', async () => resetAllData());
+ipcMain.handle('app:resetData', async () => {
+  const reset = resetAllData();
+  applyWindowTheme(reset.theme);
+  return reset;
+});
 
 // Open OS default movie player
 ipcMain.handle('app:openMoviePlayer', async (_, filePath: string) => {

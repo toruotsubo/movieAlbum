@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Movie, DEFAULT_FIELD_ORDER } from '@/lib/types';
 import { useApp } from '@/components/AppProvider';
 import { RatingStars } from '@/components/RatingStars';
-import { formatMediaUrl, getSplitValues, formatReleaseDate, getSavedSliderIndex, saveSliderIndex, getCastLabel } from '@/lib/utils';
+import { formatMediaUrl, getSplitValues, formatReleaseDate, getSavedSliderIndex, saveSliderIndex, getGenreLabel, getCastLabel } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import {
   Play,
@@ -83,7 +83,7 @@ export function MovieCardSlider({
   if (totalCount === 0) return null;
 
   return (
-    <div className="glass-card rounded-2xl overflow-hidden group/card flex flex-col justify-between border border-slate-800 relative select-none">
+    <div className="glass-card rounded-2xl overflow-hidden group/card flex flex-col justify-between border border-slate-200/90 dark:border-slate-800 relative select-none shadow-sm">
       {/* Group Controls Overlay (16:9 aspect ratio, perfectly aligned with the thumbnail image) */}
       {totalCount > 1 && (
         <div className="absolute top-0 left-0 right-0 aspect-video pointer-events-none z-20">
@@ -188,7 +188,7 @@ export function MovieCardSlider({
                       openMoviePlayer(movie.file_path);
                     }
                   }}
-                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
+                  className="relative aspect-video w-full bg-slate-200 dark:bg-slate-950 overflow-hidden group/img cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
                   title={t('movies_list_play_tooltip')}
                   aria-label={t('movies_list_play_tooltip')}
                 >
@@ -202,7 +202,7 @@ export function MovieCardSlider({
                       className="w-full h-full object-cover group-hover/img:scale-105 group-focus-visible/img:scale-105 transition-transform duration-300 pointer-events-none"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-900 select-none">
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 bg-slate-100 dark:bg-slate-900 select-none">
                       <Film className="w-10 h-10 mb-1 opacity-40" />
                       <span className="text-xs">NO IMAGE</span>
                     </div>
@@ -219,11 +219,11 @@ export function MovieCardSlider({
                 {/* Metadata & Rating */}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
-                    <h3 className="text-base font-bold text-white line-clamp-1">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1">
                       {movie.title || movie.file_name}
                     </h3>
 
-                    <div className="space-y-1.5 text-xs text-slate-400">
+                    <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
                       {/* Dynamic Field Ordering */}
                       {(() => {
                         const order = settings?.field_order || DEFAULT_FIELD_ORDER;
@@ -236,20 +236,20 @@ export function MovieCardSlider({
                             if (filterValues && filterValues['genre'] !== undefined) return null;
                             return (
                               <div key="genre" className="flex items-center gap-2">
-                                <Shapes className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <Shapes className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                                 {movie.genre ? (
                                   <div className="flex flex-wrap items-center gap-1">
                                     {getSplitValues(movie.genre).map((gVal, idx) => (
                                       <React.Fragment key={idx}>
-                                        {idx > 0 && <span className="text-slate-500">,</span>}
+                                        {idx > 0 && <span className="text-slate-400 dark:text-slate-500">,</span>}
                                         <button
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             onKeyItemClick('genre', gVal);
                                           }}
-                                          className="text-blue-400 hover:underline font-semibold cursor-pointer"
-                                          title={t('filter_by_genre', { value: gVal })}
+                                          className="text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
+                                          title={t('filter_by_field', { field: getGenreLabel(settings, t), value: gVal })}
                                         >
                                           {gVal}
                                         </button>
@@ -257,7 +257,7 @@ export function MovieCardSlider({
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="text-slate-300">-</span>
+                                  <span className="text-slate-600 dark:text-slate-300">-</span>
                                 )}
                               </div>
                             );
@@ -267,19 +267,19 @@ export function MovieCardSlider({
                             if (filterValues && filterValues['cast'] !== undefined) return null;
                             return (
                               <div key="cast" className="flex items-center gap-2">
-                                <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <User className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                                 {movie.cast ? (
                                   <div className="flex flex-wrap items-center gap-1">
                                     {getSplitValues(movie.cast).map((cVal, idx) => (
                                       <React.Fragment key={idx}>
-                                        {idx > 0 && <span className="text-slate-500">,</span>}
+                                        {idx > 0 && <span className="text-slate-400 dark:text-slate-500">,</span>}
                                         <button
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             onKeyItemClick('cast', cVal);
                                           }}
-                                          className="text-blue-400 hover:underline font-semibold cursor-pointer"
+                                          className="text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
                                           title={t('filter_by_field', { field: getCastLabel(settings, t), value: cVal })}
                                         >
                                           {cVal}
@@ -288,7 +288,7 @@ export function MovieCardSlider({
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="text-slate-300">-</span>
+                                  <span className="text-slate-600 dark:text-slate-300">-</span>
                                 )}
                               </div>
                             );
@@ -305,7 +305,7 @@ export function MovieCardSlider({
                               return null;
                             return (
                               <div key="release" className="flex items-center gap-2">
-                                <Calendar className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                                 {movie.release_year ? (
                                   <button
                                     type="button"
@@ -313,13 +313,13 @@ export function MovieCardSlider({
                                       e.stopPropagation();
                                       onKeyItemClick('release_year', movie.release_year!);
                                     }}
-                                    className="text-blue-400 hover:underline font-semibold cursor-pointer"
+                                    className="text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
                                     title={t('filter_by_year', { year: movie.release_year })}
                                   >
                                     {formatReleaseDate(movie.release_year, movie.release_date, language)}
                                   </button>
                                 ) : (
-                                  <span className="text-slate-300">
+                                  <span className="text-slate-600 dark:text-slate-300">
                                     {formatReleaseDate(movie.release_year, movie.release_date, language)}
                                   </span>
                                 )}
@@ -340,19 +340,19 @@ export function MovieCardSlider({
 
                             return (
                               <div key={fieldId} className="flex items-center gap-2">
-                                <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                <FileText className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                                 {customVal ? (
                                   <div className="flex flex-wrap items-center gap-1">
                                     {getSplitValues(customVal).map((cVal, idx) => (
                                       <React.Fragment key={idx}>
-                                        {idx > 0 && <span className="text-slate-500">,</span>}
+                                        {idx > 0 && <span className="text-slate-400 dark:text-slate-500">,</span>}
                                         <button
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             onKeyItemClick(fieldId, cVal);
                                           }}
-                                          className="text-blue-400 hover:underline font-semibold cursor-pointer"
+                                          className="text-blue-600 dark:text-blue-400 hover:underline font-semibold cursor-pointer"
                                           title={t('filter_by_field', { field: customName, value: cVal })}
                                         >
                                           {cVal}
@@ -361,7 +361,7 @@ export function MovieCardSlider({
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="text-slate-300">-</span>
+                                  <span className="text-slate-600 dark:text-slate-300">-</span>
                                 )}
                               </div>
                             );
@@ -386,7 +386,7 @@ export function MovieCardSlider({
                                   'px-2 py-0.5 rounded-md border text-[11px] font-medium transition-colors cursor-pointer',
                                   isSelected
                                     ? 'bg-blue-600 text-white border-blue-500 font-semibold shadow-sm'
-                                    : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'
+                                    : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-600/20 dark:border-blue-500/30 dark:text-blue-300 dark:hover:bg-blue-600/30'
                                 )}
                               >
                                 {tag}
@@ -399,7 +399,7 @@ export function MovieCardSlider({
                   </div>
 
                   {/* Rating & Actions */}
-                  <div className="pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+                  <div className="pt-3 border-t border-slate-200/90 dark:border-slate-800 flex items-center justify-between gap-2">
                     <div className="flex items-center shrink-0">
                       <RatingStars
                         rating={movie.rating}
@@ -411,10 +411,10 @@ export function MovieCardSlider({
                       <button
                         type="button"
                         onClick={() => openEditMovieModal(movie)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-medium border border-slate-700/80 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-white text-xs font-medium dark:border-slate-700/80 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
                         title={t('edit')}
                       >
-                        <Edit className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <Edit className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                         <span>{t('edit')}</span>
                       </button>
                       <button
@@ -431,7 +431,7 @@ export function MovieCardSlider({
                           }
                           router.push(`/movies/detail?${params.toString()}`);
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 dark:bg-blue-600/20 dark:hover:bg-blue-600/30 dark:text-blue-300 dark:hover:text-blue-200 text-xs font-medium dark:border-blue-500/40 transition-colors cursor-pointer whitespace-nowrap shrink-0 select-none"
                       >
                         <span>{t('movies_list_detail_btn')}</span>
                       </button>

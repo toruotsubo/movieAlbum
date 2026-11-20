@@ -4,7 +4,7 @@ import React from 'react';
 import { AppSettings, DEFAULT_FIELD_ORDER } from '../../lib/types';
 import { RatingStars } from '../RatingStars';
 import { useApp } from '../AppProvider';
-import { getKeyFieldLabel, getCastLabel, getCastKanaLabel, split8DigitYear, findKanaForCast } from '../../lib/utils';
+import { getKeyFieldLabel, getGenreLabel, getCastLabel, getCastKanaLabel, split8DigitYear, findKanaForCast } from '../../lib/utils';
 import { TagInput } from '../TagInput';
 
 export interface MovieFormData {
@@ -91,12 +91,13 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
     const keyFields = settings?.key_fields || ['genre'];
     const baseGroupFields = new Set(['title', 'genre', 'release_year', 'release_date']);
     const extraKeyFields = keyFields.filter((kf) => !baseGroupFields.has(kf));
+    const genreLabel = getGenreLabel(settings, t);
 
     if (extraKeyFields.length === 0) {
-      return t('form_grouping_desc_base');
+      return t('form_grouping_desc_base', { genre: genreLabel });
     }
     const keyFieldsLabel = extraKeyFields.map((kf) => getKeyFieldLabel(kf, settings, t)).join(' / ');
-    return t('form_grouping_desc', { keyFields: keyFieldsLabel });
+    return t('form_grouping_desc', { genre: genreLabel, keyFields: keyFieldsLabel });
   };
 
   const order = settings?.field_order || DEFAULT_FIELD_ORDER;
@@ -105,19 +106,19 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {/* Title */}
       <div className="md:col-span-2">
-        <label className="text-xs text-slate-400 mb-1 block">{t('field_title')}</label>
+        <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('field_title')}</label>
         <input
           type="text"
           value={formData.title}
           onChange={(e) => onFieldChange('title', e.target.value)}
           placeholder={t('form_title_placeholder')}
-          className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+          className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
         />
       </div>
 
       {/* Rating (Under Title) */}
-      <div className="md:col-span-2 flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-        <span className="text-sm text-slate-300 font-medium">{t('form_rating_label')}</span>
+      <div className="md:col-span-2 flex items-center justify-between p-3 rounded-xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+        <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">{t('form_rating_label')}</span>
         <RatingStars rating={formData.rating} onChange={(r) => onFieldChange('rating', r)} size="lg" />
       </div>
 
@@ -128,13 +129,13 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
         if (fieldId === 'genre') {
           return (
             <div key="genre">
-              <label className="text-xs text-slate-400 mb-1 block">{t('field_genre')}</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{getGenreLabel(settings, t)}</label>
               <input
                 type="text"
                 value={formData.genre}
                 onChange={(e) => onFieldChange('genre', e.target.value)}
                 placeholder={t('form_genre_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
           );
@@ -144,25 +145,25 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
           return (
             <React.Fragment key="cast">
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">{getCastLabel(settings, t)}</label>
+                <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{getCastLabel(settings, t)}</label>
                 <input
                   type="text"
                   value={formData.cast}
                   onChange={(e) => onFieldChange('cast', e.target.value)}
                   onBlur={handleCastBlur}
                   placeholder={t('form_cast_placeholder')}
-                  className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
               </div>
               {showKana && (
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">{getCastKanaLabel(settings, t)}</label>
+                  <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{getCastKanaLabel(settings, t)}</label>
                   <input
                     type="text"
                     value={formData.castKana}
                     onChange={(e) => onFieldChange('castKana', e.target.value)}
                     placeholder={t('form_cast_kana_placeholder')}
-                    className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               )}
@@ -173,7 +174,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
         if (fieldId === 'release_year') {
           return (
             <div key="release_year">
-              <label className="text-xs text-slate-400 mb-1 block">{t('form_release_year_label')}</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('form_release_year_label')}</label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -181,7 +182,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
                 onChange={(e) => handleReleaseYearChange(e.target.value)}
                 onBlur={handleReleaseYearBlur}
                 placeholder={t('form_release_year_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
           );
@@ -190,13 +191,13 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
         if (fieldId === 'release_date') {
           return (
             <div key="release_date">
-              <label className="text-xs text-slate-400 mb-1 block">{t('form_release_date_label')}</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('form_release_date_label')}</label>
               <input
                 type="text"
                 value={formData.releaseDate}
                 onChange={(e) => onFieldChange('releaseDate', e.target.value)}
                 placeholder={t('form_release_date_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
             </div>
           );
@@ -218,12 +219,12 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
 
           return (
             <div key={fieldId}>
-              <label className="text-xs text-slate-400 mb-1 block">{customName}</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{customName}</label>
               <input
                 type="text"
                 value={val}
                 onChange={(e) => onFieldChange(fieldKey, e.target.value)}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
               />
             </div>
           );
@@ -234,19 +235,19 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
 
       {/* Comment */}
       <div className="md:col-span-2">
-        <label className="text-xs text-slate-400 mb-1 block">{t('field_comment')}</label>
+        <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('field_comment')}</label>
         <textarea
           value={formData.comment}
           onChange={(e) => onFieldChange('comment', e.target.value)}
           rows={3}
           placeholder={t('form_comment_placeholder')}
-          className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
+          className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500"
         />
       </div>
 
       {/* Tags */}
       <div className="md:col-span-2">
-        <label className="text-xs text-slate-400 mb-1 block">{t('field_tags')}</label>
+        <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('field_tags')}</label>
         <TagInput
           value={formData.tags}
           onChange={(newTags) => onFieldChange('tags', newTags)}
@@ -256,10 +257,10 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
       </div>
 
       {/* Grouping Option */}
-      <div className="md:col-span-2 flex items-center justify-between p-3.5 rounded-xl bg-slate-900/60 border border-slate-800">
+      <div className="md:col-span-2 flex items-center justify-between p-3.5 rounded-xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
         <div className="space-y-0.5">
-          <span className="text-sm font-semibold text-slate-200 block">{t('form_grouping_label')}</span>
-          <span className="text-xs text-slate-400 block">
+          <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 block">{t('form_grouping_label')}</span>
+          <span className="text-xs text-slate-500 dark:text-slate-400 block">
             {getGroupingDesc()}
           </span>
         </div>
@@ -268,7 +269,7 @@ export const MovieMetadataFields: React.FC<MovieMetadataFieldsProps> = ({
           onClick={onToggleGrouping}
           className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${formData.isGrouped
               ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/30'
-              : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'
+              : 'bg-white border-slate-300 text-slate-600 hover:text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white'
             }`}
         >
           {formData.isGrouped ? t('on') : t('off')}

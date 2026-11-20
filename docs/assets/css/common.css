@@ -155,7 +155,7 @@ body {
 }
 
 .main section {
-  margin: 2em 1em;
+  margin: 6em 1em;
 }
 .main section .title {
   margin: 0 0 1em;
@@ -191,6 +191,17 @@ body {
 .main section table th {
   background: #f3f3f3;
 }
+.main section table td {
+  min-width: 5em;
+}
+.main section table thead th {
+  text-align: center;
+}
+.main section .screenShots {
+  border: 1px solid #888;
+  padding: 2em;
+  border-radius: 0.5em;
+}
 .main section .images {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -216,7 +227,7 @@ body {
   margin: 0;
 }
 .main section section {
-  margin: 1.5em 0;
+  margin: 4em 0;
 }
 .main section section .title {
   margin: 0 0 1em;

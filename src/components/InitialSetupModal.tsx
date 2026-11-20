@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState } from '../lib/types';
-import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Settings, Scale, Edit, Save, X } from 'lucide-react';
+import { AppSettings, ALL_BASE_FIELDS, DEFAULT_FIELD_ORDER, DatabaseState, ThemeSetting } from '../lib/types';
+import { Check, Radio, Circle, RotateCcw, GripVertical, Lock, Plus, Trash2, Globe, Palette, ChevronDown, ExternalLink, FileText, Copy, CheckCheck, ChevronRight, Settings, Scale, Edit, Save, X } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useApp } from './AppProvider';
 import { LanguageSetting } from '../lib/translations';
@@ -20,6 +20,7 @@ interface InitialSetupModalProps {
   onDeleteDatabase?: (id: string) => Promise<void>;
   onSave: (settings: {
     is_initialized: boolean;
+    genre_label?: string | null;
     cast_label?: string | null;
     custom_field_1_name: string | null;
     custom_field_2_name: string | null;
@@ -30,6 +31,7 @@ interface InitialSetupModalProps {
     key_fields: string[];
     field_order?: string[];
     language?: LanguageSetting;
+    theme?: ThemeSetting;
     database_name?: string;
   }) => void;
   onResetData?: () => Promise<void>;
@@ -51,9 +53,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const { t } = useApp();
   const modalRef = useFocusTrap<HTMLDivElement>(isOpen);
   const [databaseName, setDatabaseName] = useState('設定ファイル_00');
+  const [genreLabel, setGenreLabel] = useState('');
   const [castLabel, setCastLabel] = useState('');
-  const [isEditingCastLabel, setIsEditingCastLabel] = useState(false);
-  const [editingCastLabelValue, setEditingCastLabelValue] = useState('');
+  const [editingLabelField, setEditingLabelField] = useState<'genre' | 'cast' | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState('');
   const [custom1, setCustom1] = useState('');
   const [custom2, setCustom2] = useState('');
   const [custom3, setCustom3] = useState('');
@@ -62,6 +65,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [custom3DisplayInList, setCustom3DisplayInList] = useState(true);
   const [selectedKeyFields, setSelectedKeyFields] = useState<string[]>(['genre']);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageSetting>('auto');
+  const [selectedTheme, setSelectedTheme] = useState<ThemeSetting>('dark');
   const [activeTab, setActiveTab] = useState<'settings' | 'licenses'>('settings');
 
   // 'title' と 'rating' 以外の項目の並び順ID配列
@@ -171,7 +175,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   useEffect(() => {
     if (!isOpen) {
       setActiveTab('settings');
-      setIsEditingCastLabel(false);
+      setEditingLabelField(null);
       isLoadedRef.current = false;
       loadedDbIdRef.current = null;
       return;
@@ -182,9 +186,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       isLoadedRef.current = true;
       loadedDbIdRef.current = currentDbId;
       setDatabaseName(currentSettings.database_name || '設定ファイル_00');
+      setGenreLabel(currentSettings.genre_label || '');
       setCastLabel(currentSettings.cast_label || '');
-      setIsEditingCastLabel(false);
-      setEditingCastLabelValue(currentSettings.cast_label || '');
+      setEditingLabelField(null);
+      setEditingLabelValue('');
       setCustom1(currentSettings.custom_field_1_name || '');
       setCustom2(currentSettings.custom_field_2_name || '');
       setCustom3(currentSettings.custom_field_3_name || '');
@@ -192,6 +197,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       setCustom2DisplayInList(currentSettings.custom_field_2_display_in_list !== false);
       setCustom3DisplayInList(currentSettings.custom_field_3_display_in_list !== false);
       setSelectedLanguage(currentSettings.language || 'auto');
+      setSelectedTheme(currentSettings.theme || 'dark');
 
       if (currentSettings.key_fields && currentSettings.key_fields.length > 0) {
         setSelectedKeyFields(currentSettings.key_fields.slice(0, 3));
@@ -223,7 +229,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   // Helper to get field label by ID
   const getFieldLabel = (id: string): string => {
     if (id === 'title') return t('field_title');
-    if (id === 'genre') return t('field_genre');
+    if (id === 'genre') return genreLabel.trim() || t('field_genre');
     if (id === 'cast') return castLabel.trim() || t('field_cast');
     if (id === 'release_year') return t('field_release_year');
     if (id === 'release_date') return t('field_release_date');
@@ -340,10 +346,25 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const handleSave = () => {
     const fullFieldOrder = ['title', 'rating', ...reorderableFieldIds];
     const validKeyFields = selectedKeyFields.filter((id) => !isFieldDisabled(id));
+    const effectiveGenreLabel =
+      editingLabelField === 'genre'
+        ? (() => {
+            const trimmed = editingLabelValue.trim();
+            return trimmed === t('field_genre') ? '' : trimmed;
+          })()
+        : genreLabel;
+    const effectiveCastLabel =
+      editingLabelField === 'cast'
+        ? (() => {
+            const trimmed = editingLabelValue.trim();
+            return trimmed === t('field_cast') ? '' : trimmed;
+          })()
+        : castLabel;
     onSave({
       is_initialized: true,
       database_name: databaseName.trim() || '設定ファイル_00',
-      cast_label: castLabel.trim() || null,
+      genre_label: effectiveGenreLabel.trim() || null,
+      cast_label: effectiveCastLabel.trim() || null,
       custom_field_1_name: custom1.trim() || null,
       custom_field_2_name: custom2.trim() || null,
       custom_field_3_name: custom3.trim() || null,
@@ -353,6 +374,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       key_fields: validKeyFields.length > 0 ? validKeyFields : ['genre'],
       field_order: fullFieldOrder,
       language: selectedLanguage,
+      theme: selectedTheme,
     });
     if (onClose) onClose();
   };
@@ -365,9 +387,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     if (onResetData) {
       await onResetData();
     }
+    setGenreLabel('');
     setCastLabel('');
-    setIsEditingCastLabel(false);
-    setEditingCastLabelValue('');
+    setEditingLabelField(null);
+    setEditingLabelValue('');
     setCustom1('');
     setCustom2('');
     setCustom3('');
@@ -376,14 +399,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setCustom3DisplayInList(true);
     setSelectedKeyFields(['genre']);
     setSelectedLanguage('auto');
+    setSelectedTheme('dark');
     setReorderableFieldIds(DEFAULT_FIELD_ORDER.filter((id) => id !== 'title' && id !== 'rating'));
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
-      <div ref={modalRef} className="glass-card w-full max-w-4xl rounded-2xl border border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-100 max-h-[90vh] overflow-y-auto select-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+      <div ref={modalRef} className="glass-card w-full max-w-4xl rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-2xl p-6 md:p-8 space-y-6 text-slate-900 dark:text-slate-100 max-h-[90vh] overflow-y-auto select-none">
         {/* Tab Navigation & Version */}
-        <div className="flex items-center justify-between border-b border-slate-700/60">
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/60">
           <div className="flex items-center gap-2 -mb-px">
             <button
               type="button"
@@ -391,8 +415,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               className={clsx(
                 'px-4 py-2.5 text-sm font-medium border-b-2 transition-all flex items-center gap-2 cursor-pointer',
                 activeTab === 'settings'
-                  ? 'border-blue-500 text-blue-400 font-semibold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                  ? 'border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
               )}
             >
               <Settings className="w-4 h-4" />
@@ -404,15 +428,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               className={clsx(
                 'px-4 py-2.5 text-sm font-medium border-b-2 transition-all flex items-center gap-2 cursor-pointer',
                 activeTab === 'licenses'
-                  ? 'border-blue-500 text-blue-400 font-semibold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
+                  ? 'border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-400 font-semibold'
+                  : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:border-slate-600'
               )}
             >
               <Scale className="w-4 h-4" />
               <span>{t('settings_tab_licenses')}</span>
             </button>
           </div>
-          <span className="text-xs font-mono text-slate-400 select-none pr-2">
+          <span className="text-xs font-mono text-slate-500 dark:text-slate-400 select-none pr-2">
             v{APP_VERSION}
           </span>
         </div>
@@ -421,7 +445,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           <>
             {/* Database File Section (Always at the top) */}
         <div className="space-y-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-blue-400 block">
+          <label className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
             {t('settings_db_name')}
           </label>
           <div className="flex items-center gap-3">
@@ -430,17 +454,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               value={databaseName}
               onChange={(e) => setDatabaseName(e.target.value)}
               placeholder={t('settings_db_placeholder')}
-              className="flex-1 bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
+              className="flex-1 bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
             />
             {hasMultipleDbs && databaseState && (
               <select
                 value={databaseState.activeId}
                 onChange={handleDbSelectChange}
-                className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 title={t('settings_db_select')}
               >
                 {databaseState.databases.map((db) => (
-                  <option key={db.id} value={db.id}>
+                  <option key={db.id} value={db.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
                     {db.name}
                   </option>
                 ))}
@@ -451,38 +475,38 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
 
         {/* Section 1: User defined fields */}
         <div className="space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
             {t('settings_section1')}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item1')}</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('settings_custom_item1')}</label>
               <input
                 type="text"
                 value={custom1}
                 onChange={(e) => setCustom1(e.target.value)}
                 placeholder={t('settings_custom_item1_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
+                className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item2')}</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('settings_custom_item2')}</label>
               <input
                 type="text"
                 value={custom2}
                 onChange={(e) => setCustom2(e.target.value)}
                 placeholder={t('settings_custom_item2_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
+                className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs text-slate-400 mb-1 block">{t('settings_custom_item3')}</label>
+              <label className="text-xs text-slate-600 dark:text-slate-400 mb-1 block">{t('settings_custom_item3')}</label>
               <input
                 type="text"
                 value={custom3}
                 onChange={(e) => setCustom3(e.target.value)}
                 placeholder={t('settings_custom_item3_placeholder')}
-                className="w-full bg-slate-900/80 border border-slate-700/70 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
+                className="w-full bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 rounded-xl px-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 select-text"
               />
             </div>
           </div>
@@ -491,14 +515,14 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
         {/* Section 2: Key item selection & Reordering */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
               {t('settings_section2')}
             </h3>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-950/70 border border-blue-500/40 text-blue-300 font-semibold">
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-500/40 text-blue-700 dark:text-blue-300 font-semibold">
               {t('settings_key_fields_count', { count: selectedKeyFields.length }) || `キー項目: ${selectedKeyFields.length} / 3`}
             </span>
           </div>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {t('settings_section2_desc')}
           </p>
 
@@ -513,8 +537,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                   className={clsx(
                     'flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
                     isTitleSelected
-                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
-                      : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                      ? 'bg-blue-50 border-blue-500 text-blue-950 dark:bg-blue-600/20 dark:border-blue-500 dark:text-white shadow-sm ring-1 ring-blue-500'
+                      : 'bg-slate-100/70 border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200'
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -523,11 +547,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                         {titleKeyIndex + 1}
                       </span>
                     ) : (
-                      <span className="w-5 h-5 rounded-full border border-slate-600/80 flex items-center justify-center shrink-0" />
+                      <span className="w-5 h-5 rounded-full border border-slate-400 dark:border-slate-600/80 flex items-center justify-center shrink-0" />
                     )}
                     <span>{t('field_title')}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60">
+                  <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/70 dark:border-slate-700/60">
                     <Lock className="w-3 h-3" />
                     <span>{t('settings_fixed_position')}</span>
                   </div>
@@ -545,8 +569,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                   className={clsx(
                     'flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer select-none',
                     isRatingSelected
-                      ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500'
-                      : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                      ? 'bg-blue-50 border-blue-500 text-blue-950 dark:bg-blue-600/20 dark:border-blue-500 dark:text-white shadow-sm ring-1 ring-blue-500'
+                      : 'bg-slate-100/70 border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200'
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -555,11 +579,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                         {ratingKeyIndex + 1}
                       </span>
                     ) : (
-                      <span className="w-5 h-5 rounded-full border border-slate-600/80 flex items-center justify-center shrink-0" />
+                      <span className="w-5 h-5 rounded-full border border-slate-400 dark:border-slate-600/80 flex items-center justify-center shrink-0" />
                     )}
                     <span>{t('field_rating')}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/60">
+                  <div className="flex items-center gap-1 text-xs text-slate-500 px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/70 dark:border-slate-700/60">
                     <Lock className="w-3 h-3" />
                     <span>{t('settings_fixed_position')}</span>
                   </div>
@@ -597,12 +621,12 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                     className={clsx(
                       'flex items-center justify-between px-3 py-2.5 rounded-xl border text-sm font-medium transition-all select-none',
                       isDisabled
-                        ? 'bg-slate-900/30 border-slate-800/40 text-slate-500 opacity-40 cursor-not-allowed'
+                        ? 'bg-slate-100/50 border-slate-200/60 text-slate-400 dark:bg-slate-900/30 dark:border-slate-800/40 dark:text-slate-500 opacity-50 cursor-not-allowed'
                         : isSelected
-                        ? 'bg-blue-600/20 border-blue-500 text-white shadow-sm ring-1 ring-blue-500 cursor-pointer'
-                        : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200 cursor-pointer',
+                        ? 'bg-blue-50 border-blue-500 text-blue-950 dark:bg-blue-600/20 dark:border-blue-500 dark:text-white shadow-sm ring-1 ring-blue-500 cursor-pointer'
+                        : 'bg-slate-100/70 border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:bg-slate-900/50 dark:border-slate-800 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200 cursor-pointer',
                       !isDisabled && isDragging && 'opacity-40 border-dashed border-blue-400',
-                      !isDisabled && isDragOver && 'border-blue-400 bg-blue-600/10 scale-[1.01]'
+                      !isDisabled && isDragOver && 'border-blue-400 bg-blue-500/10 scale-[1.01]'
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -610,8 +634,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                         className={clsx(
                           'p-1 rounded transition-colors',
                           isDisabled
-                            ? 'text-slate-700 cursor-not-allowed'
-                            : 'cursor-grab active:cursor-grabbing text-slate-500 hover:text-slate-300'
+                            ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed'
+                            : 'cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-300'
                         )}
                         title={isDisabled ? undefined : t('settings_drag_to_reorder')}
                         onMouseEnter={() => {
@@ -631,13 +655,13 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                         <span
                           className={clsx(
                             'w-5 h-5 rounded-full border flex items-center justify-center shrink-0',
-                            isDisabled ? 'border-slate-700/50' : 'border-slate-600/80'
+                            isDisabled ? 'border-slate-300 dark:border-slate-700/50' : 'border-slate-400 dark:border-slate-600/80'
                           )}
                         />
                       )}
 
-                      {fieldId === 'cast' ? (
-                        isEditingCastLabel ? (
+                      {fieldId === 'genre' || fieldId === 'cast' ? (
+                        editingLabelField === fieldId ? (
                           <div
                             className="flex items-center gap-1.5 min-w-0"
                             onClick={(e) => e.stopPropagation()}
@@ -645,37 +669,44 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                           >
                             <input
                               type="text"
-                              value={editingCastLabelValue}
-                              onChange={(e) => setEditingCastLabelValue(e.target.value)}
+                              value={editingLabelValue}
+                              onChange={(e) => setEditingLabelValue(e.target.value)}
                               onKeyDown={(e) => {
+                                const defaultLabel = fieldId === 'genre' ? t('field_genre') : t('field_cast');
+                                const currentSaved = fieldId === 'genre' ? genreLabel : castLabel;
                                 if (e.key === 'Enter') {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  const trimmed = editingCastLabelValue.trim();
-                                  setCastLabel(trimmed === t('field_cast') ? '' : trimmed);
-                                  setIsEditingCastLabel(false);
+                                  const trimmed = editingLabelValue.trim();
+                                  const nextVal = trimmed === defaultLabel ? '' : trimmed;
+                                  if (fieldId === 'genre') setGenreLabel(nextVal);
+                                  else setCastLabel(nextVal);
+                                  setEditingLabelField(null);
                                 } else if (e.key === 'Escape') {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setEditingCastLabelValue(castLabel);
-                                  setIsEditingCastLabel(false);
+                                  setEditingLabelValue(currentSaved);
+                                  setEditingLabelField(null);
                                 }
                               }}
-                              placeholder={t('field_cast')}
+                              placeholder={fieldId === 'genre' ? t('field_genre') : t('field_cast')}
                               autoFocus
-                              className="bg-slate-950/80 border border-slate-700/80 hover:border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-0.5 text-sm text-white placeholder-slate-400 focus:outline-none w-40 sm:w-56 select-text"
+                              className="bg-white dark:bg-slate-950/80 border border-slate-300 dark:border-slate-700/80 hover:border-slate-400 dark:hover:border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg px-2.5 py-0.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none w-40 sm:w-56 select-text"
                             />
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const trimmed = editingCastLabelValue.trim();
-                                setCastLabel(trimmed === t('field_cast') ? '' : trimmed);
-                                setIsEditingCastLabel(false);
+                                const defaultLabel = fieldId === 'genre' ? t('field_genre') : t('field_cast');
+                                const trimmed = editingLabelValue.trim();
+                                const nextVal = trimmed === defaultLabel ? '' : trimmed;
+                                if (fieldId === 'genre') setGenreLabel(nextVal);
+                                else setCastLabel(nextVal);
+                                setEditingLabelField(null);
                               }}
                               title={t('save')}
                               aria-label={t('save')}
-                              className="p-1 rounded-lg bg-blue-600/80 hover:bg-blue-500 text-white transition-colors shrink-0 cursor-pointer"
+                              className="p-1 rounded-lg bg-blue-600/90 hover:bg-blue-500 text-white transition-colors shrink-0 cursor-pointer"
                             >
                               <Save className="w-3.5 h-3.5" />
                             </button>
@@ -683,12 +714,12 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setEditingCastLabelValue(castLabel);
-                                setIsEditingCastLabel(false);
+                                setEditingLabelValue(fieldId === 'genre' ? genreLabel : castLabel);
+                                setEditingLabelField(null);
                               }}
                               title={t('cancel')}
                               aria-label={t('cancel')}
-                              className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors shrink-0 cursor-pointer"
+                              className="p-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 hover:text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 dark:hover:text-white transition-colors shrink-0 cursor-pointer"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
@@ -700,13 +731,13 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setEditingCastLabelValue(castLabel);
-                                setIsEditingCastLabel(true);
+                                setEditingLabelValue(fieldId === 'genre' ? genreLabel : castLabel);
+                                setEditingLabelField(fieldId);
                               }}
                               onMouseDown={(e) => e.stopPropagation()}
                               title={t('edit')}
                               aria-label={t('edit')}
-                              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors shrink-0 cursor-pointer"
+                              className="p-1 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-200/80 dark:hover:text-white dark:hover:bg-slate-800/80 transition-colors shrink-0 cursor-pointer"
                             >
                               <Edit className="w-3.5 h-3.5" />
                             </button>
@@ -723,8 +754,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                           className={clsx(
                             'flex items-center gap-1.5 text-xs select-none',
                             isDisabled
-                              ? 'text-slate-600 cursor-not-allowed'
-                              : 'text-slate-300 hover:text-white cursor-pointer'
+                              ? 'text-slate-400 dark:text-slate-600 cursor-not-allowed'
+                              : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white cursor-pointer'
                           )}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -747,12 +778,12 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                               else if (fieldId === 'custom_field_2') setCustom2DisplayInList(e.target.checked);
                               else if (fieldId === 'custom_field_3') setCustom3DisplayInList(e.target.checked);
                             }}
-                            className="rounded border-slate-700 text-blue-600 focus:ring-blue-500 bg-slate-900 w-3.5 h-3.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 bg-white dark:bg-slate-900 w-3.5 h-3.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                           />
                           <span>{t('settings_custom_display_in_list')}</span>
                         </label>
                       )}
-                      <span className={clsx('text-xs font-mono', isDisabled ? 'text-slate-700' : 'text-slate-600')}>
+                      <span className={clsx('text-xs font-mono', isDisabled ? 'text-slate-400 dark:text-slate-700' : 'text-slate-400 dark:text-slate-600')}>
                         #{index + 1}
                       </span>
                     </div>
@@ -763,35 +794,67 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           </div>
         </div>
 
-        {/* Section 3: Language Selection */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-400">
-            {t('settings_section3')}
-          </h3>
+        {/* Section 3: Language & Color Theme Selection */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+              {t('settings_section3')}
+            </h3>
 
-          <div className="relative max-w-xs">
-            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
-              <Globe className="w-4 h-4" />
+            <div className="relative max-w-xs">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                <Globe className="w-4 h-4" />
+              </div>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value as LanguageSetting)}
+                className="w-full appearance-none bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 hover:border-slate-400 dark:hover:border-slate-600 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
+              >
+                {[
+                  { id: 'auto', label: t('settings_lang_auto') },
+                  { id: 'ja', label: t('settings_lang_ja') },
+                  { id: 'en', label: t('settings_lang_en') },
+                  { id: 'zh-CN', label: t('settings_lang_zh_CN') },
+                  { id: 'zh-TW', label: t('settings_lang_zh_TW') },
+                ].map((langOpt) => (
+                  <option key={langOpt.id} value={langOpt.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
+                    {langOpt.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                <ChevronDown className="w-4 h-4" />
+              </div>
             </div>
-            <select
-              value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value as LanguageSetting)}
-              className="w-full appearance-none bg-slate-900/80 border border-slate-700/70 hover:border-slate-600 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
-            >
-              {[
-                { id: 'auto', label: t('settings_lang_auto') },
-                { id: 'ja', label: t('settings_lang_ja') },
-                { id: 'en', label: t('settings_lang_en') },
-                { id: 'zh-CN', label: t('settings_lang_zh_CN') },
-                { id: 'zh-TW', label: t('settings_lang_zh_TW') },
-              ].map((langOpt) => (
-                <option key={langOpt.id} value={langOpt.id} className="bg-slate-900 text-white">
-                  {langOpt.label}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
-              <ChevronDown className="w-4 h-4" />
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+              {t('settings_theme_section')}
+            </h3>
+
+            <div className="relative max-w-xs">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                <Palette className="w-4 h-4" />
+              </div>
+              <select
+                value={selectedTheme}
+                onChange={(e) => setSelectedTheme(e.target.value as ThemeSetting)}
+                className="w-full appearance-none bg-white dark:bg-slate-900/80 border border-slate-300 dark:border-slate-700/70 hover:border-slate-400 dark:hover:border-slate-600 rounded-xl pl-10 pr-10 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
+              >
+                {[
+                  { id: 'dark', label: t('settings_theme_dark') },
+                  { id: 'light', label: t('settings_theme_light') },
+                  { id: 'auto', label: t('settings_theme_auto') },
+                ].map((themeOpt) => (
+                  <option key={themeOpt.id} value={themeOpt.id} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
+                    {themeOpt.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                <ChevronDown className="w-4 h-4" />
+              </div>
             </div>
           </div>
         </div>
@@ -799,19 +862,19 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     ) : (
       /* Section: Open Source Licenses */
       <div className="space-y-4">
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
+        <div className="p-4 rounded-xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-white text-sm">{t('settings_ffmpeg_title')}</span>
-                  <span className="text-xs font-medium text-blue-400">
+                  <span className="font-semibold text-slate-900 dark:text-white text-sm">{t('settings_ffmpeg_title')}</span>
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
                     {t('settings_ffmpeg_license_badge')}
                   </span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                   {t('settings_ffmpeg_desc')}
                 </p>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                   {t('settings_ffmpeg_source_desc')}
                 </p>
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
@@ -825,43 +888,43 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <button
                 type="button"
                 onClick={() => handleOpenExternal('https://ffmpeg.org')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs text-slate-700 hover:text-slate-900 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                <ExternalLink className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{t('settings_ffmpeg_official_site')}</span>
               </button>
               <button
                 type="button"
                 onClick={() => handleOpenExternal('https://www.gyan.dev/ffmpeg/builds/')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs text-slate-700 hover:text-slate-900 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <ExternalLink className="w-3.5 h-3.5 text-blue-400" />
+                <ExternalLink className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{t('settings_ffmpeg_build_site')}</span>
               </button>
               <button
                 type="button"
                 onClick={handleToggleLicense}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs text-slate-700 hover:text-slate-900 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <FileText className="w-3.5 h-3.5 text-blue-400" />
+                <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{showLicenseText ? t('settings_ffmpeg_hide_license') : t('settings_ffmpeg_view_license')}</span>
               </button>
             </div>
 
             {/* License Text Area */}
             {showLicenseText && (
-              <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                   <span className="font-mono">GNU General Public License v3.0</span>
                   <button
                     type="button"
                     onClick={handleCopyLicense}
-                    className="flex items-center gap-1 text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer"
+                    className="flex items-center gap-1 text-slate-600 hover:text-slate-900 px-2 py-1 rounded bg-white border border-slate-300 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                   >
                     {isLicenseCopied ? (
                       <>
-                        <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">{t('settings_ffmpeg_copied')}</span>
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-emerald-600 dark:text-emerald-400">{t('settings_ffmpeg_copied')}</span>
                       </>
                     ) : (
                       <>
@@ -874,7 +937,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 {isLoadingLicense ? (
                   <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
                 ) : (
-                  <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
+                  <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
                     {licenseText}
                   </pre>
                 )}
@@ -883,11 +946,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           </div>
 
           {/* Third-Party OSS Box */}
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-700/60 space-y-3">
+          <div className="p-4 rounded-xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700/60 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <span className="font-semibold text-white text-sm">{t('settings_third_party_title')}</span>
-                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                <span className="font-semibold text-slate-900 dark:text-white text-sm">{t('settings_third_party_title')}</span>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
                   {t('settings_third_party_desc')}
                 </p>
               </div>
@@ -897,26 +960,26 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <button
                 type="button"
                 onClick={handleToggleThirdParty}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-300 text-xs text-slate-700 hover:text-slate-900 dark:bg-slate-800/80 dark:hover:bg-slate-700/80 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white transition-colors cursor-pointer"
               >
-                <FileText className="w-3.5 h-3.5 text-blue-400" />
+                <FileText className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                 <span>{showThirdPartyLicenses ? t('settings_third_party_hide_license') : t('settings_third_party_view_license')}</span>
               </button>
             </div>
 
             {showThirdPartyLicenses && (
-              <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-400">
+              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
                   <span className="font-mono">Third-Party Licenses</span>
                   <button
                     type="button"
                     onClick={handleCopyThirdParty}
-                    className="flex items-center gap-1 text-slate-400 hover:text-white px-2 py-1 rounded bg-slate-800 border border-slate-700 hover:bg-slate-700 transition-colors cursor-pointer"
+                    className="flex items-center gap-1 text-slate-600 hover:text-slate-900 px-2 py-1 rounded bg-white border border-slate-300 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                   >
                     {isThirdPartyCopied ? (
                       <>
-                        <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">{t('settings_ffmpeg_copied')}</span>
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-emerald-600 dark:text-emerald-400">{t('settings_ffmpeg_copied')}</span>
                       </>
                     ) : (
                       <>
@@ -929,7 +992,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 {isLoadingThirdParty ? (
                   <div className="py-6 text-center text-xs text-slate-500">Loading...</div>
                 ) : (
-                  <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
+                  <pre className="max-h-52 overflow-y-auto p-3 rounded-lg bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed select-text">
                     {thirdPartyLicensesText}
                   </pre>
                 )}
@@ -940,7 +1003,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       )}
 
         {/* Footer actions */}
-        <div className="pt-4 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-3">
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-700/60 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {activeTab === 'settings' && (
               <>
@@ -948,7 +1011,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                   <button
                     type="button"
                     onClick={handleResetData}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-300 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-600/10 dark:text-red-400 dark:hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                     title={t('settings_reset_data_tooltip')}
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -958,7 +1021,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowDeleteDbConfirm(true)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/40 bg-red-600/10 text-red-400 hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-300 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/40 dark:bg-red-600/10 dark:text-red-400 dark:hover:bg-red-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                     title={t('settings_delete_db')}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -969,7 +1032,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAddDatabase}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-600/10 dark:text-blue-400 dark:hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                   title={t('settings_add_db')}
                 >
                   <Plus className="w-4 h-4" />
@@ -979,7 +1042,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                 <button
                   type="button"
                   onClick={handleDuplicateDatabase}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-500/40 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-500/40 dark:bg-blue-600/10 dark:text-blue-400 dark:hover:bg-blue-600/20 font-medium text-sm transition-colors whitespace-nowrap"
                   title={t('settings_duplicate_db')}
                 >
                   <Copy className="w-4 h-4" />
@@ -994,7 +1057,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               <button
                 type="button"
                 onClick={onClose || (() => setActiveTab('settings'))}
-                className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+                className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
               >
                 {t('close')}
               </button>
@@ -1004,7 +1067,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-5 py-2.5 rounded-xl border border-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+                    className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 transition-colors"
                   >
                     {t('cancel')}
                   </button>

@@ -144,18 +144,18 @@ function KeyItemsContent() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-10 w-full bg-slate-900/50 rounded-xl animate-pulse" />
+        <div className="h-10 w-full bg-slate-200/70 dark:bg-slate-900/50 rounded-xl animate-pulse" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-[1600px]:grid-cols-4 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="glass-card rounded-xl overflow-hidden border border-slate-800 p-6 space-y-4">
-              <div className="aspect-video w-full bg-slate-900 rounded-lg animate-pulse" />
+            <div key={i} className="glass-card rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 p-6 space-y-4">
+              <div className="aspect-video w-full bg-slate-200 dark:bg-slate-900 rounded-lg animate-pulse" />
               <div className="space-y-2">
-                <div className="h-6 w-3/4 bg-slate-900 rounded animate-pulse" />
-                <div className="h-4 w-1/2 bg-slate-900 rounded animate-pulse" />
+                <div className="h-6 w-3/4 bg-slate-200 dark:bg-slate-900 rounded animate-pulse" />
+                <div className="h-4 w-1/2 bg-slate-200 dark:bg-slate-900 rounded animate-pulse" />
               </div>
-              <div className="pt-4 border-t border-slate-800 flex justify-between">
-                <div className="h-6 w-24 bg-slate-900 rounded animate-pulse" />
-                <div className="h-6 w-16 bg-slate-900 rounded animate-pulse" />
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-between">
+                <div className="h-6 w-24 bg-slate-200 dark:bg-slate-900 rounded animate-pulse" />
+                <div className="h-6 w-16 bg-slate-200 dark:bg-slate-900 rounded animate-pulse" />
               </div>
             </div>
           ))}
@@ -238,7 +238,7 @@ function KeyItemsContent() {
     <>
       <div className="space-y-6">
         {/* Controls Bar */}
-        <div className="space-y-3 pb-6 border-b border-slate-800/80 select-none">
+        <div className="space-y-3 pb-6 border-b border-slate-200 dark:border-slate-800/80 select-none">
           <div className="flex flex-wrap items-center justify-between gap-4">
             {/* Left Group: Search + Tag Filter + Rating Filter + Reset */}
             <div className="flex flex-wrap items-center gap-3 sm:gap-4">
@@ -250,13 +250,13 @@ function KeyItemsContent() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('movies_list_search_placeholder')}
-                  className="pl-8 pr-7 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all w-44 sm:w-56 hover:border-slate-700"
+                  className="pl-8 pr-7 py-1.5 rounded-xl text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all w-44 sm:w-56 hover:border-slate-300 dark:hover:border-slate-700"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2 text-slate-400 hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
+                    className="absolute right-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-0.5 rounded transition-colors cursor-pointer"
                     title={t('movies_list_search_clear')}
                   >
                     <X className="w-3.5 h-3.5" />
@@ -283,10 +283,10 @@ function KeyItemsContent() {
                 <button
                   type="button"
                   onClick={resetAllFilters}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-300 dark:bg-slate-800/90 dark:hover:bg-slate-700 dark:text-slate-200 dark:hover:text-white dark:border-slate-700 transition-all cursor-pointer"
                   title={t('filter_reset_all')}
                 >
-                  <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
+                  <RotateCcw className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                   <span>{t('filter_clear_short')}</span>
                 </button>
               )}
@@ -296,22 +296,22 @@ function KeyItemsContent() {
             <div className="flex flex-wrap items-center gap-3">
               {/* Sort Bar */}
               <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                   <ArrowUpDown className="w-3.5 h-3.5" /> {t('key_list_sort_label')}
                 </span>
                 <button
                   onClick={toggleSort}
-                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium bg-slate-900 border border-slate-800 text-slate-200 hover:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
                 >
                   <span>{keyLabel}</span>
-                  <ArrowUpDown className="w-3 h-3 text-blue-400" />
+                  <ArrowUpDown className="w-3 h-3 text-blue-600 dark:text-blue-400" />
                 </button>
               </div>
 
               {/* Text List Button */}
               <button
                 onClick={() => setIsTextListModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-medium bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 border border-blue-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
+                className="flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-medium bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 dark:bg-blue-600/20 dark:hover:bg-blue-600/30 dark:text-blue-300 dark:hover:text-blue-200 dark:border-blue-500/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 transition-all cursor-pointer"
               >
                 <span>{t('key_list_text_display')}</span>
               </button>
@@ -324,13 +324,13 @@ function KeyItemsContent() {
               {selectedTags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-lg bg-blue-600/25 border border-blue-500/50 text-blue-200 text-xs font-medium"
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-lg bg-blue-100 border border-blue-300 text-blue-800 dark:bg-blue-600/25 dark:border-blue-500/50 dark:text-blue-200 text-xs font-medium"
                 >
                   <span>{tag}</span>
                   <button
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className="p-0.5 rounded hover:bg-blue-500/30 text-blue-300 hover:text-white transition-colors cursor-pointer"
+                    className="p-0.5 rounded hover:bg-blue-200/80 dark:hover:bg-blue-500/30 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-white transition-colors cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -342,12 +342,12 @@ function KeyItemsContent() {
 
         {/* Empty State */}
         {sortedGroups.length === 0 && (
-          <div className="glass-card rounded-xl p-8 sm:p-12 text-center border border-slate-800 space-y-4 shadow-sm">
-            <div className="w-16 h-16 rounded-full bg-slate-800/80 flex items-center justify-center mx-auto text-slate-400 border border-slate-700/50">
+          <div className="glass-card rounded-xl p-8 sm:p-12 text-center border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+            <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center mx-auto text-slate-400 border border-slate-200 dark:border-slate-700/50">
               <Film className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-200 tracking-tight">{t('key_list_empty')}</h3>
-            <p className="text-sm text-slate-400 max-w-md mx-auto">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 tracking-tight">{t('key_list_empty')}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
               {hasActiveFilters
                 ? t('movies_list_empty_filter_desc')
                 : t('key_list_empty_desc')}
@@ -375,7 +375,7 @@ function KeyItemsContent() {
             return (
               <div
                 key={group.key_signature}
-                className="glass-card glass-card-hover rounded-xl overflow-hidden flex flex-col justify-between border border-slate-800/80 transition-all shadow-sm"
+                className="glass-card glass-card-hover rounded-xl overflow-hidden flex flex-col justify-between border border-slate-200/90 dark:border-slate-800/80 transition-all shadow-sm"
               >
                 {/* Summary Image (720x405 Aspect Ratio) */}
                 <div
@@ -388,7 +388,7 @@ function KeyItemsContent() {
                       handleRowClick(group);
                     }
                   }}
-                  className="relative aspect-video w-full bg-slate-950 overflow-hidden group/img cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
+                  className="relative aspect-video w-full bg-slate-200 dark:bg-slate-950 overflow-hidden group/img cursor-pointer select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset"
                 >
                   {imageSrc ? (
                     <img
@@ -398,14 +398,14 @@ function KeyItemsContent() {
                       className="w-full h-full object-cover group-hover/img:scale-105 group-focus-visible/img:scale-105 transition-transform duration-300 pointer-events-none"
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/80 gap-1.5 select-none">
+                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-900/80 gap-1.5 select-none">
                       <Film className="w-10 h-10 opacity-40" />
                       <span className="text-xs font-medium tracking-wider">NO IMAGE</span>
                     </div>
                   )}
 
                   {/* Badge count */}
-                  <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-slate-950/20 backdrop-blur-md text-xs font-semibold text-blue-400 border border-blue-500/30 shadow-sm z-10 select-none">
+                  <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-slate-950/60 backdrop-blur-md text-xs font-semibold text-blue-300 border border-blue-500/30 shadow-sm z-10 select-none">
                     {t('key_list_movies_count', { count: group.movie_count })}
                   </div>
                 </div>
@@ -415,7 +415,7 @@ function KeyItemsContent() {
                   <div className="space-y-3">
                     <div className="space-y-1">
                       {Object.values(group.key_values).map((val, idx) => (
-                        <div key={idx} className="text-lg font-semibold text-slate-100 tracking-tight line-clamp-1">
+                        <div key={idx} className="text-lg font-semibold text-slate-900 dark:text-slate-100 tracking-tight line-clamp-1">
                           {val}
                         </div>
                       ))}
@@ -437,7 +437,7 @@ function KeyItemsContent() {
                                 'px-2.5 py-1 rounded-lg border text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer',
                                 isSelected
                                   ? 'bg-blue-600 text-white border-blue-500 font-semibold shadow-sm'
-                                  : 'bg-blue-600/20 border-blue-500/30 text-blue-300 hover:bg-blue-600/30'
+                                  : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-600/20 dark:border-blue-500/30 dark:text-blue-300 dark:hover:bg-blue-600/30'
                               )}
                             >
                               {trimmedTag}
@@ -448,7 +448,7 @@ function KeyItemsContent() {
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                  <div className="pt-4 border-t border-slate-200/90 dark:border-slate-800/80 flex items-center justify-between gap-2">
                     <div className="flex items-center shrink-0">
                       <RatingStars
                         rating={group.rating}
@@ -460,16 +460,16 @@ function KeyItemsContent() {
                     <div className="flex items-center gap-1.5 shrink-0 select-none">
                       <button
                         onClick={() => openEditKeyItemModal(group)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-slate-100 text-xs font-medium border border-slate-800 hover:border-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0 select-none"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-slate-300 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-300 dark:hover:text-slate-100 text-xs font-medium dark:border-slate-800 dark:hover:border-slate-700 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0 select-none"
                         title={t('edit')}
                       >
-                        <Edit className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                        <Edit className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                         <span>{t('edit')}</span>
                       </button>
 
                       <button
                         onClick={() => handleRowClick(group)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-blue-200 text-xs font-medium border border-blue-500/40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0 select-none"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 border border-blue-200 dark:bg-blue-600/20 dark:hover:bg-blue-600/30 dark:text-blue-300 dark:hover:text-blue-200 text-xs font-medium dark:border-blue-500/40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer whitespace-nowrap shrink-0 select-none"
                       >
                         <span>{t('movies_list_title')}</span>
                       </button>
@@ -484,14 +484,14 @@ function KeyItemsContent() {
 
       {/* Text List Modal */}
       {isTextListModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-          <div ref={textListModalRef} className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div ref={textListModalRef} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-              <h3 className="text-base font-semibold text-slate-100 select-none">{t('key_list_text_display')}</h3>
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/90">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 select-none">{t('key_list_text_display')}</h3>
               <button
                 onClick={() => setIsTextListModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -500,7 +500,7 @@ function KeyItemsContent() {
             {/* Modal Body / Tag Cloud Items */}
             <div className="p-6 overflow-y-auto flex-1 max-h-[60vh]">
               {sortedGroups.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-sm">
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
                   {t('key_list_empty')}
                 </div>
               ) : (
@@ -514,7 +514,7 @@ function KeyItemsContent() {
                           setIsTextListModalOpen(false);
                           handleRowClick(group);
                         }}
-                        className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-800/80 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-700/70 hover:border-blue-500 transition-all cursor-pointer shadow-sm hover:shadow-blue-500/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                        className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white border border-slate-200 hover:border-blue-500 dark:bg-slate-800/80 dark:hover:bg-blue-600 dark:text-slate-200 dark:hover:text-white dark:border-slate-700/70 dark:hover:border-blue-500 transition-all cursor-pointer shadow-sm hover:shadow-blue-500/20 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         {keyText}
                       </button>
