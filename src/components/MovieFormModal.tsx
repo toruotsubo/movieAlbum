@@ -51,6 +51,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
   // Media & Metadata State
   const [summaryImagePath, setSummaryImagePath] = useState<string | null>(null);
   const [timelineImagePath, setTimelineImagePath] = useState<string | null>(null);
+  const [isGeneratingTimeline, setIsGeneratingTimeline] = useState(false);
   const [capturedTime, setCapturedTime] = useState<number | null>(null);
   const [duration, setDuration] = useState<number | null>(null);
   const [width, setWidth] = useState<number | null>(null);
@@ -113,6 +114,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
 
       setSummaryImagePath(movie.summary_image_path || null);
       setTimelineImagePath(movie.timeline_image_path || null);
+      setIsGeneratingTimeline(false);
       timelinePromiseRef.current = null;
       setCapturedTime(movie.captured_time !== undefined ? movie.captured_time : null);
       setDuration(movie.duration || null);
@@ -136,6 +138,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
 
       // Generate 8-point timeline image when registering a new video (or if missing)
       if (!movie.timeline_image_path && movie.file_path && window.api?.generateTimelineThumbnail) {
+        setIsGeneratingTimeline(true);
         timelinePromiseRef.current = window.api
           .generateTimelineThumbnail(
             movie.file_path,
@@ -144,6 +147,7 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
             movie.height || null
           )
           .then((res) => {
+            if (loadedMovieKeyRef.current !== currentKey) return res?.imagePath || null;
             if (res?.imagePath) {
               setTimelineImagePath(res.imagePath);
               if (res.duration && (!movie.duration || movie.duration <= 0)) setDuration(res.duration);
@@ -156,6 +160,11 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
           .catch((err) => {
             console.warn('Failed to generate timeline thumbnail in modal:', err);
             return null;
+          })
+          .finally(() => {
+            if (loadedMovieKeyRef.current === currentKey) {
+              setIsGeneratingTimeline(false);
+            }
           });
       }
     }
@@ -287,9 +296,13 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
             ref={playerRef}
             filePath={movie.file_path}
             summaryImagePath={summaryImagePath}
+            timelineImagePath={timelineImagePath}
+            isGeneratingTimeline={isGeneratingTimeline}
             capturedTime={capturedTime}
             presetDuration={duration}
             presetFrameRate={frameRate}
+            videoWidth={width}
+            videoHeight={height}
             onSummaryImageChange={(img, time) => {
               setSummaryImagePath(img);
               if (time !== null) setCapturedTime(time);
