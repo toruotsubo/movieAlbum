@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { formatMediaUrl, isUnsupportedInlinePlayback } from '../../lib/utils';
+import React, { useRef, useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { formatMediaUrl, isUnsupportedInlinePlayback, TIMELINE_RATIOS } from '../../lib/utils';
 import { clsx } from 'clsx';
 import {
   Play,
@@ -24,9 +24,13 @@ export interface VideoThumbnailPlayerHandle {
 interface VideoThumbnailPlayerProps {
   filePath?: string | null;
   summaryImagePath: string | null;
+  timelineImagePath?: string | null;
+  isGeneratingTimeline?: boolean;
   capturedTime: number | null;
   presetDuration?: number | null;
   presetFrameRate?: number | null;
+  videoWidth?: number | null;
+  videoHeight?: number | null;
   onSummaryImageChange: (imagePath: string | null, capturedTime: number | null) => void;
   onMetadataExtracted?: (meta: { duration?: number; width?: number; height?: number; frame_rate?: number }) => void;
   onErrorModal: (title: string, description: string) => void;
@@ -61,9 +65,13 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
     {
       filePath,
       summaryImagePath,
+      timelineImagePath,
+      isGeneratingTimeline = false,
       capturedTime,
       presetDuration,
       presetFrameRate,
+      videoWidth,
+      videoHeight,
       onSummaryImageChange,
       onMetadataExtracted,
       onErrorModal,
@@ -86,7 +94,9 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     const isUnsupportedPlayback = isUnsupportedInlinePlayback(filePath);
     const videoSrc = formatMediaUrl(filePath, false);
-    const imageSrc = formatMediaUrl(summaryImagePath);
+    const imageSrc = useMemo(() => formatMediaUrl(summaryImagePath), [summaryImagePath]);
+    const timelineImageSrc = useMemo(() => formatMediaUrl(timelineImagePath), [timelineImagePath]);
+    const isPortraitTimeline = Boolean(videoWidth && videoHeight && videoHeight > videoWidth);
 
     // Format seconds to mm:ss or hh:mm:ss
     const formatTime = (timeInSeconds: number) => {
@@ -445,6 +455,20 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       if (isProcessingFFmpeg) return;
       const fps = frameRate > 0 ? frameRate : 30;
       generateThumbnailAtTime(currentTime + frames / fps);
+    };
+
+    const effectiveDuration = duration > 0 ? duration : (videoRef.current?.duration && !isNaN(videoRef.current.duration) ? videoRef.current.duration : 0);
+    const isTimelineInteractive = isPlayingVideo && !videoError && effectiveDuration > 0;
+
+    const handleTimelineCellClick = (ratio: number) => {
+      if (!isTimelineInteractive) return;
+      const targetTime = effectiveDuration * ratio;
+      if (isUnsupportedPlayback) {
+        if (isProcessingFFmpeg) return;
+        generateThumbnailAtTime(targetTime);
+      } else {
+        seekTo(targetTime);
+      }
     };
 
     const unsupportedSeekButtons = [
@@ -834,6 +858,63 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
             </div>
           )}
         </div>
+
+        {/* 8-point Timeline Composite Screenshot */}
+        {(timelineImageSrc || isGeneratingTimeline) && (
+          <div className="relative w-full max-w-[720px] mx-auto rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-md select-none">
+            {timelineImageSrc ? (
+              <>
+                <img
+                  src={timelineImageSrc}
+                  alt="Timeline"
+                  draggable={false}
+                  decoding="async"
+                  className="w-full h-auto block pointer-events-none"
+                />
+                {isTimelineInteractive && (
+                  <div
+                    className={clsx(
+                      'absolute inset-0 grid',
+                      isPortraitTimeline ? 'grid-cols-8 grid-rows-1' : 'grid-cols-4 grid-rows-2'
+                    )}
+                  >
+                    {TIMELINE_RATIOS.map((ratio, idx) => {
+                      const targetTime = effectiveDuration * ratio;
+                      const formattedTime = formatTime(targetTime);
+                      const tooltipText = t('form_timeline_seek_tooltip', { time: formattedTime });
+                      const isDisabled = isUnsupportedPlayback && isProcessingFFmpeg;
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => handleTimelineCellClick(ratio)}
+                          title={tooltipText}
+                          aria-label={tooltipText}
+                          className={clsx(
+                            'group/cell relative w-full h-full flex items-end justify-end p-1 transition-colors focus:outline-none',
+                            isDisabled
+                              ? 'cursor-wait'
+                              : 'cursor-pointer hover:bg-blue-500/15 hover:ring-2 hover:ring-inset hover:ring-blue-400 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500'
+                          )}
+                        >
+                          <span className="opacity-0 group-hover/cell:opacity-100 group-focus-visible/cell:opacity-100 transition-opacity px-1.5 py-0.5 rounded bg-slate-950/85 text-white text-[10px] font-mono leading-none shadow-sm pointer-events-none">
+                            {formattedTime}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="w-full py-6 flex items-center justify-center bg-slate-100 dark:bg-slate-900/80 text-slate-400">
+                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }

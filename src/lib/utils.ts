@@ -111,6 +111,11 @@ export function getKanaForCast(
 
 export const INLINE_PLAYBACK_EXTENSIONS = new Set(['mp4', 'm4v', 'webm', 'ogv', 'ogg']);
 
+/**
+ * Ratios used by electron/main.ts to generate the 8-point timeline composite screenshot.
+ */
+export const TIMELINE_RATIOS = [0.08, 0.20, 0.32, 0.46, 0.58, 0.70, 0.82, 0.94] as const;
+
 export const VIDEO_EXTENSIONS = new Set([
   'mp4', 'm4v', 'mkv', 'avi', 'wmv', 'mov', 'flv', 'webm',
   'mpg', 'mpeg', 'm2v', '3gp', '3g2', 'ts', 'mts', 'm2ts',
