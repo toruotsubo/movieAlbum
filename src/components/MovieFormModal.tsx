@@ -19,8 +19,15 @@ interface MovieFormModalProps {
   onClose: () => void;
 }
 
-export const MovieFormModal: React.FC<MovieFormModalProps> = ({
-  isOpen,
+interface MovieFormModalContentProps {
+  movie: Partial<Movie>;
+  settings: AppSettings | null;
+  onSave: (movieData: Partial<Movie>) => void;
+  onDelete?: (id: number) => Promise<void>;
+  onClose: () => void;
+}
+
+const MovieFormModalContent: React.FC<MovieFormModalContentProps> = ({
   movie,
   settings,
   onSave,
@@ -29,35 +36,57 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
 }) => {
   const { showKana, t, movies } = useApp();
   const playerRef = useRef<VideoThumbnailPlayerHandle>(null);
-  const modalRef = useFocusTrap<HTMLDivElement>(isOpen && !!movie);
+  const modalRef = useFocusTrap<HTMLDivElement>(true);
 
-  // Form State
-  const [formData, setFormData] = useState<MovieFormData>({
-    title: '',
-    genre: '',
-    cast: '',
-    castKana: '',
-    releaseYear: '',
-    releaseDate: '',
-    rating: 3,
-    comment: '',
-    tags: '',
-    custom1: '',
-    custom2: '',
-    custom3: '',
-    isGrouped: false,
+  // Form State (initialized synchronously from movie so first render has accurate data)
+  const [formData, setFormData] = useState<MovieFormData>(() => {
+    let initYear: number | string = movie.release_year ?? '';
+    let initDate: string = movie.release_date || '';
+    const splitResult = split8DigitYear(initYear);
+    if (splitResult) {
+      initYear = splitResult.year;
+      initDate = splitResult.date;
+    }
+
+    const isInitiallyGrouped = Boolean(
+      movie.is_grouped ||
+      movie.parent_movie_id ||
+      (movie.id && movies.some((m) => m.parent_movie_id === movie.id))
+    );
+
+    return {
+      title: movie.title || movie.file_name || '',
+      genre: movie.genre || '',
+      cast: movie.cast || '',
+      castKana: movie.cast_kana || '',
+      releaseYear: initYear,
+      releaseDate: initDate,
+      rating: movie.rating || 3,
+      comment: movie.comment || '',
+      tags: movie.tags || '',
+      custom1: movie.custom_field_1 || '',
+      custom2: movie.custom_field_2 || '',
+      custom3: movie.custom_field_3 || '',
+      isGrouped: isInitiallyGrouped,
+    };
   });
 
-  // Media & Metadata State
-  const [summaryImagePath, setSummaryImagePath] = useState<string | null>(null);
-  const [timelineImagePath, setTimelineImagePath] = useState<string | null>(null);
+  // Media & Metadata State (initialized synchronously from movie to prevent stale/null props on mount)
+  const [summaryImagePath, setSummaryImagePath] = useState<string | null>(
+    () => movie.summary_image_path || null
+  );
+  const [timelineImagePath, setTimelineImagePath] = useState<string | null>(
+    () => movie.timeline_image_path || null
+  );
   const [isGeneratingTimeline, setIsGeneratingTimeline] = useState(false);
-  const [capturedTime, setCapturedTime] = useState<number | null>(null);
-  const [duration, setDuration] = useState<number | null>(null);
-  const [width, setWidth] = useState<number | null>(null);
-  const [height, setHeight] = useState<number | null>(null);
-  const [frameRate, setFrameRate] = useState<number | null>(null);
-  const [fileSize, setFileSize] = useState<number | null>(null);
+  const [capturedTime, setCapturedTime] = useState<number | null>(
+    () => (movie.captured_time !== undefined ? movie.captured_time : null)
+  );
+  const [duration, setDuration] = useState<number | null>(() => movie.duration || null);
+  const [width, setWidth] = useState<number | null>(() => movie.width || null);
+  const [height, setHeight] = useState<number | null>(() => movie.height || null);
+  const [frameRate, setFrameRate] = useState<number | null>(() => movie.frame_rate || null);
+  const [fileSize, setFileSize] = useState<number | null>(() => movie.file_size || null);
 
   const timelinePromiseRef = useRef<Promise<string | null> | null>(null);
 
@@ -69,106 +98,59 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
     description: string;
   } | null>(null);
 
-  const loadedMovieKeyRef = useRef<string | number | null>(null);
-
-  // Initialize form when movie or isOpen changes
+  // Extract metadata & generate 8-point timeline image when missing on mount
   useEffect(() => {
-    if (!isOpen || !movie) {
-      loadedMovieKeyRef.current = null;
-      return;
+    let cancelled = false;
+
+    if (movie.file_path && window.api?.extractMetadata) {
+      window.api
+        .extractMetadata(movie.file_path)
+        .then((meta) => {
+          if (cancelled || !meta) return;
+          if (meta.file_size) setFileSize(meta.file_size);
+          if (meta.duration && (!movie.duration || movie.duration <= 0)) setDuration(meta.duration);
+          if (meta.width) setWidth(meta.width);
+          if (meta.height) setHeight(meta.height);
+          if (meta.frame_rate && (!movie.frame_rate || movie.frame_rate <= 0)) setFrameRate(meta.frame_rate);
+        })
+        .catch((err) => console.warn('Failed to extract metadata in modal:', err));
     }
 
-    const currentKey = movie.id || movie.file_path || null;
-    if (loadedMovieKeyRef.current !== currentKey) {
-      loadedMovieKeyRef.current = currentKey;
-
-      let initYear: number | string = movie.release_year ?? '';
-      let initDate: string = movie.release_date || '';
-      const splitResult = split8DigitYear(initYear);
-      if (splitResult) {
-        initYear = splitResult.year;
-        initDate = splitResult.date;
-      }
-
-      const isInitiallyGrouped = Boolean(
-        movie.is_grouped ||
-        movie.parent_movie_id ||
-        (movie.id && movies.some((m) => m.parent_movie_id === movie.id))
-      );
-
-      setFormData({
-        title: movie.title || movie.file_name || '',
-        genre: movie.genre || '',
-        cast: movie.cast || '',
-        castKana: movie.cast_kana || '',
-        releaseYear: initYear,
-        releaseDate: initDate,
-        rating: movie.rating || 3,
-        comment: movie.comment || '',
-        tags: movie.tags || '',
-        custom1: movie.custom_field_1 || '',
-        custom2: movie.custom_field_2 || '',
-        custom3: movie.custom_field_3 || '',
-        isGrouped: isInitiallyGrouped,
-      });
-
-      setSummaryImagePath(movie.summary_image_path || null);
-      setTimelineImagePath(movie.timeline_image_path || null);
-      setIsGeneratingTimeline(false);
-      timelinePromiseRef.current = null;
-      setCapturedTime(movie.captured_time !== undefined ? movie.captured_time : null);
-      setDuration(movie.duration || null);
-      setWidth(movie.width || null);
-      setHeight(movie.height || null);
-      setFrameRate(movie.frame_rate || null);
-      setFileSize(movie.file_size || null);
-
-      // Extract metadata if needed
-      if (movie.file_path && window.api?.extractMetadata) {
-        window.api.extractMetadata(movie.file_path).then((meta) => {
-          if (meta) {
-            if (meta.file_size) setFileSize(meta.file_size);
-            if (meta.duration && (!movie.duration || movie.duration <= 0)) setDuration(meta.duration);
-            if (meta.width) setWidth(meta.width);
-            if (meta.height) setHeight(meta.height);
-            if (meta.frame_rate && (!movie.frame_rate || movie.frame_rate <= 0)) setFrameRate(meta.frame_rate);
+    if (!movie.timeline_image_path && movie.file_path && window.api?.generateTimelineThumbnail) {
+      setIsGeneratingTimeline(true);
+      timelinePromiseRef.current = window.api
+        .generateTimelineThumbnail(
+          movie.file_path,
+          movie.duration || null,
+          movie.width || null,
+          movie.height || null
+        )
+        .then((res) => {
+          if (cancelled) return res?.imagePath || null;
+          if (res?.imagePath) {
+            setTimelineImagePath(res.imagePath);
+            if (res.duration && (!movie.duration || movie.duration <= 0)) setDuration(res.duration);
+            if (res.width && !movie.width) setWidth(res.width);
+            if (res.height && !movie.height) setHeight(res.height);
+            return res.imagePath;
           }
-        }).catch((err) => console.warn('Failed to extract metadata in modal:', err));
-      }
-
-      // Generate 8-point timeline image when registering a new video (or if missing)
-      if (!movie.timeline_image_path && movie.file_path && window.api?.generateTimelineThumbnail) {
-        setIsGeneratingTimeline(true);
-        timelinePromiseRef.current = window.api
-          .generateTimelineThumbnail(
-            movie.file_path,
-            movie.duration || null,
-            movie.width || null,
-            movie.height || null
-          )
-          .then((res) => {
-            if (loadedMovieKeyRef.current !== currentKey) return res?.imagePath || null;
-            if (res?.imagePath) {
-              setTimelineImagePath(res.imagePath);
-              if (res.duration && (!movie.duration || movie.duration <= 0)) setDuration(res.duration);
-              if (res.width && !movie.width) setWidth(res.width);
-              if (res.height && !movie.height) setHeight(res.height);
-              return res.imagePath;
-            }
-            return null;
-          })
-          .catch((err) => {
-            console.warn('Failed to generate timeline thumbnail in modal:', err);
-            return null;
-          })
-          .finally(() => {
-            if (loadedMovieKeyRef.current === currentKey) {
-              setIsGeneratingTimeline(false);
-            }
-          });
-      }
+          return null;
+        })
+        .catch((err) => {
+          console.warn('Failed to generate timeline thumbnail in modal:', err);
+          return null;
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsGeneratingTimeline(false);
+          }
+        });
     }
-  }, [isOpen, movie, movies]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleFieldChange = <K extends keyof MovieFormData>(field: K, value: MovieFormData[K]) => {
     setFormData((prev) => {
@@ -270,8 +252,6 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
     }
     onClose();
   };
-
-  if (!isOpen || !movie) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 dark:bg-slate-950/80 backdrop-blur-md animate-fadeIn">
@@ -391,5 +371,30 @@ export const MovieFormModal: React.FC<MovieFormModalProps> = ({
         />
       )}
     </div>
+  );
+};
+
+export const MovieFormModal: React.FC<MovieFormModalProps> = ({
+  isOpen,
+  movie,
+  settings,
+  onSave,
+  onDelete,
+  onClose,
+}) => {
+  if (!isOpen || !movie) return null;
+
+  const movieKey =
+    movie.id != null ? `id-${movie.id}` : `path-${movie.file_path || 'new'}`;
+
+  return (
+    <MovieFormModalContent
+      key={movieKey}
+      movie={movie}
+      settings={settings}
+      onSave={onSave}
+      onDelete={onDelete}
+      onClose={onClose}
+    />
   );
 };
