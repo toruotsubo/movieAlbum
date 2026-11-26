@@ -13,7 +13,17 @@ import { TagFilterPopover } from '@/components/TagFilterPopover';
 import { RatingRangeFilter } from '@/components/RatingRangeFilter';
 
 function KeyItemsContent() {
-  const { settings, updateKeyItemRating, openEditKeyItemModal, loading: appLoading, t, databaseState, movies } = useApp();
+  const {
+    settings,
+    updateKeyItemRating,
+    openEditKeyItemModal,
+    loading: appLoading,
+    t,
+    databaseState,
+    movies,
+    setHeaderSelectedTags,
+    setOnRemoveHeaderTag,
+  } = useApp();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -139,6 +149,26 @@ function KeyItemsContent() {
     prevActiveDbRef.current = databaseState.activeId;
   }, [databaseState.activeId]);
 
+  const toggleTag = React.useCallback((tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }, []);
+
+  useEffect(() => {
+    setHeaderSelectedTags(selectedTags);
+    return () => {
+      setHeaderSelectedTags([]);
+    };
+  }, [selectedTags, setHeaderSelectedTags]);
+
+  useEffect(() => {
+    setOnRemoveHeaderTag(toggleTag);
+    return () => {
+      setOnRemoveHeaderTag(null);
+    };
+  }, [toggleTag, setOnRemoveHeaderTag]);
+
   const loading = appLoading || groupsLoading;
 
   if (loading) {
@@ -172,12 +202,6 @@ function KeyItemsContent() {
       )
     )
   ).sort((a, b) => a.localeCompare(b, 'ja'));
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
-  };
 
   const isRatingFiltered = ratingRange[0] > 1 || ratingRange[1] < 5;
 
@@ -317,27 +341,6 @@ function KeyItemsContent() {
               </button>
             </div>
           </div>
-
-          {/* Active Selected Tags Pills Row */}
-          {selectedTags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              {selectedTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 rounded-lg bg-blue-100 border border-blue-300 text-blue-800 dark:bg-blue-600/25 dark:border-blue-500/50 dark:text-blue-200 text-xs font-medium"
-                >
-                  <span>{tag}</span>
-                  <button
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    className="p-0.5 rounded hover:bg-blue-200/80 dark:hover:bg-blue-500/30 text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-white transition-colors cursor-pointer"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Empty State */}
