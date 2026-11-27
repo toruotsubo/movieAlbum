@@ -39,6 +39,10 @@ interface AppContextType {
   setHeaderMovieCount: (count: number | null) => void;
   headerFilterText: string | null;
   setHeaderFilterText: (text: string | null) => void;
+  headerSelectedTags: string[];
+  setHeaderSelectedTags: (tags: string[]) => void;
+  onRemoveHeaderTag: ((tag: string) => void) | null;
+  setOnRemoveHeaderTag: (handler: ((tag: string) => void) | null) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -59,6 +63,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [loading, setLoading] = useState(true);
   const [headerMovieCount, setHeaderMovieCount] = useState<number | null>(null);
   const [headerFilterText, setHeaderFilterText] = useState<string | null>(null);
+  const [headerSelectedTags, setHeaderSelectedTags] = useState<string[]>([]);
+  const [onRemoveHeaderTag, setOnRemoveHeaderTagState] = useState<((tag: string) => void) | null>(null);
+  const setOnRemoveHeaderTag = React.useCallback((handler: ((tag: string) => void) | null) => {
+    setOnRemoveHeaderTagState(() => handler);
+  }, []);
   const [detectedLang, setDetectedLang] = useState<Language>('ja');
   const [systemTheme, setSystemTheme] = useState<'dark' | 'light'>('dark');
 
@@ -186,6 +195,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     setHeaderFilterText(null);
+    setHeaderSelectedTags([]);
   };
 
   const handleSwitchDatabase = async (id: string) => {
@@ -405,6 +415,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setHeaderMovieCount,
         headerFilterText,
         setHeaderFilterText,
+        headerSelectedTags,
+        setHeaderSelectedTags,
+        onRemoveHeaderTag,
+        setOnRemoveHeaderTag,
       }}
     >
       <DragDropWrapper onFileDrop={handleFileDrop}>

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { formatMediaUrl, isUnsupportedInlinePlayback, TIMELINE_RATIOS } from '../../lib/utils';
+import { formatMediaUrl, isUnsupportedInlinePlayback, isCodecUnsupportedInBrowser, TIMELINE_RATIOS } from '../../lib/utils';
 import { clsx } from 'clsx';
 import {
   Play,
@@ -31,6 +31,7 @@ interface VideoThumbnailPlayerProps {
   presetFrameRate?: number | null;
   videoWidth?: number | null;
   videoHeight?: number | null;
+  videoCodec?: string | null;
   onSummaryImageChange: (imagePath: string | null, capturedTime: number | null) => void;
   onMetadataExtracted?: (meta: { duration?: number; width?: number; height?: number; frame_rate?: number }) => void;
   onErrorModal: (title: string, description: string) => void;
@@ -72,6 +73,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
       presetFrameRate,
       videoWidth,
       videoHeight,
+      videoCodec,
       onSummaryImageChange,
       onMetadataExtracted,
       onErrorModal,
@@ -81,6 +83,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
     const { t, openMoviePlayer } = useApp();
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const videoNoFrameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [isPlayingVideo, setIsPlayingVideo] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -91,12 +94,42 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
     const [isProcessingFFmpeg, setIsProcessingFFmpeg] = useState(false);
     const [isAutoGeneratingSummary, setIsAutoGeneratingSummary] = useState(false);
     const [videoError, setVideoError] = useState<string | null>(null);
+    const [runtimeUnsupported, setRuntimeUnsupported] = useState(false);
 
-    const isUnsupportedPlayback = isUnsupportedInlinePlayback(filePath);
+    const isUnsupportedExt = isUnsupportedInlinePlayback(filePath);
+    const isUnsupportedCodec = useMemo(
+      () => isCodecUnsupportedInBrowser(filePath, videoCodec),
+      [filePath, videoCodec]
+    );
+    const isUnsupportedPlayback = isUnsupportedExt || isUnsupportedCodec || runtimeUnsupported;
     const videoSrc = formatMediaUrl(filePath, false);
     const imageSrc = useMemo(() => formatMediaUrl(summaryImagePath), [summaryImagePath]);
     const timelineImageSrc = useMemo(() => formatMediaUrl(timelineImagePath), [timelineImagePath]);
     const isPortraitTimeline = Boolean(videoWidth && videoHeight && videoHeight > videoWidth);
+
+    const clearVideoNoFrameTimer = () => {
+      if (videoNoFrameTimerRef.current) {
+        clearTimeout(videoNoFrameTimerRef.current);
+        videoNoFrameTimerRef.current = null;
+      }
+    };
+
+    // Reset runtime playback state when filePath changes
+    useEffect(() => {
+      clearVideoNoFrameTimer();
+      setRuntimeUnsupported(false);
+      setVideoError(null);
+    }, [filePath]);
+
+    // Clear no-frame detection timer on unmount or when leaving inline video mode
+    useEffect(() => {
+      if (!isPlayingVideo || isUnsupportedPlayback) {
+        clearVideoNoFrameTimer();
+      }
+      return () => {
+        clearVideoNoFrameTimer();
+      };
+    }, [isPlayingVideo, isUnsupportedPlayback]);
 
     // Format seconds to mm:ss or hh:mm:ss
     const formatTime = (timeInSeconds: number) => {
@@ -130,65 +163,92 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
 
     // Extract duration & frameRate for unsupported formats if missing or updated
     useEffect(() => {
+      let cancelled = false;
       if (isUnsupportedPlayback && filePath) {
         if (window.api?.extractMetadata) {
           window.api.extractMetadata(filePath).then((meta) => {
-            if (meta) {
-              if (meta.duration && meta.duration > 0) {
-                setDuration(meta.duration);
-                if (onMetadataExtracted) {
-                  onMetadataExtracted({ duration: meta.duration });
-                }
+            if (cancelled || !meta) return;
+            if (meta.duration && meta.duration > 0) {
+              setDuration(meta.duration);
+              if (onMetadataExtracted) {
+                onMetadataExtracted({ duration: meta.duration });
               }
-              if (meta.frame_rate && meta.frame_rate > 0) {
-                setFrameRate(meta.frame_rate);
-                if (onMetadataExtracted) {
-                  onMetadataExtracted({ frame_rate: meta.frame_rate });
-                }
+            }
+            if (meta.frame_rate && meta.frame_rate > 0) {
+              setFrameRate(meta.frame_rate);
+              if (onMetadataExtracted) {
+                onMetadataExtracted({ frame_rate: meta.frame_rate });
               }
-              if (meta.width && meta.height && onMetadataExtracted) {
-                onMetadataExtracted({
-                  width: meta.width,
-                  height: meta.height,
-                });
-              }
+            }
+            if (meta.width && meta.height && onMetadataExtracted) {
+              onMetadataExtracted({
+                width: meta.width,
+                height: meta.height,
+              });
             }
           }).catch((err) => console.warn('Failed to extract metadata for unsupported video:', err));
         }
       }
+      return () => {
+        cancelled = true;
+      };
     }, [isUnsupportedPlayback, filePath]);
 
     // Auto-generate summary thumbnail if none exists
     useEffect(() => {
-      if (!summaryImagePath && filePath) {
-        setIsAutoGeneratingSummary(true);
-        generateDefaultSummary(filePath, duration || presetDuration)
-          .then(({ imagePath, targetTime, duration: autoDur }) => {
-            if (imagePath) {
-              onSummaryImageChange(imagePath, targetTime);
-              setCurrentTime(targetTime);
-            }
-            if (autoDur && autoDur > 0) {
-              setDuration(autoDur);
-              if (onMetadataExtracted) {
-                onMetadataExtracted({ duration: autoDur });
-              }
-            }
-            setIsAutoGeneratingSummary(false);
-          })
-          .catch((err) => {
-            console.error('Failed to generate auto summary image:', err);
-            setIsAutoGeneratingSummary(false);
-          });
+      if (summaryImagePath || !filePath) {
+        setIsAutoGeneratingSummary(false);
+        return;
       }
+
+      let cancelled = false;
+      let cancelGeneration: (() => void) | null = null;
+
+      setIsAutoGeneratingSummary(true);
+      generateDefaultSummary(
+        filePath,
+        duration || presetDuration,
+        () => cancelled,
+        (cancelFn) => {
+          cancelGeneration = cancelFn;
+        }
+      )
+        .then(({ imagePath, targetTime, duration: autoDur }) => {
+          if (cancelled) return;
+          if (imagePath) {
+            onSummaryImageChange(imagePath, targetTime);
+            setCurrentTime(targetTime);
+          }
+          if (autoDur && autoDur > 0) {
+            setDuration(autoDur);
+            if (onMetadataExtracted) {
+              onMetadataExtracted({ duration: autoDur });
+            }
+          }
+          setIsAutoGeneratingSummary(false);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error('Failed to generate auto summary image:', err);
+          setIsAutoGeneratingSummary(false);
+        });
+
+      return () => {
+        cancelled = true;
+        if (cancelGeneration) {
+          cancelGeneration();
+        }
+      };
     }, [filePath, summaryImagePath]);
 
     const generateDefaultSummary = (
       path: string,
-      dur?: number | null
+      dur?: number | null,
+      isCancelled: () => boolean = () => false,
+      onRegisterCancel?: (cancelFn: () => void) => void
     ): Promise<{ imagePath: string | null; targetTime: number; duration?: number | null }> => {
       return new Promise(async (resolve) => {
-        if (typeof window === 'undefined') {
+        if (typeof window === 'undefined' || isCancelled()) {
           resolve({ imagePath: null, targetTime: 0 });
           return;
         }
@@ -197,6 +257,10 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
         if (isUnsupportedPlayback && window.api?.generateThumbnail) {
           try {
             const res = await window.api.generateThumbnail(path, dur ? dur * 0.5 : null);
+            if (isCancelled()) {
+              resolve({ imagePath: null, targetTime: 0 });
+              return;
+            }
             if (res) {
               resolve({ imagePath: res.imagePath, targetTime: res.targetTime, duration: res.duration });
               return;
@@ -206,6 +270,11 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           }
         }
 
+        if (isCancelled()) {
+          resolve({ imagePath: null, targetTime: 0 });
+          return;
+        }
+
         const video = document.createElement('video');
         video.crossOrigin = 'anonymous';
         video.src = formatMediaUrl(path, false);
@@ -213,6 +282,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
         video.muted = true;
 
         let timeoutId: NodeJS.Timeout;
+        let settled = false;
         const cleanup = () => {
           clearTimeout(timeoutId);
           video.onloadedmetadata = null;
@@ -222,27 +292,81 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           video.remove();
         };
 
-        timeoutId = setTimeout(async () => {
+        const finish = (result: { imagePath: string | null; targetTime: number; duration?: number | null }) => {
+          if (settled) return;
+          settled = true;
           cleanup();
+          resolve(result);
+        };
+
+        if (onRegisterCancel) {
+          onRegisterCancel(() => {
+            finish({ imagePath: null, targetTime: 0 });
+          });
+        }
+
+        const fallbackViaFFmpeg = async () => {
+          cleanup();
+          if (isCancelled()) {
+            finish({ imagePath: null, targetTime: 0 });
+            return;
+          }
+          if (window.api?.checkFileExists) {
+            try {
+              const exists = await window.api.checkFileExists(path);
+              if (!exists) {
+                finish({ imagePath: null, targetTime: 0 });
+                return;
+              }
+            } catch {}
+          }
+          if (!isCancelled()) {
+            setRuntimeUnsupported(true);
+          }
           if (window.api?.generateThumbnail) {
             try {
               const res = await window.api.generateThumbnail(path, (dur && dur > 0) ? dur * 0.5 : null);
-              if (res) {
-                resolve({ imagePath: res.imagePath, targetTime: res.targetTime });
+              if (!isCancelled() && res) {
+                finish({ imagePath: res.imagePath, targetTime: res.targetTime, duration: res.duration });
                 return;
               }
             } catch (e) {
-              console.error('FFmpeg fallback failed on timeout:', e);
+              console.error('FFmpeg fallback failed in auto summary generation:', e);
             }
           }
-          resolve({ imagePath: null, targetTime: 0 });
+          finish({ imagePath: null, targetTime: 0 });
+        };
+
+        timeoutId = setTimeout(() => {
+          void fallbackViaFFmpeg();
         }, 8000);
 
         video.onloadedmetadata = () => {
+          if (isCancelled()) {
+            finish({ imagePath: null, targetTime: 0 });
+            return;
+          }
           const vDur = video.duration && !isNaN(video.duration) && video.duration > 0 ? video.duration : dur || 0;
           const targetTime = vDur > 0 ? vDur * 0.5 : 0;
 
+          // If audio-only decoded (unsupported video codec in .mp4), shorten timeout to fail over quickly
+          if (video.videoWidth === 0 || video.videoHeight === 0) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+              void fallbackViaFFmpeg();
+            }, 2500);
+          }
+
           video.onseeked = async () => {
+            if (isCancelled()) {
+              finish({ imagePath: null, targetTime: 0 });
+              return;
+            }
+            // Guard against unsupported video codecs where Chromium seeks audio without decoding video frames
+            if (video.videoWidth === 0 || video.videoHeight === 0 || video.readyState < 2) {
+              await fallbackViaFFmpeg();
+              return;
+            }
             try {
               const canvas = document.createElement('canvas');
               canvas.width = 720;
@@ -251,24 +375,28 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
               if (ctx) {
                 drawVideoFrameContain(ctx, video, 720, 405);
                 const dataUrl = canvas.toDataURL('image/png');
+                if (isCancelled()) {
+                  finish({ imagePath: null, targetTime: 0 });
+                  return;
+                }
                 let savedPath = dataUrl;
                 if (window.api?.saveSummaryImage) {
                   try {
                     savedPath = await window.api.saveSummaryImage(dataUrl);
                   } catch (err) {
                     console.error('Failed to save summary image:', err);
-                    onErrorModal(t('error_title'), t('error_save_summary_failed'));
+                    if (!isCancelled()) {
+                      onErrorModal(t('error_title'), t('error_save_summary_failed'));
+                    }
                   }
                 }
-                cleanup();
-                resolve({ imagePath: savedPath, targetTime });
+                finish({ imagePath: isCancelled() ? null : savedPath, targetTime });
                 return;
               }
             } catch (err) {
               console.error('Failed to capture frame in auto summary generation:', err);
             }
-            cleanup();
-            resolve({ imagePath: null, targetTime });
+            await fallbackViaFFmpeg();
           };
 
           if (targetTime > 0) {
@@ -278,20 +406,8 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
           }
         };
 
-        video.onerror = async () => {
-          cleanup();
-          if (window.api?.generateThumbnail) {
-            try {
-              const res = await window.api.generateThumbnail(path, (dur && dur > 0) ? dur * 0.5 : null);
-              if (res) {
-                resolve({ imagePath: res.imagePath, targetTime: res.targetTime, duration: res.duration });
-                return;
-              }
-            } catch (e) {
-              console.error('FFmpeg fallback failed on video error:', e);
-            }
-          }
-          resolve({ imagePath: null, targetTime: 0 });
+        video.onerror = () => {
+          void fallbackViaFFmpeg();
         };
       });
     };
@@ -300,6 +416,7 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
     const captureFrame = async (): Promise<string | null> => {
       if (!videoRef.current || !canvasRef.current) return null;
       const video = videoRef.current;
+      if (video.videoWidth === 0 || video.videoHeight === 0) return null;
       const canvas = canvasRef.current;
 
       canvas.width = 720;
@@ -350,8 +467,12 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
         try {
           await videoRef.current.play();
           setIsPlaying(true);
-        } catch (err) {
+        } catch (err: any) {
           console.error('Failed to play video:', err);
+          if (err?.name === 'NotSupportedError' || videoRef.current?.error) {
+            const switched = await enterRuntimeFFmpegMode(videoRef.current?.currentTime);
+            if (switched) return;
+          }
           setVideoError(t('error_video_play_failed'));
           setIsPlaying(false);
         }
@@ -378,6 +499,37 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
         setIsPlaying(false);
       }
       seekTo(videoRef.current.currentTime + frames / fps);
+    };
+
+    // Switch seamlessly to FFmpeg mode (same UI as WMV) when inline <video> fails to decode an existing file
+    const enterRuntimeFFmpegMode = async (fallbackTime?: number): Promise<boolean> => {
+      if (!filePath) return false;
+      if (window.api?.checkFileExists) {
+        try {
+          const exists = await window.api.checkFileExists(filePath);
+          if (!exists) return false;
+        } catch {
+          return false;
+        }
+      }
+
+      clearVideoNoFrameTimer();
+      setIsPlaying(false);
+      setVideoError(null);
+      setRuntimeUnsupported(true);
+
+      if (!summaryImagePath) {
+        const target =
+          fallbackTime !== undefined && !isNaN(fallbackTime) && fallbackTime > 0
+            ? fallbackTime
+            : currentTime > 0
+              ? currentTime
+              : duration > 0
+                ? duration * 0.5
+                : 0;
+        void generateThumbnailAtTime(target);
+      }
+      return true;
     };
 
     // FFmpeg thumbnail generation for unsupported formats with concurrency lock
@@ -714,14 +866,18 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                   }}
                   onLoadedMetadata={() => {
                     if (videoRef.current) {
-                      const vidDuration = videoRef.current.duration;
+                      const vid = videoRef.current;
+                      const vidDuration = vid.duration;
                       setDuration(vidDuration);
                       if (onMetadataExtracted) {
-                        onMetadataExtracted({
+                        const extracted: { duration?: number; width?: number; height?: number } = {
                           duration: vidDuration,
-                          width: videoRef.current.videoWidth,
-                          height: videoRef.current.videoHeight,
-                        });
+                        };
+                        if (vid.videoWidth > 0 && vid.videoHeight > 0) {
+                          extracted.width = vid.videoWidth;
+                          extracted.height = vid.videoHeight;
+                        }
+                        onMetadataExtracted(extracted);
                       }
 
                       let target = 0;
@@ -731,31 +887,53 @@ export const VideoThumbnailPlayer = forwardRef<VideoThumbnailPlayerHandle, Video
                         target = vidDuration * 0.5;
                       }
 
+                      if (vid.videoWidth === 0 || vid.videoHeight === 0) {
+                        clearVideoNoFrameTimer();
+                        videoNoFrameTimerRef.current = setTimeout(() => {
+                          if (videoRef.current && (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0)) {
+                            void enterRuntimeFFmpegMode(target || videoRef.current.currentTime);
+                          }
+                        }, 2500);
+                      } else {
+                        clearVideoNoFrameTimer();
+                      }
+
                       if (target > 0) {
-                        videoRef.current.currentTime = target;
+                        vid.currentTime = target;
                         setCurrentTime(target);
                       }
                     }
                   }}
-                  onError={(e) => {
+                  onLoadedData={() => {
+                    if (videoRef.current) {
+                      if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+                        clearVideoNoFrameTimer();
+                      } else {
+                        void enterRuntimeFFmpegMode(videoRef.current.currentTime);
+                      }
+                    }
+                  }}
+                  onSeeked={() => {
+                    if (videoRef.current) {
+                      if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
+                        clearVideoNoFrameTimer();
+                      } else {
+                        void enterRuntimeFFmpegMode(videoRef.current.currentTime);
+                      }
+                    }
+                  }}
+                  onError={async (e) => {
                     const target = e.currentTarget as HTMLVideoElement;
                     const errorDetails = target.error
                       ? `Code: ${target.error.code}, Message: ${target.error.message}`
                       : 'Unknown video error';
 
-                    if (isUnsupportedPlayback || errorDetails.includes('DEMUXER_ERROR')) {
-                      setVideoError(`${t('form_unsupported_format_notice')} (${errorDetails})`);
-                      if (!summaryImagePath && filePath && window.api?.generateThumbnail) {
-                        window.api.generateThumbnail(filePath).then((res) => {
-                          if (res) {
-                            onSummaryImageChange(res.imagePath, res.targetTime);
-                            if (res.duration && !duration) setDuration(res.duration);
-                          }
-                        }).catch(() => { });
-                      }
-                    } else {
-                      setVideoError(t('error_video_load_failed', { error: errorDetails, path: filePath || '' }));
+                    const switched = await enterRuntimeFFmpegMode(currentTime);
+                    if (switched) {
+                      return;
                     }
+
+                    setVideoError(t('error_video_load_failed', { error: errorDetails, path: filePath || '' }));
                   }}
                   onEnded={() => setIsPlaying(false)}
                 />

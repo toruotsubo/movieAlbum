@@ -16,7 +16,16 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { settings, t, headerMovieCount, headerFilterText, databaseState, switchDatabase } = useApp();
+  const {
+    settings,
+    t,
+    headerMovieCount,
+    headerFilterText,
+    headerSelectedTags,
+    onRemoveHeaderTag,
+    databaseState,
+    switchDatabase,
+  } = useApp();
 
   const isKeyItemsPage = pathname === '/';
   const isMoviesActive = pathname === '/movies' || pathname.startsWith('/movies/');
@@ -27,10 +36,10 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
 
   return (
     <header className="sticky top-0 z-40 w-full glass-card border-b border-slate-200 dark:border-slate-800 bg-white/85 dark:bg-slate-900/80 backdrop-blur-md select-none">
-      <div className="px-6 h-16 flex items-center justify-between">
+      <div className="px-6 min-h-16 py-2 flex flex-wrap items-center justify-between gap-2">
 
         {/* Navigation Links */}
-        <nav className="flex items-center gap-2 bg-slate-100/90 dark:bg-slate-950/60 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800/80">
+        <nav className="flex flex-wrap items-center gap-2 bg-slate-100/90 dark:bg-slate-950/60 p-1.5 rounded-xl border border-slate-200 dark:border-slate-800/80">
           {keyFields.map((fieldId, idx) => {
             const isActive = isKeyItemsPage && activeKeyField === fieldId;
             const keyLabel = getKeyFieldLabel(fieldId, settings, t);
@@ -68,14 +77,31 @@ function NavbarContent({ onOpenSettings }: NavbarProps) {
             <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 px-2.5 py-1.5 rounded-lg animate-fadeIn">
               <span>{headerFilterText}</span>
               <button
+                type="button"
                 onClick={() => router.push('/movies')}
-                className="p-0.5 hover:bg-blue-200/70 dark:hover:bg-blue-800/60 rounded text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-white transition-colors"
+                className="p-0.5 hover:bg-blue-200/70 dark:hover:bg-blue-800/60 rounded text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-white transition-colors cursor-pointer"
                 title={t('key_list_filter_clear')}
               >
                 <X className="w-3 h-3" />
               </button>
             </div>
           )}
+          {headerSelectedTags.map((tag) => (
+            <div
+              key={tag}
+              className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 px-2.5 py-1.5 rounded-lg animate-fadeIn"
+            >
+              <span>{tag}</span>
+              <button
+                type="button"
+                onClick={() => onRemoveHeaderTag?.(tag)}
+                className="p-0.5 hover:bg-blue-200/70 dark:hover:bg-blue-800/60 rounded text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-white transition-colors cursor-pointer"
+                title={t('key_list_filter_clear')}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
           {headerMovieCount !== null && (
             <span className="text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-200/70 dark:bg-slate-800/80 border border-slate-300/70 dark:border-slate-700/50 px-2.5 py-1.5 rounded-lg">
               {t('movies_list_movies_count', { count: headerMovieCount })}

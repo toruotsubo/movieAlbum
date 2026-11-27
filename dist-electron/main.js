@@ -852,7 +852,8 @@ async function extractVideoMetadata(filePath) {
           duration: mp4Meta.duration ?? meta?.duration,
           width: mp4Meta.width ?? meta?.width,
           height: mp4Meta.height ?? meta?.height,
-          frameRate: mp4Meta.frameRate ?? meta?.frameRate
+          frameRate: mp4Meta.frameRate ?? meta?.frameRate,
+          videoCodec: mp4Meta.videoCodec ?? meta?.videoCodec
         };
       }
     }
@@ -863,7 +864,8 @@ async function extractVideoMetadata(filePath) {
           duration: meta?.duration ?? ffmpegMeta.duration,
           width: meta?.width ?? ffmpegMeta.width,
           height: meta?.height ?? ffmpegMeta.height,
-          frameRate: meta?.frameRate ?? ffmpegMeta.frameRate
+          frameRate: meta?.frameRate ?? ffmpegMeta.frameRate,
+          videoCodec: meta?.videoCodec ?? ffmpegMeta.videoCodec
         };
       }
     }
@@ -872,7 +874,8 @@ async function extractVideoMetadata(filePath) {
       duration: meta?.duration ?? null,
       width: meta?.width ?? null,
       height: meta?.height ?? null,
-      frame_rate: meta?.frameRate ?? null
+      frame_rate: meta?.frameRate ?? null,
+      video_codec: meta?.videoCodec ?? null
     };
   } catch (err) {
     console.error("Failed to extract video metadata:", err);
@@ -898,6 +901,7 @@ async function extractMetadataWithFFmpeg(filePath) {
         let width;
         let height;
         let frameRate;
+        let videoCodec;
         const durMatch = output.match(/Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/);
         if (durMatch) {
           const h = parseFloat(durMatch[1]);
@@ -905,23 +909,108 @@ async function extractMetadataWithFFmpeg(filePath) {
           const s = parseFloat(durMatch[3]);
           duration = Math.round((h * 3600 + m * 60 + s) * 100) / 100;
         }
-        const streamMatch = output.match(/Stream #\d+:\d+.*?: Video:.*? (\d{2,5})x(\d{2,5})/);
+        const streamMatch = output.match(/Stream #\d+:\d+.*?: Video:\s*([a-zA-Z0-9_-]+).*? (\d{2,5})x(\d{2,5})/);
         if (streamMatch) {
-          width = parseInt(streamMatch[1], 10);
-          height = parseInt(streamMatch[2], 10);
+          videoCodec = streamMatch[1].toLowerCase();
+          width = parseInt(streamMatch[2], 10);
+          height = parseInt(streamMatch[3], 10);
+        } else {
+          const codecOnlyMatch = output.match(/Stream #\d+:\d+.*?: Video:\s*([a-zA-Z0-9_-]+)/);
+          if (codecOnlyMatch) {
+            videoCodec = codecOnlyMatch[1].toLowerCase();
+          }
         }
         const fpsMatch = output.match(/(\d+(?:\.\d+)?)\s*fps/);
         if (fpsMatch) {
           frameRate = Math.round(parseFloat(fpsMatch[1]) * 100) / 100;
         }
-        if (duration || width || height) {
-          resolve({ duration, width, height, frameRate });
+        if (duration || width || height || videoCodec) {
+          resolve({ duration, width, height, frameRate, videoCodec });
         } else {
           resolve(null);
         }
       }
     );
   });
+}
+function reverseBits32(n) {
+  let result = 0;
+  for (let i = 0; i < 32; i++) {
+    result = result * 2 + (n >>> i & 1);
+  }
+  return result >>> 0;
+}
+function parseVideoCodecFromStsd(buf, contentStart, contentEnd) {
+  if (contentStart + 16 > contentEnd) return void 0;
+  const entryCount = buf.readUInt32BE(contentStart + 4);
+  if (entryCount < 1) return void 0;
+  const entryOffset = contentStart + 8;
+  const entrySize = buf.readUInt32BE(entryOffset);
+  if (entrySize < 8) return void 0;
+  const entryEnd = Math.min(contentEnd, entryOffset + entrySize);
+  const fourcc = buf.toString("ascii", entryOffset + 4, entryOffset + 8);
+  if (!/^[\x20-\x7E]{4}$/.test(fourcc)) return void 0;
+  const hex2 = (v) => v.toString(16).toUpperCase().padStart(2, "0");
+  const dec2 = (v) => v.toString(10).padStart(2, "0");
+  const childrenStart = entryOffset + 86;
+  if (childrenStart + 8 <= entryEnd) {
+    let p = childrenStart;
+    while (p + 8 <= entryEnd) {
+      const childSize32 = buf.readUInt32BE(p);
+      const childType = buf.toString("ascii", p + 4, p + 8);
+      let childSize = childSize32 === 1 && p + 16 <= entryEnd ? Number(buf.readBigUInt64BE(p + 8)) : childSize32;
+      const childHeaderLen = childSize32 === 1 ? 16 : 8;
+      if (childSize <= 0 || p + childSize > entryEnd) break;
+      const cStart = p + childHeaderLen;
+      const cEnd = p + childSize;
+      if ((fourcc === "avc1" || fourcc === "avc3") && childType === "avcC" && cStart + 4 <= cEnd) {
+        const profile = buf.readUInt8(cStart + 1);
+        const compat = buf.readUInt8(cStart + 2);
+        const level = buf.readUInt8(cStart + 3);
+        return `${fourcc}.${hex2(profile)}${hex2(compat)}${hex2(level)}`;
+      }
+      if ((fourcc === "hvc1" || fourcc === "hev1") && childType === "hvcC" && cStart + 13 <= cEnd) {
+        const b1 = buf.readUInt8(cStart + 1);
+        const profileSpaceIdx = b1 >> 6 & 3;
+        const profileSpace = ["", "A", "B", "C"][profileSpaceIdx] || "";
+        const tier = (b1 >> 5 & 1) === 1 ? "H" : "L";
+        const profileIdc = b1 & 31;
+        const compatFlags = buf.readUInt32BE(cStart + 2);
+        const compatHex = reverseBits32(compatFlags).toString(16).toUpperCase();
+        const levelIdc = buf.readUInt8(cStart + 12);
+        const constraintBytes = [];
+        for (let i = 0; i < 6; i++) {
+          constraintBytes.push(buf.readUInt8(cStart + 6 + i));
+        }
+        while (constraintBytes.length > 1 && constraintBytes[constraintBytes.length - 1] === 0) {
+          constraintBytes.pop();
+        }
+        const constraintStr = constraintBytes.map((b) => b.toString(16).toUpperCase()).join(".");
+        return `${fourcc}.${profileSpace}${profileIdc}.${compatHex}.${tier}${levelIdc}.${constraintStr}`;
+      }
+      if (fourcc === "av01" && childType === "av1C" && cStart + 4 <= cEnd) {
+        const b1 = buf.readUInt8(cStart + 1);
+        const b2 = buf.readUInt8(cStart + 2);
+        const seqProfile = b1 >> 5 & 7;
+        const seqLevelIdx0 = b1 & 31;
+        const seqTier0 = (b2 >> 7 & 1) === 1 ? "H" : "M";
+        const highBitdepth = (b2 >> 6 & 1) === 1;
+        const twelveBit = (b2 >> 5 & 1) === 1;
+        const bitDepth = highBitdepth ? twelveBit ? 12 : 10 : 8;
+        return `av01.${seqProfile}.${dec2(seqLevelIdx0)}${seqTier0}.${dec2(bitDepth)}`;
+      }
+      if (fourcc === "vp09" && childType === "vpcC" && cStart + 7 <= cEnd) {
+        const profile = buf.readUInt8(cStart + 4);
+        const level = buf.readUInt8(cStart + 5);
+        const bitDepth = buf.readUInt8(cStart + 6) >> 4 & 15;
+        if (bitDepth > 0) {
+          return `vp09.${dec2(profile)}.${dec2(level)}.${dec2(bitDepth)}`;
+        }
+      }
+      p += childSize;
+    }
+  }
+  return fourcc.trim();
 }
 function extractMp4MetadataNative(filePath, fileSize) {
   let fd = null;
@@ -962,6 +1051,7 @@ function extractMp4MetadataNative(filePath, fileSize) {
       let timescale = 0;
       let duration = 0;
       let sampleCount = 0;
+      let trackCodec;
       function scanTrakNodes(curr, stop) {
         while (curr + 8 <= stop) {
           const size32 = buf.readUInt32BE(curr);
@@ -994,6 +1084,10 @@ function extractMp4MetadataNative(filePath, fileSize) {
               timescale = buf.readUInt32BE(contentStart + 12);
               duration = buf.readUInt32BE(contentStart + 16);
             }
+          } else if (type === "stsd") {
+            if (!trackCodec) {
+              trackCodec = parseVideoCodecFromStsd(buf, contentStart, contentEnd);
+            }
           } else if (type === "stsz") {
             if (contentStart + 8 <= contentEnd) {
               const count = buf.readUInt32BE(contentStart + 4);
@@ -1024,6 +1118,7 @@ function extractMp4MetadataNative(filePath, fileSize) {
         if (timescale > 0) videoTimescale = timescale;
         if (duration > 0) videoDuration = duration;
         if (sampleCount > 0) videoSampleCount = sampleCount;
+        if (trackCodec && !videoCodec) videoCodec = trackCodec;
       }
     };
     var parseBoxes = parseBoxes2, parseTrak = parseTrak2;
@@ -1089,6 +1184,7 @@ function extractMp4MetadataNative(filePath, fileSize) {
     let videoTimescale = 0;
     let videoDuration = 0;
     let videoSampleCount = 0;
+    let videoCodec;
     parseBoxes2(moovBuf, 0, moovBuf.length);
     let finalDuration;
     if (videoTimescale > 0 && videoDuration > 0) {
@@ -1104,7 +1200,8 @@ function extractMp4MetadataNative(filePath, fileSize) {
       duration: finalDuration ? Math.round(finalDuration * 100) / 100 : void 0,
       width: videoWidth || void 0,
       height: videoHeight || void 0,
-      frameRate
+      frameRate,
+      videoCodec
     };
   } catch (err) {
     if (fd !== null) {
