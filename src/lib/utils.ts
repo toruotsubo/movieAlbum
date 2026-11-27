@@ -137,6 +137,87 @@ export function isUnsupportedInlinePlayback(filePath: string | null | undefined)
   return !INLINE_PLAYBACK_EXTENSIONS.has(ext);
 }
 
+const KNOWN_UNSUPPORTED_VIDEO_CODECS = new Set([
+  'mp4v', 'mpeg4', 'xvid', 'divx', 'dx50', 'mp42', 'mp43',
+  'mjpeg', 'mjpg', 'jpeg', 'dmb1',
+  'prores', 'apch', 'apcn', 'apcs', 'apco', 'ap4h', 'ap4x',
+  'mpeg1video', 'mpeg2video', 'mp2v', 'mpg2', 'm2v1', 'hdv1', 'hdv2', 'hdv3',
+  'h263', 's263', 'h261',
+  'wmv1', 'wmv2', 'wmv3', 'vc1', 'wvc1',
+  'flv1', 'rv40', 'dnxhd', 'avdn', 'svq3', 'rpza',
+  'dvh1', 'dvhe', 'dvc ', 'dvcp', 'dvpp',
+]);
+
+const INLINE_MIME_BY_EXT: Record<string, string> = {
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  ogv: 'video/ogg',
+  ogg: 'video/ogg',
+};
+
+/**
+ * Pre-check whether a video codec in an otherwise inline-playable container (e.g. .mp4)
+ * is unsupported by the current Chromium/Electron <video> element.
+ * Returns true only when the codec is known to be unsupported; returns false when unknown
+ * or playable so runtime detection can handle edge cases safely.
+ */
+export function isCodecUnsupportedInBrowser(
+  filePath: string | null | undefined,
+  videoCodec: string | null | undefined
+): boolean {
+  if (!filePath || !videoCodec) return false;
+  if (isUnsupportedInlinePlayback(filePath)) return true;
+
+  const trimmed = videoCodec.trim();
+  if (!trimmed) return false;
+
+  const lower = trimmed.toLowerCase();
+  const baseCodec = lower.split('.')[0];
+  if (KNOWN_UNSUPPORTED_VIDEO_CODECS.has(lower) || KNOWN_UNSUPPORTED_VIDEO_CODECS.has(baseCodec)) {
+    return true;
+  }
+
+  if (typeof document === 'undefined') return false;
+
+  const ext = filePath.split('.').pop()?.toLowerCase() || '';
+  const mime = INLINE_MIME_BY_EXT[ext];
+  if (!mime) return false;
+
+  const testVideo = document.createElement('video');
+  if (typeof testVideo.canPlayType !== 'function') return false;
+
+  const canPlayAny = (candidates: string[]) =>
+    candidates.some((c) => testVideo.canPlayType(`${mime}; codecs="${c}"`) !== '');
+
+  // Full RFC 6381 codec string (e.g. avc1.640028, hvc1.1.6.L93.B0, av01.0.08M.08, vp09.00.41.08)
+  if (trimmed.includes('.')) {
+    return !canPlayAny([trimmed]);
+  }
+
+  // Fallback for bare FourCC or FFmpeg codec names without profile/level suffix
+  if (lower === 'hevc' || lower === 'hvc1' || lower === 'hev1') {
+    return !canPlayAny(['hvc1.1.6.L93.B0', 'hev1.1.6.L93.B0']);
+  }
+  if (lower === 'h264' || lower === 'avc1' || lower === 'avc3') {
+    return !canPlayAny(['avc1.42E01E', 'avc1.640028']);
+  }
+  if (lower === 'av1' || lower === 'av01') {
+    return !canPlayAny(['av01.0.04M.08']);
+  }
+  if (lower === 'vp9' || lower === 'vp09') {
+    return !canPlayAny(['vp09.00.10.08', 'vp9']);
+  }
+  if (lower === 'vp8' || lower === 'vp08') {
+    return !canPlayAny(['vp8']);
+  }
+  if (lower === 'theora' || lower === 'theo') {
+    return !canPlayAny(['theora']);
+  }
+
+  return false;
+}
+
 /**
  * Split an 8-digit numeric string (YYYYMMDD) into year (number) and date (MM-DD)
  */

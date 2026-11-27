@@ -87,6 +87,7 @@ const MovieFormModalContent: React.FC<MovieFormModalContentProps> = ({
   const [height, setHeight] = useState<number | null>(() => movie.height || null);
   const [frameRate, setFrameRate] = useState<number | null>(() => movie.frame_rate || null);
   const [fileSize, setFileSize] = useState<number | null>(() => movie.file_size || null);
+  const [videoCodec, setVideoCodec] = useState<string | null>(null);
 
   const timelinePromiseRef = useRef<Promise<string | null> | null>(null);
 
@@ -112,6 +113,7 @@ const MovieFormModalContent: React.FC<MovieFormModalContentProps> = ({
           if (meta.width) setWidth(meta.width);
           if (meta.height) setHeight(meta.height);
           if (meta.frame_rate && (!movie.frame_rate || movie.frame_rate <= 0)) setFrameRate(meta.frame_rate);
+          if (meta.video_codec) setVideoCodec(meta.video_codec);
         })
         .catch((err) => console.warn('Failed to extract metadata in modal:', err));
     }
@@ -283,6 +285,7 @@ const MovieFormModalContent: React.FC<MovieFormModalContentProps> = ({
             presetFrameRate={frameRate}
             videoWidth={width}
             videoHeight={height}
+            videoCodec={videoCodec}
             onSummaryImageChange={(img, time) => {
               setSummaryImagePath(img);
               if (time !== null) setCapturedTime(time);

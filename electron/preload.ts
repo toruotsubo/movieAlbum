@@ -61,6 +61,7 @@ export const api = {
     width: number | null;
     height: number | null;
     frame_rate: number | null;
+    video_codec: string | null;
   } | null> => ipcRenderer.invoke('movies:extractMetadata', filePath),
 
   saveSummaryImage: (base64Data: string): Promise<string> => ipcRenderer.invoke('app:saveSummaryImage', base64Data),
